@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Notebook Creator - iPad Fixed</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Patrick+Hand&family=Caveat:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Kalam:wght@300;400;700&family=Architects+Daughter&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --paper-bg: #fdfbf7;
+            --grid-line: #e3e0d9;
+            --ink-color: #2c3e50;
+            --pencil-color: #5a5a5a;
+            --pen-color: #1a1a1a;
+            --marker-color: #000000;
+            --sidebar-bg: #2c3e50;
+            --sidebar-text: #ecf0f1;
+            --accent-color: #e74c3c;
+            --toolbar-bg: #d4a373;
+            --voice-active: #e67e22;
+            --template-color: #3498db;
+            --workspace-bg: #e0e0e0;
+            --workspace-dot: #bebebe;
+            --highlight-bg: #fff9c4;
+            --chalk-bg: #2d3436;
+            --chalk-text: #dfe6e9;
+            --save-color: #27ae60;
+            --highlighter-color: rgba(255, 235, 59, 0.4);
+        }
+
+        body.dark-mode {
+            --paper-bg: #2c3e50;
+            --grid-line: #34495e;
+            --ink-color: #ecf0f1;
+            --pencil-color: #bdc3c7;
+            --pen-color: #ffffff;
+            --marker-color: #ffffff;
+            --workspace-bg: #1a1a1a;
+            --workspace-dot: #333333;
+            --highlight-bg: #4a4a4a;
+            --sidebar-bg: #1a1a1a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Patrick Hand', cursive;
+            color: var(--ink-color);
+            background-color: var(--workspace-bg);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Tool classes */
+        .writing-tool-pencil { font-family: 'Caveat', cursive; color: var(--pencil-color); }
+        .writing-tool-pen { font-family: 'Patrick Hand', cursive; color: var(--pen-color); }
+        .writing-tool-marker { font-family: 'Permanent Marker', cursive; color: var(--marker-color); }
+        .writing-tool-brush { font-family: 'Shadows Into Light', cursive; color: var(--ink-color); }
+        .writing-tool-chalk { font-family: 'Architects Daughter', cursive; color: #4a4a4a; }
+        .writing-tool-elegant { font-family: 'Kalam', cursive; color: var(--ink-color); }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.3);
+            z-index: 20;
+            flex-shrink: 0;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            position: absolute;
+            left: 0;
+            top: 0;
+            overflow: hidden;
+        }
+
+        /* Mobile Sidebar adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                width: 80%;
+                max-width: 300px;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .app-title { font-size: 1.8rem; margin-bottom: 1.5rem; text-align: center; flex-shrink: 0; }
+        .search-container { margin-bottom: 1rem; position: relative; flex-shrink: 0; }
+        .search-input {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+        .search-input::placeholder { color: rgba(255,255,255,0.5); }
+
+        /* COLLAPSIBLE SECTIONS CSS */
+        .sidebar-section {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+            min-height: 0; 
+        }
+        
+        .sidebar-section.pages-section {
+            flex-grow: 1;
+        }
+        
+        .sidebar-section.collapsed-wrapper {
+            flex-grow: 0 !important;
+            height: auto;
+        }
+
+        .section-header {
+            padding: 8px 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 5px;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .section-header:hover { background: rgba(255,255,255,0.1); }
+        
+        .arrow { transition: transform 0.3s ease; font-size: 0.8rem; }
+        
+        .section-content {
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+        
+        /* Specific Scrollbar for Pages List */
+        #pagesContent {
+            overflow-y: auto;
+            flex-grow: 1;
+            padding-right: 2px;
+        }
+        #pagesContent::-webkit-scrollbar { width: 4px; }
+        #pagesContent::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+        /* Specific Scrollbar for Tools List */
+        #toolsContent {
+            overflow-y: auto;
+            max-height: 45vh;
+            padding-right: 2px;
+        }
+        #toolsContent::-webkit-scrollbar { width: 4px; }
+        #toolsContent::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+        
+        .section-content.collapsed {
+            display: none !important;
+        }
+
+        .chapter-list { 
+            list-style: none; 
+            margin-bottom: 0; 
+            padding-bottom: 10px;
+        }
+        
+        .nav-item {
+            padding: 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.05);
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow: hidden;
+            flex-grow: 1;
+            min-width: 0;
+            margin-right: 8px;
+        }
+
+        .nav-item:hover { background: rgba(255,255,255,0.15); }
+        .nav-item.active { border-left: 4px solid var(--accent-color); background: rgba(255,255,255,0.1); }
+        .nav-item-title { font-weight: bold; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .nav-item-snippet { font-size: 0.8rem; opacity: 0.7; font-family: sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .btn-delete {
+            background: transparent;
+            border: none;
+            color: var(--sidebar-text);
+            font-size: 1.2rem;
+            opacity: 0.6;
+            cursor: pointer;
+            padding: 0 12px;
+            height: 40px;
+            transition: all 0.2s;
+            z-index: 10;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        .btn-delete:hover { 
+            opacity: 1; 
+            color: #e74c3c; 
+            background: rgba(231, 76, 60, 0.1);
+        }
+
+        .btn { position: relative; border: none; padding: 10px; border-radius: 6px; font-family: inherit; cursor: pointer; transition: 0.3s; width: 100%; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-add { background: var(--accent-color); color: white; }
+        .btn-save-sidebar { background: var(--save-color); color: white; margin-top: 5px; }
+        .btn-mode { background: rgba(255,255,255,0.1); color: white; }
+        .btn-sketch { background: var(--toolbar-bg); color: white; }
+        .btn-sketch.active { background: #e67e22; border: 2px solid white; }
+        .btn-secondary { background: rgba(255,255,255,0.15); color: #ecf0f1; font-size: 0.9rem; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.25); }
+
+        /* Dark Mode Corner Button */
+        .btn-dark-circle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: white;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            cursor: pointer;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: 0.3s;
+        }
+        body.dark-mode .btn-dark-circle {
+            background: var(--sidebar-bg);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .btn-dark-circle:hover { transform: scale(1.1); }
+
+        /* Focus Mode Exit Button */
+        .btn-exit-focus {
+            position: fixed;
+            top: 20px;
+            right: 80px;
+            background: var(--accent-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: none;
+            cursor: pointer;
+            z-index: 60;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            font-weight: bold;
+        }
+
+        /* Mobile Menu Button */
+        .btn-menu-mobile {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--sidebar-bg);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            cursor: pointer;
+            z-index: 60;
+            display: none; /* Hidden on desktop */
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        @media (max-width: 768px) {
+            .btn-menu-mobile { display: flex; }
+        }
+
+        /* Workspace */
+        .workspace {
+            flex-grow: 1;
+            padding: 2rem;
+            overflow: auto; /* Changed to auto to allow both scroll directions */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-image: radial-gradient(var(--workspace-dot) 1px, transparent 1px);
+            background-size: 20px 20px;
+            position: relative;
+            margin-left: 280px; /* Offset for fixed sidebar */
+            transition: margin-left 0.3s;
+            width: 100%;
+        }
+        
+        .workspace.grabbing {
+            cursor: grabbing;
+            cursor: -webkit-grabbing;
+        }
+
+        @media (max-width: 768px) {
+            .workspace { margin-left: 0; padding: 1rem; padding-top: 5rem; }
+        }
+
+        /* Focus Mode Styles */
+        body.focus-mode .sidebar { transform: translateX(-100%); }
+        body.focus-mode .workspace { margin-left: 0; }
+        body.focus-mode .tool-tray-container { display: none; }
+        body.focus-mode .btn-exit-focus { display: block; }
+        body.focus-mode .btn-menu-mobile { display: none; }
+
+        /* Read Mode Styles */
+        body.read-mode .content-area { pointer-events: none; }
+        body.read-mode #sketchCanvas { pointer-events: none; }
+        body.read-mode .tool-tray-container { opacity: 0.5; pointer-events: none; }
+        body.read-mode .writing-tools { opacity: 0; pointer-events: none; }
+
+        .paper {
+            width: 100%;
+            max-width: 800px;
+            background-color: var(--paper-bg);
+            /* Default Grid */
+            background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 25px 25px;
+            min-height: 1100px;
+            padding: 6rem 4rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            position: relative;
+            transition: border 0.3s, box-shadow 0.3s, background-image 0.3s;
+        }
+        
+        /* Drag Overlay Effect */
+        .paper.drag-over {
+            border: 4px dashed var(--accent-color);
+            background-color: rgba(231, 76, 60, 0.05);
+        }
+
+        /* Paper Styles */
+        .paper.lined {
+            background-image: linear-gradient(transparent 95%, var(--grid-line) 95%);
+            background-size: 100% 30px;
+        }
+        .paper.dotted {
+            background-image: radial-gradient(var(--grid-line) 2px, transparent 2px);
+            background-size: 25px 25px;
+        }
+        .paper.plain {
+            background-image: none;
+        }
+
+        /* INFINITE WHITEBOARD STYLE */
+        .paper.infinite {
+            max-width: none;
+            width: 3000px;
+            height: 3000px;
+            background-size: 40px 40px; /* Larger grid for whiteboard feel */
+        }
+
+        /* VISUAL SKETCH CUE */
+        body.sketch-mode .paper {
+            border: 3px solid var(--voice-active);
+            box-shadow: 0 10px 40px rgba(230, 126, 34, 0.2);
+        }
+        
+        @media (max-width: 768px) {
+            .paper { padding: 4rem 2rem; }
+        }
+
+        #sketchCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+        }
+        body.sketch-mode #sketchCanvas { pointer-events: auto; cursor: crosshair; }
+
+        .writing-tools {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 10px 20px;
+            border-radius: 40px;
+            display: flex;
+            gap: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 15;
+            overflow-x: auto;
+            max-width: 90%;
+            transition: opacity 0.3s;
+        }
+        
+        /* Sticky writing tools for infinite scroll */
+        .paper.infinite .writing-tools {
+            position: fixed;
+            top: 20px;
+            left: calc(50% + 140px); /* Center relative to workspace excluding sidebar */
+        }
+        body.focus-mode .paper.infinite .writing-tools {
+            left: 50%;
+        }
+
+        .tool-opt { cursor: pointer; font-size: 1.5rem; transition: transform 0.2s; padding: 5px; border-radius: 50%; }
+        .tool-opt.active { background: #eee; transform: scale(1.2); }
+        .tool-opt.highlighter { 
+            color: #f1c40f; 
+            text-shadow: 1px 1px 0 #999;
+            filter: hue-rotate(60deg) drop-shadow(0 0 2px rgba(255, 255, 0, 0.5)); /* Distinct Yellow Glow */
+        }
+        
+        /* SKETCH ACTIONS (Hidden unless in Sketch Mode) */
+        .sketch-only { display: none; }
+        body.sketch-mode .sketch-only { display: block; }
+        
+        .tool-divider {
+            width: 1px;
+            background: #e0e0e0;
+            margin: 0 5px;
+            align-self: center;
+            height: 30px;
+            display: none;
+        }
+        body.sketch-mode .tool-divider { display: block; }
+
+        /* VERTICAL COLLAPSIBLE TRAY */
+        .tool-tray-container {
+            position: fixed;
+            left: 295px; /* Adjust based on sidebar width */
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 40;
+            display: flex;
+            align-items: center;
+            transition: left 0.3s ease, opacity 0.3s;
+        }
+        @media (max-width: 768px) {
+             .tool-tray-container { left: 0; }
+        }
+        
+        .tool-tray-container.collapsed {
+            left: 280px;
+        }
+        @media (max-width: 768px) {
+             .tool-tray-container.collapsed { left: -15px; }
+        }
+
+        .tool-tray-toggle {
+            background: white;
+            border: 1px solid #ddd;
+            width: 24px;
+            height: 60px;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+            font-size: 0.8rem;
+            color: #666;
+            transition: 0.3s;
+        }
+        body.dark-mode .tool-tray-toggle { background: #34495e; color: white; border-color: #444; }
+
+        .tool-tray {
+            background: white;
+            padding: 15px 10px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 4px 4px 20px rgba(0,0,0,0.1);
+            border: 1px solid #eee;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform-origin: left center;
+        }
+        
+        body.dark-mode .tool-tray { background: #34495e; border-color: #444; }
+        
+        .tool-tray-container.collapsed .tool-tray {
+            transform: scaleX(0);
+            opacity: 0;
+            pointer-events: none;
+            width: 0;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* iPAD FIX FOR COLOR PICKER: WRAP INPUT */
+        .color-picker-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        /* Make the native input cover the button completely */
+        .color-picker-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 5;
+        }
+
+        .tool-btn { 
+            background: #fefefe; 
+            border: 1px solid #ddd; 
+            padding: 8px 12px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-family: inherit; 
+            font-size: 0.9rem;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+            position: relative;
+        }
+        .tool-btn:hover { background: #f0f0f0; }
+        body.dark-mode .tool-btn { background: #2c3e50; color: white; border-color: #555; }
+        body.dark-mode .tool-btn:hover { background: #3d566e; }
+        
+        .tool-btn.active { background: #e0e0e0; border-color: #999; }
+        .active-voice { background: var(--voice-active) !important; color: white; animation: pulse 1.5s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        .paper-title { font-size: 2.4rem; border: none; border-bottom: 2px solid var(--accent-color); width: 100%; background: transparent; font-family: inherit; margin-bottom: 2rem; color: var(--ink-color); }
+        .content-area { min-height: 800px; outline: none; line-height: 1.8; font-size: 1.3rem; color: var(--ink-color); }
+
+        /* Block styles */
+        .styled-header { color: var(--accent-color); border-bottom: 1px dashed #ccc; margin: 15px 0; }
+        .sticky-note { background: var(--highlight-bg); padding: 15px; border-left: 5px solid #f1c40f; transform: rotate(-1deg); margin: 15px 0; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+        .chalk-code { background: var(--chalk-bg); color: var(--chalk-text); padding: 15px; border-radius: 6px; font-family: 'Architects Daughter'; margin: 15px 0; }
+        
+        .checklist-item { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+        /* iPad Fix: ensure checkbox doesn't trigger keyboard */
+        .checklist-item .checkbox-wrapper { contenteditable: false; }
+        
+        .checkbox { width: 22px; height: 22px; border: 2px solid #555; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 4px; flex-shrink: 0; transition: all 0.2s ease; }
+        .checkbox.checked { background: var(--accent-color); border-color: var(--accent-color); }
+        .checkbox::after { content: '✓'; color: white; font-weight: bold; transform: scale(0); transition: transform 0.2s cubic-bezier(0.5, 0, 0, 1.5); }
+        .checkbox.checked::after { transform: scale(1); }
+        
+        .checklist-text { position: relative; transition: opacity 0.3s ease; }
+        .checkbox.checked + .checklist-text { opacity: 0.6; }
+        .checklist-text::after { content: ''; position: absolute; left: 0; top: 50%; width: 0; height: 2px; background: currentColor; transition: width 0.3s ease; pointer-events: none; border-radius: 2px; }
+        .checkbox.checked + .checklist-text::after { width: 100%; }
+
+        .uploaded-img { max-width: 100%; border-radius: 8px; margin: 10px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        /* SAVED STATUS INDICATOR */
+        .save-status {
+            position: absolute;
+            top: 2rem;
+            right: 4rem;
+            font-family: sans-serif;
+            font-size: 0.75rem;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            pointer-events: none;
+        }
+
+        .floating-pane {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 20px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            display: none; flex-direction: column; gap: 10px; z-index: 1000; min-width: 250px;
+        }
+
+        .toast { position: fixed; bottom: 30px; right: 30px; background: #333; color: white; padding: 12px 24px; border-radius: 30px; transform: translateY(200%); transition: 0.5s; z-index: 2000; }
+        .toast.show { transform: translateY(0); }
+
+        /* STORAGE BAR */
+        .storage-footer {
+            padding: 15px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: auto; /* Push to bottom */
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+        }
+        .storage-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        .storage-bar-fill {
+            height: 100%;
+            background: var(--save-color);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* TEXT FORMAT MENU (BUBBLE) */
+        .text-bubble {
+            position: absolute;
+            background: #333;
+            border-radius: 8px;
+            padding: 5px;
+            display: none;
+            gap: 5px;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transform: translate(-50%, -120%); /* Center above selection */
+        }
+        .text-bubble.visible { display: flex; }
+        .text-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px 5px 0;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        .bubble-btn {
+            background: none;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+            font-family: sans-serif;
+        }
+        .bubble-btn:hover { background: rgba(255,255,255,0.2); }
+
+        /* PRINT STYLES (Clean PDF Output) */
+        @media print {
+            .sidebar, .tool-tray-container, .writing-tools, .btn-dark-circle, .btn-exit-focus, .btn-menu-mobile, .toast, .save-status, .text-bubble {
+                display: none !important;
+            }
+            .workspace { margin: 0; padding: 0; overflow: visible; height: auto; }
+            .paper { 
+                box-shadow: none; 
+                border: none; 
+                margin: 0; 
+                max-width: 100%;
+                width: 100%;
+                min-height: auto;
+                page-break-after: always;
+            }
+            body { background: white; height: auto; overflow: visible; }
+        }
+    </style>
+</head>
+<body class="cursor-pen">
+
+    <button class="btn-dark-circle" id="darkModeToggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
+    <button class="btn-menu-mobile" id="mobileMenuBtn" onclick="toggleMobileSidebar()" title="Toggle Menu">☰</button>
+    <button class="btn-exit-focus" onclick="toggleFocusMode()">Exit Focus</button>
+
+    <!-- FLOATING TEXT MENU -->
+    <div class="text-bubble" id="textBubble">
+        <button class="bubble-btn" onclick="formatText('bold')">B</button>
+        <button class="bubble-btn" onclick="formatText('italic')">I</button>
+        <button class="bubble-btn" onclick="formatText('formatBlock', 'h2')">H1</button>
+        <button class="bubble-btn" onclick="formatText('formatBlock', 'h3')">H2</button>
+        <button class="bubble-btn" onclick="formatText('insertUnorderedList')">• List</button>
+    </div>
+
+    <aside class="sidebar" id="mainSidebar">
+        <div class="app-title">Plan Notebook</div>
+        <div class="search-container">
+            <input type="text" class="search-input" id="sidebarSearch" placeholder="Search titles & content..." oninput="renderSidebar()">
+        </div>
+
+        <!-- COLLAPSIBLE PAGES SECTION -->
+        <div class="sidebar-section pages-section" id="pagesSectionWrapper">
+            <div class="section-header" onclick="toggleSection('pagesContent', 'pagesArrow', 'pagesSectionWrapper')">
+                <span>📚 Pages</span>
+                <span class="arrow" id="pagesArrow">▼</span>
+            </div>
+            <div class="section-content" id="pagesContent">
+                <ul class="chapter-list" id="chapterList"></ul>
+            </div>
+        </div>
+        
+        <!-- COLLAPSIBLE TOOLS SECTION -->
+        <div class="sidebar-section tools-section">
+            <div class="section-header" onclick="toggleSection('toolsContent', 'toolsArrow')">
+                <span>🛠️ Tools</span>
+                <span class="arrow" id="toolsArrow">▼</span>
+            </div>
+            <div class="section-content" id="toolsContent">
+                <div class="sidebar-actions">
+                    <button class="btn btn-add" onclick="createNewChapter()">+ New Page</button>
+                    <button class="btn btn-secondary" onclick="toggleFocusMode()">👁️ Focus Mode</button>
+                    <button class="btn btn-secondary" onclick="cyclePaperStyle()" id="paperStyleBtn">📄 Paper: Grid</button>
+                    <button class="btn btn-save-sidebar" onclick="window.print()">🖨️ Save as PDF</button>
+                    <button class="btn btn-secondary" onclick="toggleReadMode()" id="readModeBtn">🔓 Lock / Read</button>
+                    <button class="btn btn-sketch" id="sketchToggle" onclick="toggleSketchMode()">🎨 Sketch Mode</button>
+                    <button class="btn" style="background: #3498db; color: white;" onclick="toggleTemplates()">📋 Templates</button>
+                    
+                    <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                        <!-- iPad Fix: Make input visible for click -->
+                        <button class="btn btn-secondary" onclick="exportData()" style="font-size: 0.8rem;">⬇ Export Backup</button>
+                        <button class="btn btn-secondary" style="font-size: 0.8rem; position: relative;">
+                            ⬆ Import Backup
+                            <input type="file" id="importFile" onchange="importData(this)" accept=".json" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STORAGE METER -->
+        <div class="storage-footer">
+            <div style="display:flex; justify-content:space-between;">
+                <span>Storage Used</span>
+                <span id="storageText">0%</span>
+            </div>
+            <div class="storage-bar-bg">
+                <div class="storage-bar-fill" id="storageBar"></div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="tool-tray-container" id="trayContainer">
+        <div class="tool-tray">
+            <button class="tool-btn" id="voiceBtn" onclick="toggleVoiceTranscription()"><span>🎤</span> Dictate</button>
+            
+            <!-- NEW: HAND TOOL -->
+            <button class="tool-btn" id="handBtn" onclick="selectSketchTool('hand')"><span>✋</span> Pan</button>
+            <button class="tool-btn" id="eraserBtn" onclick="selectSketchTool('eraser')"><span>🧼</span> Eraser</button>
+            
+            <!-- iPad Fixed Color Picker: Overlay Input -->
+            <div class="tool-btn" style="position: relative;">
+                <span>🌈</span> Color
+                <input type="color" id="customColorPicker" class="color-picker-input" onchange="setCustomColor(this.value)">
+            </div>
+            
+            <hr style="opacity: 0.2;">
+            
+            <button class="tool-btn" onclick="insertBlock('header')"><span>🏷️</span> Title</button>
+            <button class="tool-btn" onclick="insertBlock('todo')"><span>✅</span> To-Do</button>
+            <button class="tool-btn" onclick="insertBlock('note')"><span>📌</span> Note</button>
+            <button class="tool-btn" onclick="insertBlock('code')"><span>💻</span> Code</button>
+            <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
+            <hr style="opacity: 0.2;">
+            <button class="tool-btn" style="color: #e74c3c" onclick="clearSketch()"><span>🗑️</span> Clear Sketch</button>
+        </div>
+        <button class="tool-tray-toggle" id="trayToggle" onclick="toggleTray()">◀</button>
+    </div>
+
+    <main class="workspace" id="workspace">
+        <div class="paper" id="paper">
+            <canvas id="sketchCanvas"></canvas>
+            
+            <span class="save-status" id="saveStatus">All changes saved</span>
+
+            <div class="writing-tools">
+                <div class="tool-opt active" data-tool="pen" onclick="selectWritingTool('pen')">🖊️</div>
+                <div class="tool-opt" data-tool="pencil" onclick="selectWritingTool('pencil')">✏️</div>
+                <div class="tool-opt highlighter" data-tool="highlighter" onclick="selectWritingTool('highlighter')">🖌️</div>
+                <div class="tool-opt" data-tool="marker" onclick="selectWritingTool('marker')">🖍️</div>
+                <div class="tool-opt" data-tool="elegant" onclick="selectWritingTool('elegant')">✒️</div>
+                <div class="tool-opt" data-tool="brush" onclick="selectWritingTool('brush')">🎨</div>
+                <div class="tool-opt" data-tool="chalk" onclick="selectWritingTool('chalk')">📝</div>
+                
+                <div class="tool-divider sketch-only"></div>
+                <div class="tool-opt sketch-only" onclick="undoSketch()" title="Undo">↩️</div>
+                <div class="tool-opt sketch-only" onclick="redoSketch()" title="Redo">↪️</div>
+            </div>
+
+            <input type="file" id="imageInput" style="display: none;" accept="image/*" onchange="handleImageUpload(event)">
+            <input type="text" class="paper-title" id="pageTitle" placeholder="Untitled Page" oninput="markUnsaved(); saveCurrentToCloud()">
+            <!-- CRITICAL FOR iPAD: Event delegation added, inline handlers removed -->
+            <div class="content-area writing-tool-pen" id="editor" contenteditable="true" spellcheck="false" oninput="markUnsaved(); saveCurrentToCloud()"></div>
+        </div>
+    </main>
+
+    <div id="templatePopup" class="floating-pane">
+        <h3 style="margin-bottom: 10px;">Select Template</h3>
+        <button class="tool-btn" onclick="applyTemplate('meeting')">📅 Meeting Notes</button>
+        <button class="tool-btn" onclick="applyTemplate('journal')">📖 Daily Journal</button>
+        <button class="tool-btn" onclick="applyTemplate('project')">🚀 Project Tracking</button>
+        <button class="tool-btn" onclick="applyTemplate('eisenhower')">⚖️ Eisenhower Matrix</button>
+        <button class="tool-btn" onclick="applyTemplate('whiteboard')">♾️ Infinite Whiteboard</button>
+        <button class="tool-btn" onclick="toggleTemplates()" style="margin-top: 10px; background: #eee;">Close</button>
+    </div>
+
+    <div id="toast" class="toast">Action Successful!</div>
+
+    <script>
+        // --- LOCAL STORAGE MANAGER ---
+        const STORAGE_KEY = 'notebook_data_v1';
+
+        function getLocalData() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            updateStorageUI(raw ? raw.length : 0);
+            return raw ? JSON.parse(raw) : [];
+        }
+
+        function saveLocalData(chapters) {
+            const str = JSON.stringify(chapters);
+            localStorage.setItem(STORAGE_KEY, str);
+            updateStorageUI(str.length);
+        }
+
+        function updateStorageUI(bytes) {
+            const limit = 5000000; // Approx 5MB
+            const percent = Math.min(100, Math.round((bytes / limit) * 100));
+            const mb = (bytes / 1024 / 1024).toFixed(2);
+            document.getElementById('storageBar').style.width = percent + '%';
+            document.getElementById('storageText').innerText = `${mb} MB (${percent}%)`;
+            
+            if(percent > 90) {
+                document.getElementById('storageBar').style.background = '#e74c3c';
+            } else {
+                document.getElementById('storageBar').style.background = '#27ae60';
+            }
+        }
+
+        // --- APP STATE ---
+        let chapters = getLocalData();
+        let currentId = null;
+        let isSketchMode = false;
+        let activeSketchTool = 'brush'; 
+        let customStrokeStyle = null; // New: Stores custom color
+        let isReadMode = false; // New: Read mode state
+        let isListening = false;
+        let recognition = null;
+        let sketchData = null;
+        let isTrayCollapsed = false;
+
+        // Undo/Redo Stacks
+        let undoStack = [];
+        let redoStack = [];
+
+        const canvas = document.getElementById('sketchCanvas');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+
+        // Paper Styles
+        const paperStyles = ['grid', 'lined', 'dotted', 'plain'];
+
+        // Initialize
+        function initApp() {
+            if (chapters.length === 0) {
+                createNewChapter("Welcome Page");
+            } else {
+                renderSidebar();
+                loadChapter(chapters[0].id);
+            }
+            
+            setupDragAndDrop();
+            
+            // iPad Fix: Global Click Listener for Checkboxes (Event Delegation)
+            document.getElementById('editor').addEventListener('click', function(e) {
+                // Check if we clicked the checkmark box
+                if (e.target.classList.contains('checkbox')) {
+                    e.preventDefault(); // Stop keyboard from popping up
+                    e.target.classList.toggle('checked');
+                    saveCurrentToCloud();
+                }
+            });
+
+            // Init Selection Menu
+            document.addEventListener('selectionchange', handleSelectionChange);
+        }
+
+        // --- CORE FUNCTIONS ---
+
+        // SECTION TOGGLE LOGIC
+        window.toggleSection = (contentId, arrowId, wrapperId = null) => {
+            const content = document.getElementById(contentId);
+            const arrow = document.getElementById(arrowId);
+            
+            const isCollapsed = content.classList.contains('collapsed');
+            
+            if (isCollapsed) {
+                content.classList.remove('collapsed');
+                arrow.style.transform = 'rotate(0deg)';
+                if(wrapperId) document.getElementById(wrapperId).classList.remove('collapsed-wrapper');
+            } else {
+                content.classList.add('collapsed');
+                arrow.style.transform = 'rotate(-90deg)';
+                if(wrapperId) document.getElementById(wrapperId).classList.add('collapsed-wrapper');
+            }
+        };
+
+        window.toggleTray = () => {
+            isTrayCollapsed = !isTrayCollapsed;
+            const container = document.getElementById('trayContainer');
+            const toggleBtn = document.getElementById('trayToggle');
+            container.classList.toggle('collapsed', isTrayCollapsed);
+            toggleBtn.innerText = isTrayCollapsed ? '▶' : '◀';
+        };
+
+        window.toggleMobileSidebar = () => {
+            document.getElementById('mainSidebar').classList.toggle('open');
+        };
+
+        window.toggleFocusMode = () => {
+            document.body.classList.toggle('focus-mode');
+        };
+
+        // --- READ MODE ---
+        window.toggleReadMode = () => {
+            isReadMode = !isReadMode;
+            document.body.classList.toggle('read-mode', isReadMode);
+            const btn = document.getElementById('readModeBtn');
+            const editor = document.getElementById('editor');
+            
+            if (isReadMode) {
+                btn.innerText = "🔒 Unlock / Edit";
+                editor.contentEditable = "false";
+                showToast("Read Mode Enabled");
+            } else {
+                btn.innerText = "🔓 Lock / Read";
+                editor.contentEditable = "true";
+                showToast("Editing Enabled");
+            }
+        };
+
+        // --- RICH TEXT BUBBLE MENU ---
+        function handleSelectionChange() {
+            const bubble = document.getElementById('textBubble');
+            const selection = window.getSelection();
+            const editor = document.getElementById('editor');
+
+            // Hide if selection empty or not inside editor
+            if (selection.isCollapsed || !editor.contains(selection.anchorNode)) {
+                bubble.classList.remove('visible');
+                return;
+            }
+
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            
+            // Show bubble above selection
+            bubble.classList.add('visible');
+            bubble.style.top = (rect.top + window.scrollY - 10) + 'px';
+            bubble.style.left = (rect.left + (rect.width / 2)) + 'px';
+        }
+
+        window.formatText = (command, value = null) => {
+            document.execCommand(command, false, value);
+            window.markUnsaved();
+            window.saveCurrentToCloud();
+        };
+
+        // --- IMAGE DRAG & DROP ---
+        function setupDragAndDrop() {
+            const paper = document.getElementById('paper');
+            
+            paper.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                paper.classList.add('drag-over');
+            });
+
+            paper.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                paper.classList.remove('drag-over');
+            });
+
+            paper.addEventListener('drop', (e) => {
+                e.preventDefault();
+                paper.classList.remove('drag-over');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const html = `<img src="${event.target.result}" class="uploaded-img" />`;
+                        insertHtml(html);
+                    };
+                    reader.readAsDataURL(files[0]);
+                }
+            });
+        }
+
+        // --- CUSTOM COLOR PICKER ---
+        // iPad Fix: No programmatic click, use CSS overlay input
+        window.setCustomColor = (val) => {
+            customStrokeStyle = val;
+            activeSketchTool = 'custom';
+            // Visual cue
+            document.querySelectorAll('.tool-opt').forEach(o => o.classList.remove('active'));
+            if(!isSketchMode) toggleSketchMode();
+        };
+
+        function resizeCanvas() {
+            const paper = document.getElementById('paper');
+            const dpr = window.devicePixelRatio || 1;
+            
+            if (canvas.width !== paper.offsetWidth * dpr || canvas.height !== paper.offsetHeight * dpr) {
+                canvas.width = paper.offsetWidth * dpr;
+                canvas.height = paper.offsetHeight * dpr;
+                ctx.scale(dpr, dpr);
+                if (sketchData) drawSavedSketch(sketchData);
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('touchstart', (e) => startDrawing(e.touches[0]));
+        canvas.addEventListener('touchmove', (e) => draw(e.touches[0]));
+        canvas.addEventListener('touchend', stopDrawing);
+
+        // Hand Tool Vars
+        let isPanning = false;
+        let startPanX = 0;
+        let startPanY = 0;
+        let scrollStartX = 0;
+        let scrollStartY = 0;
+
+        function startDrawing(e) {
+            // Hand Tool Logic
+            if (activeSketchTool === 'hand') {
+                isPanning = true;
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+                
+                startPanX = clientX;
+                startPanY = clientY;
+                
+                const ws = document.getElementById('workspace');
+                scrollStartX = ws.scrollLeft;
+                scrollStartY = ws.scrollTop;
+                
+                ws.classList.add('grabbing');
+                if(e.type === 'touchstart') e.preventDefault();
+                return;
+            }
+
+            if (!isSketchMode || isReadMode) return;
+            if(e.type === 'touchstart') e.preventDefault();
+            
+            // Save state for Undo before starting new stroke
+            saveStateToStack();
+
+            drawing = true;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+            
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        function draw(e) {
+            // Hand Tool Logic
+            if (activeSketchTool === 'hand') {
+                if(!isPanning) return;
+                e.preventDefault(); // Stop default scroll to handle manually
+                
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+                
+                const walkX = (clientX - startPanX);
+                const walkY = (clientY - startPanY);
+                
+                const ws = document.getElementById('workspace');
+                ws.scrollLeft = scrollStartX - walkX;
+                ws.scrollTop = scrollStartY - walkY;
+                return;
+            }
+
+            if (!drawing || !isSketchMode || isReadMode) return;
+            if(e.type === 'touchmove') e.preventDefault();
+
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // Reset composite operation by default
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+
+            if (activeSketchTool === 'eraser') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = 30;
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            } else if (activeSketchTool === 'highlighter') {
+                ctx.globalCompositeOperation = 'source-over'; 
+                ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)'; // Low opacity to prevent buildup
+                ctx.lineWidth = 20; // Thicker for highlighting
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            } else if (activeSketchTool === 'custom') {
+                 ctx.strokeStyle = customStrokeStyle;
+                 ctx.lineWidth = 2;
+                 ctx.lineTo(x, y);
+                 ctx.stroke();
+            } else {
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50';
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            }
+            
+            // CRITICAL FIX: Reset path to prevent opacity accumulation
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        function stopDrawing() {
+            // Hand Tool Logic
+            if (activeSketchTool === 'hand') {
+                isPanning = false;
+                document.getElementById('workspace').classList.remove('grabbing');
+                return;
+            }
+
+            if (drawing) {
+                drawing = false;
+                ctx.globalCompositeOperation = 'source-over';
+                saveSketchToCloud();
+            }
+        }
+
+        // --- UNDO / REDO LOGIC ---
+        function saveStateToStack() {
+            if (undoStack.length > 20) undoStack.shift(); // Limit stack size
+            undoStack.push(canvas.toDataURL());
+            redoStack = []; // Clear redo on new action
+        }
+
+        window.undoSketch = () => {
+            if (undoStack.length === 0) return;
+            
+            // Save current state to redo stack
+            redoStack.push(canvas.toDataURL());
+            
+            const prevStateUrl = undoStack.pop();
+            drawSavedSketch(prevStateUrl);
+            
+            // Update storage without pushing to stack again
+            setTimeout(() => {
+                const chapter = chapters.find(c => c.id === currentId);
+                if (chapter) {
+                    chapter.sketch = canvas.toDataURL();
+                    saveLocalData(chapters);
+                }
+            }, 100);
+        };
+
+        window.redoSketch = () => {
+            if (redoStack.length === 0) return;
+            
+            // Save current to undo
+            undoStack.push(canvas.toDataURL());
+            
+            const nextStateUrl = redoStack.pop();
+            drawSavedSketch(nextStateUrl);
+             setTimeout(() => {
+                const chapter = chapters.find(c => c.id === currentId);
+                if (chapter) {
+                    chapter.sketch = canvas.toDataURL();
+                    saveLocalData(chapters);
+                }
+            }, 100);
+        };
+
+        function drawSavedSketch(dataUrl) {
+            const img = new Image();
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width / (window.devicePixelRatio||1), canvas.height / (window.devicePixelRatio||1));
+                ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio||1), canvas.height / (window.devicePixelRatio||1));
+            };
+            img.src = dataUrl;
+        }
+
+        window.clearSketch = () => {
+            saveStateToStack(); // Save before clearing
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            saveSketchToCloud();
+            showToast("Sketch cleared");
+        };
+
+        window.selectSketchTool = (tool) => {
+            // Hand tool check
+            if (tool === 'hand') {
+                activeSketchTool = 'hand';
+                document.getElementById('handBtn').classList.add('active');
+                document.getElementById('eraserBtn').classList.remove('active');
+                // Ensure canvas is interactable
+                if(!isSketchMode) toggleSketchMode();
+                return;
+            } else {
+                document.getElementById('handBtn').classList.remove('active');
+            }
+
+            if(tool !== 'highlighter') customStrokeStyle = null; // Reset custom color if picking standard eraser etc
+            activeSketchTool = tool === activeSketchTool ? 'brush' : tool;
+            
+            document.getElementById('eraserBtn').classList.toggle('active', activeSketchTool === 'eraser');
+            
+            const highlighterBtn = document.querySelector('.tool-opt.highlighter');
+            if(highlighterBtn) highlighterBtn.classList.toggle('active', activeSketchTool === 'highlighter');
+
+            if (!isSketchMode) toggleSketchMode();
+        };
+
+        window.selectWritingTool = (tool, save = true) => {
+            if (tool === 'highlighter') {
+                selectSketchTool('highlighter');
+                return;
+            }
+            
+            // Reset hand tool if selecting pen
+            document.getElementById('handBtn').classList.remove('active');
+            if(activeSketchTool === 'hand') activeSketchTool = 'brush';
+
+            // Normal text tool selection
+            document.getElementById('editor').className = `content-area writing-tool-${tool}`;
+            document.querySelectorAll('.tool-opt').forEach(o => o.classList.toggle('active', o.dataset.tool === tool));
+            
+            if (save) {
+                const chapter = chapters.find(c => c.id === currentId);
+                if (chapter) {
+                    chapter.tool = tool;
+                    saveLocalData(chapters);
+                }
+            }
+        };
+
+        // --- PAPER STYLE LOGIC ---
+        window.cyclePaperStyle = () => {
+            const chapter = chapters.find(c => c.id === currentId);
+            if(!chapter) return;
+
+            let currentStyle = chapter.paperStyle || 'grid';
+            let nextIndex = (paperStyles.indexOf(currentStyle) + 1) % paperStyles.length;
+            let nextStyle = paperStyles[nextIndex];
+
+            applyPaperStyle(nextStyle);
+            
+            chapter.paperStyle = nextStyle;
+            saveLocalData(chapters);
+        };
+
+        function applyPaperStyle(style) {
+            const paper = document.getElementById('paper');
+            const btn = document.getElementById('paperStyleBtn');
+            
+            // Remove old classes
+            paperStyles.forEach(s => paper.classList.remove(s));
+            
+            // Add new class and default
+            if(style !== 'grid') paper.classList.add(style);
+            
+            // Update button text
+            btn.innerText = `📄 Paper: ${style.charAt(0).toUpperCase() + style.slice(1)}`;
+        }
+
+        // --- DATA BACKUP LOGIC (iPad Fix) ---
+        window.exportData = () => {
+            const dataStr = JSON.stringify(chapters, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            // iPad often blocks download attributes. Window.open is fallback.
+            // Note: User must "Save to Files" from the new tab/window
+            const win = window.open();
+            if (win) {
+                win.document.write('<pre>' + dataStr.replace(/</g, '&lt;') + '</pre>');
+                win.document.title = "backup.json";
+                win.document.close();
+            } else {
+                // Fallback for desktop/compatible browsers
+                const exportFileDefaultName = 'notebook_backup_' + new Date().toISOString().slice(0,10) + '.json';
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+            }
+        };
+
+        window.importData = (input) => {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedChapters = JSON.parse(e.target.result);
+                    if (Array.isArray(importedChapters)) {
+                        chapters = importedChapters;
+                        saveLocalData(chapters);
+                        initApp();
+                        showToast("Backup Restored!");
+                    } else {
+                        alert("Invalid backup file.");
+                    }
+                } catch (err) {
+                    alert("Error reading file");
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        // --- CHAPTER MANAGEMENT ---
+        window.createNewChapter = (title = "Untitled Page") => {
+            const id = "ch_" + Date.now();
+            const newChapter = {
+                id: id,
+                title: title,
+                content: "<div>Start typing...</div>",
+                tool: 'pen',
+                sketch: null,
+                paperStyle: 'grid',
+                lastEdited: new Date().toISOString()
+            };
+            chapters.unshift(newChapter); 
+            saveLocalData(chapters);
+            renderSidebar();
+            loadChapter(id);
+
+            setTimeout(() => {
+                const titleInput = document.getElementById('pageTitle');
+                titleInput.focus();
+                titleInput.select();
+            }, 100);
+        };
+
+        window.deleteChapter = (id, event) => {
+            if (event) {
+                event.stopPropagation();
+            }
+            
+            chapters = chapters.filter(c => c.id !== id);
+            saveLocalData(chapters);
+
+            if (currentId === id) {
+                if (chapters.length > 0) {
+                    loadChapter(chapters[0].id);
+                } else {
+                    createNewChapter("Welcome Page");
+                }
+            } else {
+                renderSidebar();
+            }
+            showToast("Page Deleted");
+        };
+
+        function loadChapter(id) {
+            currentId = id;
+            undoStack = []; 
+            redoStack = [];
+            const chapter = chapters.find(c => c.id === id);
+            
+            if (!chapter) return;
+
+            setTimeout(() => resizeCanvas(), 0);
+
+            document.getElementById('editor').innerHTML = chapter.content;
+            document.getElementById('pageTitle').value = chapter.title;
+            
+            if(chapter.isWhiteboard) {
+                document.getElementById('paper').classList.add('infinite');
+            } else {
+                document.getElementById('paper').classList.remove('infinite');
+            }
+
+            if (chapter.sketch) {
+                sketchData = chapter.sketch;
+                drawSavedSketch(sketchData);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                sketchData = null;
+            }
+            
+            selectWritingTool(chapter.tool || 'pen', false);
+            applyPaperStyle(chapter.paperStyle || 'grid');
+            
+            renderSidebar();
+            document.getElementById('mainSidebar').classList.remove('open');
+            document.getElementById('saveStatus').innerText = "All changes saved";
+            
+            if(isReadMode) {
+                document.getElementById('editor').contentEditable = "false";
+            } else {
+                document.getElementById('editor').contentEditable = "true";
+            }
+        }
+
+        let saveTimeout;
+        window.markUnsaved = () => {
+            document.getElementById('saveStatus').innerText = "Saving...";
+        }
+
+        window.saveCurrentToCloud = () => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                const chapter = chapters.find(c => c.id === currentId);
+                if (chapter) {
+                    chapter.content = document.getElementById('editor').innerHTML;
+                    chapter.title = document.getElementById('pageTitle').value;
+                    chapter.lastEdited = new Date().toISOString();
+                    saveLocalData(chapters);
+                    document.getElementById('saveStatus').innerText = "All changes saved";
+                    renderSidebar();
+                }
+            }, 1000);
+        };
+
+        window.manualSave = () => {
+            const chapter = chapters.find(c => c.id === currentId);
+            if (chapter) {
+                chapter.content = document.getElementById('editor').innerHTML;
+                chapter.title = document.getElementById('pageTitle').value;
+                chapter.sketch = canvas.toDataURL();
+                chapter.lastEdited = new Date().toISOString();
+                saveLocalData(chapters);
+                showToast("Saved to Device");
+                document.getElementById('saveStatus').innerText = "All changes saved";
+            }
+        };
+
+        function saveSketchToCloud() {
+            const chapter = chapters.find(c => c.id === currentId);
+            if (chapter) {
+                chapter.sketch = canvas.toDataURL();
+                saveLocalData(chapters);
+            }
+        }
+
+        window.toggleSketchMode = () => {
+            isSketchMode = !isSketchMode;
+            document.body.classList.toggle('sketch-mode', isSketchMode);
+            document.getElementById('sketchToggle').classList.toggle('active', isSketchMode);
+            if (!isSketchMode) activeSketchTool = 'brush';
+            showToast(isSketchMode ? "Sketching Enabled" : "Writing Enabled");
+        };
+
+        window.toggleVoiceTranscription = () => {
+            if (!recognition) {
+                const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!Speech) return showToast("Speech API not supported on this browser");
+                recognition = new Speech();
+                recognition.continuous = true;
+                recognition.interimResults = false;
+                recognition.onresult = (e) => {
+                    const text = e.results[e.results.length - 1][0].transcript;
+                    document.getElementById('editor').focus();
+                    document.execCommand('insertText', false, text + " ");
+                    window.markUnsaved();
+                    window.saveCurrentToCloud();
+                };
+                recognition.onend = () => { if (isListening) recognition.start(); };
+            }
+            if (isListening) {
+                recognition.stop();
+                isListening = false;
+                document.getElementById('voiceBtn').classList.remove('active-voice');
+            } else {
+                recognition.start();
+                isListening = true;
+                document.getElementById('voiceBtn').classList.add('active-voice');
+                showToast("Listening...");
+            }
+        };
+
+        window.triggerImageUpload = () => document.getElementById('imageInput').click();
+        window.handleImageUpload = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const html = `<img src="${event.target.result}" class="uploaded-img" />`;
+                insertHtml(html);
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.insertBlock = (type) => {
+            let html = "";
+            if (type === 'header') html = "<h2 class='styled-header'>New Title</h2>";
+            
+            // iPad Fix: Remove onclick, handled by delegation
+            if (type === 'todo') html = `<div class="checklist-item" contenteditable="false"><div class="checkbox-wrapper" contenteditable="false"><div class="checkbox"></div></div><div class="checklist-text" contenteditable="true">Task Item</div></div>`;
+            
+            if (type === 'note') html = "<div class='sticky-note'>Important Note...</div>";
+            if (type === 'code') html = "<div class='chalk-code'>// code here</div>";
+            insertHtml(html + "<p><br></p>");
+        };
+
+        function insertHtml(html) {
+            document.getElementById('editor').focus();
+            document.execCommand('insertHTML', false, html);
+            window.markUnsaved();
+            window.saveCurrentToCloud();
+        }
+
+        window.toggleTemplates = () => {
+            const p = document.getElementById('templatePopup');
+            p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+        };
+
+        window.applyTemplate = (key) => {
+            const chapter = chapters.find(c => c.id === currentId);
+            if (!chapter) return;
+
+            // iPad Fix: Templates updated to use new structure
+            const temps = {
+                meeting: { title: "Meeting: " + new Date().toLocaleDateString(), content: "<h2 class='styled-header'>Participants</h2><p>• </p><h2 class='styled-header'>Notes</h2><p></p><h2 class='styled-header'>Action Items</h2>" },
+                journal: { title: "Entry: " + new Date().toLocaleDateString(), content: "<div class='sticky-note'>What happened today?</div>" },
+                project: { title: "Project Tracker", content: "<h2 class='styled-header'>Phase 1</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Milestone</div></div>" },
+                eisenhower: { 
+                    title: "Eisenhower Matrix", 
+                    content: "<h2 class='styled-header' style='color:#c0392b'>1. Do First (Urgent & Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Crisis / Deadline</div></div><h2 class='styled-header' style='color:#2980b9'>2. Schedule (Less Urgent, Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Planning / Strategy</div></div><h2 class='styled-header' style='color:#d35400'>3. Delegate (Urgent, Less Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Interruptions / Meetings</div></div><h2 class='styled-header' style='color:#7f8c8d'>4. Don't Do (Not Urgent, Not Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Distractions</div></div>" 
+                },
+                whiteboard: {
+                    title: "Infinite Whiteboard",
+                    content: "<div>Start Brainstorming...</div>",
+                    isWhiteboard: true
+                }
+            };
+            
+            const selected = temps[key];
+            
+            document.getElementById('pageTitle').value = selected.title;
+            document.getElementById('editor').innerHTML = selected.content;
+            
+            if (key === 'whiteboard') {
+                chapter.isWhiteboard = true;
+                document.getElementById('paper').classList.add('infinite');
+            } else {
+                chapter.isWhiteboard = false;
+                document.getElementById('paper').classList.remove('infinite');
+            }
+
+            toggleTemplates();
+            window.markUnsaved();
+            window.saveCurrentToCloud();
+            resizeCanvas(); 
+        };
+
+        window.renderSidebar = () => {
+            const list = document.getElementById('chapterList');
+            const searchStr = document.getElementById('sidebarSearch').value.toLowerCase();
+            list.innerHTML = '';
+            
+            const filtered = chapters.filter(ch => {
+                const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
+                const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, '').toLowerCase();
+                return titleMatch || cleanContent.includes(searchStr);
+            });
+
+            filtered.forEach(ch => {
+                const li = document.createElement('li');
+                li.className = `nav-item ${ch.id === currentId ? 'active' : ''}`;
+                
+                const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, '');
+                let snippet = cleanContent.substring(0, 60) + (cleanContent.length > 60 ? '...' : '');
+                
+                li.innerHTML = `
+                    <div class="nav-info" onclick="loadChapter('${ch.id}')">
+                        <div class="nav-item-title">${ch.title || 'Untitled'}</div>
+                        <div class="nav-item-snippet">${snippet}</div>
+                    </div>
+                    <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">🗑️</button>
+                `;
+                list.appendChild(li);
+            });
+        };
+
+        window.toggleDarkMode = () => {
+            const isDark = document.body.classList.toggle('dark-mode');
+            document.getElementById('darkModeToggle').innerText = isDark ? '☀️' : '🌙';
+        };
+
+        window.showToast = (msg) => {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        };
+
+        initApp();
+        setTimeout(resizeCanvas, 500);
+    </script>
+</body>
+</html>
