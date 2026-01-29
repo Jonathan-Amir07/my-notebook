@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Notebook - Architected Edition</title>
+    <title>Notebook - Medical & CS Edition</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Patrick+Hand&family=Caveat:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Kalam:wght@300;400;700&family=Architects+Daughter&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
@@ -19,6 +19,7 @@
             --sidebar-text: #ecf0f1;
             --accent-color: #e74c3c;
             --cs-accent: #3498db;
+            --med-accent: #2ecc71; /* Green for Medical features */
             --code-bg: #282c34;
             --code-text: #abb2bf;
             --toolbar-bg: #d4a373;
@@ -85,6 +86,7 @@
         .search-input { width: 100%; padding: 10px 15px; border-radius: 20px; border: none; background: rgba(255,255,255,0.1); color: white; font-family: inherit; font-size: 0.95rem; }
         .category-filter { width: 100%; padding: 8px; margin-bottom: 15px; border-radius: 6px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); font-family: inherit; }
         .category-filter option { background: var(--sidebar-bg); color: white; }
+        optgroup { font-style: normal; font-weight: bold; color: #ccc; }
 
         .sidebar-section { display: flex; flex-direction: column; margin-bottom: 15px; min-height: 0; }
         .sidebar-section.pages-section { flex-grow: 1; }
@@ -114,7 +116,6 @@
         .btn { position: relative; border: none; padding: 10px; border-radius: 6px; font-family: inherit; cursor: pointer; transition: 0.3s; width: 100%; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-add { background: var(--accent-color); color: white; }
         .btn-save-sidebar { background: var(--save-color); color: white; margin-top: 5px; }
-        .btn-mode { background: rgba(255,255,255,0.1); color: white; }
         .btn-sketch { background: var(--toolbar-bg); color: white; }
         .btn-sketch.active { background: #e67e22; border: 2px solid white; }
         .btn-secondary { background: rgba(255,255,255,0.15); color: #ecf0f1; font-size: 0.9rem; }
@@ -281,14 +282,24 @@
     </div>
 
     <aside class="sidebar" id="mainSidebar">
-        <div class="app-title">CS Notebook</div>
+        <div class="app-title">Academic Notebook</div>
         
         <select class="category-filter" id="categoryFilter" onchange="filterChapters()">
             <option value="all">📁 All Notes</option>
-            <option value="Algorithms">📐 Algorithms</option>
-            <option value="Systems">⚙️ Systems</option>
-            <option value="Projects">🚀 Projects</option>
-            <option value="General">📝 General</option>
+            <optgroup label="General">
+                <option value="General">📝 General</option>
+                <option value="Projects">🚀 Projects</option>
+            </optgroup>
+            <optgroup label="Computer Science">
+                <option value="Algorithms">📐 Algorithms</option>
+                <option value="Systems">⚙️ Systems</option>
+            </optgroup>
+            <optgroup label="Medical">
+                <option value="Anatomy">🧠 Anatomy</option>
+                <option value="Pathology">🦠 Pathology</option>
+                <option value="Pharmacology">💊 Pharmacology</option>
+                <option value="Clinical">🏥 Clinical</option>
+            </optgroup>
         </select>
 
         <div class="search-container">
@@ -317,7 +328,6 @@
                     <button class="btn btn-secondary" onclick="cyclePaperStyle()" id="paperStyleBtn">📄 Paper: Grid</button>
                     <button class="btn btn-save-sidebar" onclick="window.print()">🖨️ Save as PDF</button>
                     <button class="btn btn-secondary" onclick="toggleReadMode()" id="readModeBtn">🔓 Lock / Read</button>
-                    <!-- NEW METADATA BUTTON -->
                     <button class="btn btn-secondary" onclick="openMetadataModal()">ⓘ Page Details</button>
                     
                     <button class="btn btn-secondary" style="position: relative; border: 1px solid var(--template-color);">
@@ -372,7 +382,6 @@
             
             <button class="tool-btn" onclick="insertBlock('header')"><span>🏷️</span> Title</button>
             <button class="tool-btn" onclick="insertBlock('todo')"><span>✅</span> To-Do</button>
-            <!-- NEW CS TOOLS (Initially Hidden) -->
             <button class="tool-btn" id="btnCSCode" onclick="insertCSCodeBlock()" style="color:var(--cs-accent); display:none;"><span>&lt;&gt;</span> Code</button>
             
             <button class="tool-btn" onclick="insertBlock('note')"><span>📌</span> Note</button>
@@ -417,7 +426,6 @@
             </div>
         </main>
 
-        <!-- LECTURE PANE (RIGHT SPLIT) -->
         <div class="lecture-pane" id="lecturePane">
             <div class="lecture-header">
                 <span>📚 Lecture Reader</span>
@@ -434,6 +442,7 @@
             <label class="meta-label">Discipline</label>
             <select id="metaDiscipline" class="meta-value" disabled>
                 <option value="cs">Computer Science</option>
+                <option value="medical">Medical</option>
                 <option value="general">General</option>
             </select>
         </div>
@@ -446,7 +455,17 @@
                 <option value="system">System Design</option>
                 <option value="project">Project</option>
                 <option value="whiteboard">Whiteboard</option>
+                <option value="anatomy">Anatomy</option>
+                <option value="disease">Disease Profile</option>
+                <option value="drug">Drug Monograph</option>
+                <option value="pathway">Pathway</option>
+                <option value="clinical_case">Clinical Case</option>
+                <option value="lab">Lab Interpretation</option>
             </select>
+        </div>
+        <div class="meta-group">
+            <label class="meta-label">System / Course</label>
+            <input type="text" id="metaSystem" class="meta-value" placeholder="e.g. Cardio, Neuro..." onchange="updatePageMeta()">
         </div>
         <div class="meta-group">
             <label class="meta-label">Difficulty</label>
@@ -474,6 +493,10 @@
                 <span>💻 Computer Science</span>
                 <span>▶</span>
             </button>
+            <button class="tool-btn" onclick="showMedTemplates()" style="justify-content:space-between; background: var(--med-accent); color: white; border: none;">
+                <span>⚕️ Medical</span>
+                <span>▶</span>
+            </button>
             <hr style="width:100%; opacity:0.1; margin: 8px 0;">
             <button class="tool-btn" onclick="applyTemplate('default')">📄 Default Page</button>
             <button class="tool-btn" onclick="applyTemplate('whiteboard')">♾️ Infinite Whiteboard</button>
@@ -491,6 +514,17 @@
             <button class="tool-btn" onclick="applyTemplate('project')">🚀 Project Log</button>
         </div>
 
+        <!-- Medical Sub-Menu View -->
+        <div id="tmpl-med-view" style="display:none;">
+            <button class="tool-btn" onclick="showMainTemplates()" style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <button class="tool-btn" onclick="applyTemplate('anatomy')">🧠 Anatomy Sheet</button>
+            <button class="tool-btn" onclick="applyTemplate('disease')">🏥 Disease Profile</button>
+            <button class="tool-btn" onclick="applyTemplate('drug')">💊 Drug Monograph</button>
+            <button class="tool-btn" onclick="applyTemplate('physio')">🦵 Physiotherapy Case</button>
+            <button class="tool-btn" onclick="applyTemplate('pathway')">🧬 Pathway Breakdown</button>
+            <button class="tool-btn" onclick="applyTemplate('lab')">🧪 Lab Interpretation</button>
+        </div>
+
         <button class="tool-btn" onclick="toggleTemplates()" style="margin-top: 10px; background: #eee;">Close</button>
     </div>
 
@@ -500,8 +534,8 @@
         // --- 1. DISCIPLINE ENGINE ---
         const DISCIPLINE_REGISTRY = {
             GENERAL: { id: 'general', name: 'General' },
-            CS: { id: 'cs', name: 'Computer Science' }
-            // Extensible: Add MEDICAL: { id: 'med', name: 'Medical' }
+            CS: { id: 'cs', name: 'Computer Science' },
+            MEDICAL: { id: 'medical', name: 'Medical' }
         };
 
         // --- 2. PAGE TYPES ---
@@ -511,7 +545,13 @@
             ALGORITHM: 'algorithm',
             SYSTEM: 'system',
             PROJECT: 'project',
-            WHITEBOARD: 'whiteboard'
+            WHITEBOARD: 'whiteboard',
+            ANATOMY: 'anatomy',
+            DISEASE: 'disease',
+            DRUG: 'drug',
+            PATHWAY: 'pathway',
+            CLINICAL_CASE: 'clinical_case',
+            LAB: 'lab'
         };
 
         // --- INDEXEDDB STORAGE ENGINE (DB v2 - Schema Update) ---
@@ -521,16 +561,13 @@
 
         async function initDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, 2); // Version 2
+                const request = indexedDB.open(DB_NAME, 2); 
                 
                 request.onupgradeneeded = (e) => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains(STORE_NAME)) {
                         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
                     }
-                    
-                    // V2 Migration Logic happens here implicitly for new stores
-                    // For existing stores, we handle data migration in checkMigration()
                 };
                 
                 request.onsuccess = (e) => {
@@ -598,7 +635,6 @@
                     const oldChapters = JSON.parse(oldData);
                     if (Array.isArray(oldChapters)) {
                         for (const chap of oldChapters) {
-                            // Backfill metadata
                             chap.metadata = {
                                 discipline: 'general',
                                 type: PAGE_TYPES.NOTE,
@@ -618,7 +654,6 @@
             let migrationCount = 0;
             for (const chap of allChaps) {
                 if (!chap.metadata) {
-                    // Heuristic to guess metadata from old categories
                     let disc = 'general';
                     let type = PAGE_TYPES.NOTE;
                     
@@ -633,7 +668,7 @@
                         type: type,
                         difficulty: 'medium',
                         topics: [],
-                        createdAt: chap.lastEdited, // Best guess
+                        createdAt: chap.lastEdited, 
                         updatedAt: chap.lastEdited
                     };
                     await saveChapterToDB(chap);
@@ -748,7 +783,6 @@
         }
 
         // --- COMPUTER SCIENCE FUNCTIONS ---
-        
         function updateToolVisibility(chapter) {
             const btn = document.getElementById('btnCSCode');
             // Check metadata discipline instead of category
@@ -783,10 +817,10 @@
             const chapter = chapters.find(c => c.id === currentId);
             if (!chapter) return;
             
-            // Populate fields
             document.getElementById('metaDiscipline').value = chapter.metadata?.discipline || 'general';
             document.getElementById('metaType').value = chapter.metadata?.type || 'note';
             document.getElementById('metaDifficulty').value = chapter.metadata?.difficulty || 'medium';
+            document.getElementById('metaSystem').value = chapter.metadata?.system || '';
             document.getElementById('metaCreated').innerText = new Date(chapter.metadata?.createdAt).toLocaleString();
             
             document.getElementById('metadataModal').style.display = 'flex';
@@ -801,10 +835,10 @@
             if (chapter) {
                 chapter.metadata.type = document.getElementById('metaType').value;
                 chapter.metadata.difficulty = document.getElementById('metaDifficulty').value;
+                chapter.metadata.system = document.getElementById('metaSystem').value;
                 saveChapterToDB(chapter);
             }
         };
-
 
         // --- CORE FUNCTIONS ---
         
@@ -911,39 +945,11 @@
 
         function setupDragAndDrop() {
             const paper = document.getElementById('paper');
-            const editor = document.getElementById('editor');
-
-            paper.addEventListener('dragover', (e) => { 
-                e.preventDefault(); 
-                e.stopPropagation();
-                paper.classList.add('drag-over'); 
-            });
-
-            paper.addEventListener('dragleave', (e) => { 
-                e.preventDefault(); 
-                e.stopPropagation();
-                // Only remove if leaving the main container
-                if (e.target === paper) {
-                    paper.classList.remove('drag-over'); 
-                }
-            });
-
+            paper.addEventListener('dragover', (e) => { e.preventDefault(); paper.classList.add('drag-over'); });
+            paper.addEventListener('dragleave', (e) => { e.preventDefault(); paper.classList.remove('drag-over'); });
             paper.addEventListener('drop', (e) => {
                 e.preventDefault();
-                e.stopPropagation();
                 paper.classList.remove('drag-over');
-                
-                // 1. Move Cursor to Drop Location
-                if (document.caretRangeFromPoint) {
-                    const range = document.caretRangeFromPoint(e.clientX, e.clientY);
-                    if (range && editor.contains(range.startContainer)) {
-                        const sel = window.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                    }
-                }
-
-                // 2. Handle Files (Images)
                 const files = e.dataTransfer.files;
                 if (files.length > 0 && files[0].type.startsWith('image/')) {
                     const reader = new FileReader();
@@ -952,15 +958,6 @@
                         insertHtml(html);
                     };
                     reader.readAsDataURL(files[0]);
-                    return;
-                }
-
-                // 3. Handle Text/HTML Dropped from other sources
-                const textData = e.dataTransfer.getData('text/plain');
-                if (textData) {
-                    document.execCommand('insertText', false, textData);
-                    window.markUnsaved();
-                    window.saveCurrentToCloud();
                 }
             });
         }
@@ -1279,14 +1276,19 @@
                 paperStyle: 'grid',
                 lastEdited: new Date().toISOString(),
                 metadata: {
-                    discipline: category === 'General' ? 'general' : 'cs',
+                    discipline: 'general',
                     type: PAGE_TYPES.NOTE,
                     difficulty: 'medium',
                     topics: [],
+                    system: '',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 }
             };
+            
+            // Apply discipline if category implies it
+            if(['Algorithms','Systems','Projects'].includes(category)) newChapter.metadata.discipline = 'cs';
+            if(['Anatomy','Pathology','Pharmacology','Clinical'].includes(category)) newChapter.metadata.discipline = 'medical';
             
             chapters.unshift(newChapter); 
             saveChapterToDB(newChapter);
@@ -1487,18 +1489,26 @@
         window.showCSTemplates = () => {
             document.getElementById('tmpl-main-view').style.display = 'none';
             document.getElementById('tmpl-cs-view').style.display = 'block';
+            document.getElementById('tmpl-med-view').style.display = 'none';
+        };
+
+        window.showMedTemplates = () => {
+            document.getElementById('tmpl-main-view').style.display = 'none';
+            document.getElementById('tmpl-cs-view').style.display = 'none';
+            document.getElementById('tmpl-med-view').style.display = 'block';
         };
 
         window.showMainTemplates = () => {
             document.getElementById('tmpl-main-view').style.display = 'block';
             document.getElementById('tmpl-cs-view').style.display = 'none';
+            document.getElementById('tmpl-med-view').style.display = 'none';
         };
 
         window.applyTemplate = async (key) => {
             const chapter = chapters.find(c => c.id === currentId);
             if (!chapter) return;
 
-            // Update templates logic to set metadata
+            // iPad Fix: Templates updated to use new structure
             const temps = {
                 default: { title: "New Note", content: "<div>Start typing...</div>", isWhiteboard: false, type: PAGE_TYPES.NOTE },
                 meeting: { title: "Meeting: " + new Date().toLocaleDateString(), content: "<h2 class='styled-header'>Participants</h2><p>• </p><h2 class='styled-header'>Notes</h2><p></p><h2 class='styled-header'>Action Items</h2>", type: PAGE_TYPES.NOTE },
@@ -1518,7 +1528,14 @@
                 algo: { title: "Algorithm Analysis", content: "<h2 class='styled-header'>Problem Statement</h2><p>Describe the problem...</p><h2 class='styled-header'>Complexity</h2><span class='algo-badge'>Time: O(n)</span><span class='algo-badge'>Space: O(1)</span><h2 class='styled-header'>Pseudocode</h2><div class='chalk-code'>// Logic here</div>", type: PAGE_TYPES.ALGORITHM },
                 sysDesign: { title: "System Design", content: "<h2 class='styled-header'>Requirements</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scalability</div></div><h2 class='styled-header'>Architecture Diagram</h2><p>(Use Sketch Mode)</p>", isWhiteboard: true, type: PAGE_TYPES.SYSTEM },
                 codeStudy: { title: "Code Study", content: "<h2 class='styled-header'>Code Snippet</h2><div class='cs-code-container' contenteditable='false'><div class='cs-code-header'><span>Main.java</span></div><div class='cs-code-editor' contenteditable='true'>public static void main(String[] args) {}</div><div class='cs-code-output' contenteditable='true'>Output...</div></div><h2 class='styled-header'>Trace / Logic</h2><p>Step 1: ...</p>", type: PAGE_TYPES.NOTE },
-                project: { title: "Project Log", content: "<h2 class='styled-header'>Goal</h2><p>Build X...</p><h2 class='styled-header'>Milestones</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Setup Repo</div></div>", type: PAGE_TYPES.PROJECT },
+                
+                // MEDICAL TEMPLATES
+                anatomy: { title: "Anatomy Sheet", content: "<h2 class='styled-header'>Structure & Function</h2><p>Describe location, origin, insertion...</p><h2 class='styled-header'>Relations</h2><p>Anterior, posterior...</p><h2 class='styled-header'>Clinical Relevance</h2><div class='sticky-note'>Important clinical notes...</div><h2 class='styled-header'>Sketch Area</h2><p>(Draw below)</p>", type: PAGE_TYPES.ANATOMY },
+                disease: { title: "Disease Profile", content: "<h2 class='styled-header'>Definition & Etiology</h2><p>...</p><h2 class='styled-header'>Pathophysiology</h2><p>...</p><h2 class='styled-header'>Clinical Features</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Symptom 1</div></div><h2 class='styled-header'>Management</h2><p>...</p>", type: PAGE_TYPES.DISEASE },
+                drug: { title: "Drug Monograph", content: "<h2 class='styled-header'>Class & Mechanism</h2><p>...</p><h2 class='styled-header'>Indications</h2><p>...</p><h2 class='styled-header'>Contraindications & Side Effects</h2><div class='sticky-note'>Warning: ...</div><h2 class='styled-header'>Dosage</h2><p>...</p>", type: PAGE_TYPES.DRUG },
+                physio: { title: "Physio Case", content: "<h2 class='styled-header'>Patient Profile</h2><p>Age, Gender, Occupation...</p><h2 class='styled-header'>Assessment (SOAP)</h2><p>Subjective: ...</p><p>Objective: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Exercise 1</div></div>", type: PAGE_TYPES.CLINICAL_CASE },
+                pathway: { title: "Pathway Breakdown", content: "<h2 class='styled-header'>Overview</h2><p>...</p><h2 class='styled-header'>Steps</h2><div class='chalk-code'>1. Signal -> Receptor</div><h2 class='styled-header'>Regulation</h2><p>...</p>", type: PAGE_TYPES.PATHWAY },
+                lab: { title: "Lab Interpretation", content: "<h2 class='styled-header'>Test Name</h2><p>...</p><h2 class='styled-header'>Normal Range</h2><p>...</p><h2 class='styled-header'>Interpretation</h2><p>High: ...</p><p>Low: ...</p>", type: PAGE_TYPES.LAB }
             };
             
             const selected = temps[key];
@@ -1537,6 +1554,7 @@
                 // Determine Metadata
                 let disc = 'general';
                 if(['algo', 'codeStudy', 'sysDesign', 'project'].includes(key)) disc = 'cs';
+                if(['anatomy', 'disease', 'drug', 'physio', 'pathway', 'lab'].includes(key)) disc = 'medical';
                 
                 chapter.metadata.discipline = disc;
                 chapter.metadata.type = selected.type || PAGE_TYPES.NOTE;
@@ -1557,7 +1575,39 @@
             
             const filtered = chapters.filter(ch => {
                 const matchesSearch = (ch.title || '').toLowerCase().includes(searchStr);
-                const matchesCat = categoryFilter === 'all' || (ch.category === categoryFilter) || (!ch.category && categoryFilter === 'General');
+                
+                // Smart Filtering based on Discipline or Category
+                let matchesCat = true;
+                if (categoryFilter !== 'all') {
+                    // Map filter values to discipline/category logic
+                    if (['Algorithms', 'Systems', 'Projects'].includes(categoryFilter)) {
+                        // CS specific categories, assuming we used old 'category' field or implied
+                        // For v17, we rely on metadata mostly. 
+                        // If user selects "Algorithms", show CS algo pages.
+                        // Ideally we should map these better. For now simple check:
+                        matchesCat = (ch.category === categoryFilter); 
+                        // Fallback to metadata type check if category is generic
+                         if(ch.metadata?.type === PAGE_TYPES.ALGORITHM && categoryFilter === 'Algorithms') matchesCat = true;
+                         if(ch.metadata?.type === PAGE_TYPES.SYSTEM && categoryFilter === 'Systems') matchesCat = true;
+                         if(ch.metadata?.type === PAGE_TYPES.PROJECT && categoryFilter === 'Projects') matchesCat = true;
+                    } else if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter)) {
+                        // Medical Filters
+                        if (ch.metadata?.discipline !== 'medical') return false;
+                        // Since we don't strictly sub-categorize medical yet in metadata.category, 
+                        // we can approximate by type or just show all medical for now if granular data missing
+                        // Or rely on user manually setting system/course in metadata.
+                        // For simplicity in this phase, let's assume if discipline is medical, show it if filter is a med one, 
+                        // or refine logic later.
+                        // BETTER LOGIC: If filter is Anatomy, show ANATOMY type.
+                        if (categoryFilter === 'Anatomy' && ch.metadata?.type !== PAGE_TYPES.ANATOMY) matchesCat = false;
+                        if (categoryFilter === 'Pathology' && ch.metadata?.type !== PAGE_TYPES.DISEASE) matchesCat = false;
+                        if (categoryFilter === 'Pharmacology' && ch.metadata?.type !== PAGE_TYPES.DRUG) matchesCat = false;
+                        if (categoryFilter === 'Clinical' && ![PAGE_TYPES.CLINICAL_CASE, PAGE_TYPES.LAB].includes(ch.metadata?.type)) matchesCat = false;
+                    } else if (categoryFilter === 'General') {
+                        matchesCat = ch.metadata?.discipline === 'general';
+                    }
+                }
+                
                 return matchesSearch && matchesCat;
             });
 
