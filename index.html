@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Notebook - Medical (Dentistry) & CS Edition</title>
+    <title>Notebook - Med, Dent, CS & Eng Edition</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Patrick+Hand&family=Caveat:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Kalam:wght@300;400;700&family=Architects+Daughter&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
@@ -21,6 +21,7 @@
             --cs-accent: #3498db;
             --med-accent: #2ecc71; /* Green for Medical features */
             --dent-accent: #9b59b6; /* Purple for Dentistry */
+            --eng-accent: #d35400; /* Burnt Orange for Engineering */
             --code-bg: #282c34;
             --code-text: #abb2bf;
             --toolbar-bg: #d4a373;
@@ -305,11 +306,19 @@
                 <option value="Pharmacology">💊 Pharmacology</option>
                 <option value="Clinical">🏥 Clinical</option>
             </optgroup>
-            <!-- DENTISTRY -->
             <optgroup label="Dentistry">
                 <option value="Dental Anatomy">🦷 Dental Anatomy</option>
                 <option value="Procedures">🛠️ Procedures</option>
                 <option value="Dental Cases">🧾 Cases</option>
+            </optgroup>
+            <!-- ENGINEERING -->
+            <optgroup label="Engineering">
+                <option value="Electrical">⚡ Electrical (EE)</option>
+                <option value="Mechanical">⚙️ Mechanical (ME)</option>
+                <option value="Civil">🏗 Civil (CE)</option>
+                <option value="Electronics">📡 Electronics (ECE)</option>
+                <option value="Mechatronics">🦾 Mechatronics</option>
+                <option value="Industrial">🏭 Industrial</option>
             </optgroup>
         </select>
 
@@ -457,6 +466,7 @@
             <select id="metaDiscipline" class="meta-value" disabled>
                 <option value="cs">Computer Science</option>
                 <option value="medical">Medical</option>
+                <option value="engineering">Engineering</option>
                 <option value="general">General</option>
             </select>
         </div>
@@ -486,6 +496,17 @@
                     <option value="endo_case">Endo Case</option>
                     <option value="perio_case">Perio Case</option>
                     <option value="oral_radiology">Oral Radiology</option>
+                </optgroup>
+                <!-- ENGINEERING -->
+                <optgroup label="Engineering">
+                    <option value="problem_solution">Problem Solution</option>
+                    <option value="circuit_analysis">Circuit Analysis</option>
+                    <option value="mechanical_system">Mechanical System</option>
+                    <option value="structural_analysis">Structural Analysis</option>
+                    <option value="control_system">Control System</option>
+                    <option value="process_flow">Process Flow</option>
+                    <option value="design_calculation">Design Calc</option>
+                    <option value="lab_experiment">Lab Experiment</option>
                 </optgroup>
             </select>
         </div>
@@ -523,6 +544,22 @@
             </div>
         </div>
 
+        <!-- ENGINEERING SPECIFIC METADATA -->
+        <div id="engineeringMetaGroup" style="display:none; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px;">
+            <div class="meta-group">
+                <label class="meta-label">Engineering Branch</label>
+                <select id="metaEngBranch" class="meta-value" onchange="updatePageMeta()">
+                    <option value="Electrical">Electrical (EE)</option>
+                    <option value="Mechanical">Mechanical (ME)</option>
+                    <option value="Civil">Civil (CE)</option>
+                    <option value="Electronics">Electronics (ECE)</option>
+                    <option value="Mechatronics">Mechatronics</option>
+                    <option value="Industrial">Industrial</option>
+                    <option value="General">General</option>
+                </select>
+            </div>
+        </div>
+
         <div class="meta-group">
             <label class="meta-label">Difficulty</label>
             <select id="metaDifficulty" class="meta-value" onchange="updatePageMeta()">
@@ -555,6 +592,10 @@
             </button>
             <button class="tool-btn" onclick="showDentistryTemplates()" style="justify-content:space-between; background: var(--dent-accent); color: white; border: none;">
                 <span>🦷 Dentistry</span>
+                <span>▶</span>
+            </button>
+            <button class="tool-btn" onclick="showEngineeringTemplates()" style="justify-content:space-between; background: var(--eng-accent); color: white; border: none;">
+                <span>⚙️ Engineering</span>
                 <span>▶</span>
             </button>
             <hr style="width:100%; opacity:0.1; margin: 8px 0;">
@@ -598,6 +639,18 @@
             <button class="tool-btn" onclick="applyTemplate('oral_radiology')">🩻 Oral Radiology</button>
         </div>
 
+        <!-- Engineering Sub-Menu View -->
+        <div id="tmpl-eng-view" style="display:none;">
+            <button class="tool-btn" onclick="showMainTemplates()" style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <button class="tool-btn" onclick="applyTemplate('prob_sol')">📐 Problem Solution</button>
+            <button class="tool-btn" onclick="applyTemplate('circuit')">⚡ Circuit Analysis</button>
+            <button class="tool-btn" onclick="applyTemplate('mech_sys')">⚙️ Mechanical System</button>
+            <button class="tool-btn" onclick="applyTemplate('struct')">🏗 Structural Analysis</button>
+            <button class="tool-btn" onclick="applyTemplate('control')">🎛 Control System</button>
+            <button class="tool-btn" onclick="applyTemplate('process')">🏭 Process Flow</button>
+            <button class="tool-btn" onclick="applyTemplate('lab_exp')">🧪 Lab Experiment</button>
+        </div>
+
         <button class="tool-btn" onclick="toggleTemplates()" style="margin-top: 10px; background: #eee;">Close</button>
     </div>
 
@@ -608,7 +661,8 @@
         const DISCIPLINE_REGISTRY = {
             GENERAL: { id: 'general', name: 'General' },
             CS: { id: 'cs', name: 'Computer Science' },
-            MEDICAL: { id: 'medical', name: 'Medical' }
+            MEDICAL: { id: 'medical', name: 'Medical' },
+            ENGINEERING: { id: 'engineering', name: 'Engineering' }
         };
 
         // --- 2. PAGE TYPES ---
@@ -633,7 +687,16 @@
             PROSTHO_PLAN: 'prosthodontic_plan',
             ENDO_CASE: 'endodontic_case',
             PERIO_CASE: 'periodontal_case',
-            ORAL_RADIOLOGY: 'oral_radiology'
+            ORAL_RADIOLOGY: 'oral_radiology',
+            // Engineering
+            PROBLEM_SOLUTION: 'problem_solution',
+            CIRCUIT_ANALYSIS: 'circuit_analysis',
+            MECHANICAL_SYSTEM: 'mechanical_system',
+            STRUCTURAL_ANALYSIS: 'structural_analysis',
+            CONTROL_SYSTEM: 'control_system',
+            PROCESS_FLOW: 'process_flow',
+            DESIGN_CALCULATION: 'design_calculation',
+            LAB_EXPERIMENT: 'lab_experiment'
         };
 
         // --- INDEXEDDB STORAGE ENGINE (DB v2 - Schema Update) ---
@@ -905,13 +968,12 @@
             document.getElementById('metaSystem').value = chapter.metadata?.system || '';
             document.getElementById('metaCreated').innerText = new Date(chapter.metadata?.createdAt).toLocaleString();
             
-            // Dentistry Metadata
+            // Dentistry Metadata Visibility
             const dentalTypes = [
                 PAGE_TYPES.DENTAL_ANATOMY, PAGE_TYPES.ORAL_PATHOLOGY, PAGE_TYPES.DENTAL_PROCEDURE,
                 PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.PROSTHO_PLAN, PAGE_TYPES.ENDO_CASE,
                 PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY
             ];
-            
             const dentalGroup = document.getElementById('dentalMetaGroup');
             if(dentalTypes.includes(chapter.metadata?.type)) {
                 dentalGroup.style.display = 'block';
@@ -920,6 +982,20 @@
                 document.getElementById('metaSpecialty').value = chapter.metadata?.specialty || '';
             } else {
                 dentalGroup.style.display = 'none';
+            }
+
+            // Engineering Metadata Visibility
+             const engTypes = [
+                PAGE_TYPES.PROBLEM_SOLUTION, PAGE_TYPES.CIRCUIT_ANALYSIS, PAGE_TYPES.MECHANICAL_SYSTEM,
+                PAGE_TYPES.STRUCTURAL_ANALYSIS, PAGE_TYPES.CONTROL_SYSTEM, PAGE_TYPES.PROCESS_FLOW,
+                PAGE_TYPES.DESIGN_CALCULATION, PAGE_TYPES.LAB_EXPERIMENT
+            ];
+            const engGroup = document.getElementById('engineeringMetaGroup');
+             if(engTypes.includes(chapter.metadata?.type) || chapter.metadata?.discipline === 'engineering') {
+                engGroup.style.display = 'block';
+                document.getElementById('metaEngBranch').value = chapter.metadata?.branch || 'General';
+            } else {
+                engGroup.style.display = 'none';
             }
 
             document.getElementById('metadataModal').style.display = 'flex';
@@ -941,19 +1017,13 @@
                 chapter.metadata.quadrant = document.getElementById('metaQuadrant').value;
                 chapter.metadata.specialty = document.getElementById('metaSpecialty').value;
 
+                // Save Engineering meta
+                chapter.metadata.branch = document.getElementById('metaEngBranch').value;
+
                 saveChapterToDB(chapter);
-                // Update UI visibility for dental fields
-                 const dentalTypes = [
-                    PAGE_TYPES.DENTAL_ANATOMY, PAGE_TYPES.ORAL_PATHOLOGY, PAGE_TYPES.DENTAL_PROCEDURE,
-                    PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.PROSTHO_PLAN, PAGE_TYPES.ENDO_CASE,
-                    PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY
-                ];
-                const dentalGroup = document.getElementById('dentalMetaGroup');
-                if(dentalTypes.includes(chapter.metadata.type)) {
-                    dentalGroup.style.display = 'block';
-                } else {
-                    dentalGroup.style.display = 'none';
-                }
+                
+                // Update UI visibility for fields
+                openMetadataModal(); // Refresh modal state
             }
         };
 
@@ -1278,11 +1348,14 @@
             } else {
                 document.getElementById('handBtn').classList.remove('active');
             }
+
             if(tool !== 'highlighter') customStrokeStyle = null; 
             activeSketchTool = tool === activeSketchTool ? 'brush' : tool;
+            
             document.getElementById('eraserBtn').classList.toggle('active', activeSketchTool === 'eraser');
             const highlighterBtn = document.querySelector('.tool-opt.highlighter');
             if(highlighterBtn) highlighterBtn.classList.toggle('active', activeSketchTool === 'highlighter');
+
             if (!isSketchMode) toggleSketchMode();
         };
 
@@ -1407,6 +1480,11 @@
             if(['Algorithms','Systems','Projects'].includes(category)) newChapter.metadata.discipline = 'cs';
             if(['Anatomy','Pathology','Pharmacology','Clinical'].includes(category)) newChapter.metadata.discipline = 'medical';
             if(['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(category)) newChapter.metadata.discipline = 'medical'; // Dentistry is a specialization of medical
+            // Apply engineering discipline
+            if(['Electrical','Mechanical','Civil','Electronics','Mechatronics','Industrial'].includes(category)) {
+                newChapter.metadata.discipline = 'engineering';
+                newChapter.metadata.branch = category;
+            }
 
             chapters.unshift(newChapter); 
             saveChapterToDB(newChapter);
@@ -1605,6 +1683,7 @@
             document.getElementById('tmpl-cs-view').style.display = 'block';
             document.getElementById('tmpl-med-view').style.display = 'none';
             document.getElementById('tmpl-dentistry-view').style.display = 'none';
+            document.getElementById('tmpl-eng-view').style.display = 'none';
         };
 
         window.showMedTemplates = () => {
@@ -1612,6 +1691,7 @@
             document.getElementById('tmpl-cs-view').style.display = 'none';
             document.getElementById('tmpl-med-view').style.display = 'block';
             document.getElementById('tmpl-dentistry-view').style.display = 'none';
+            document.getElementById('tmpl-eng-view').style.display = 'none';
         };
 
         window.showDentistryTemplates = () => {
@@ -1619,6 +1699,15 @@
             document.getElementById('tmpl-cs-view').style.display = 'none';
             document.getElementById('tmpl-med-view').style.display = 'none';
             document.getElementById('tmpl-dentistry-view').style.display = 'block';
+            document.getElementById('tmpl-eng-view').style.display = 'none';
+        };
+
+        window.showEngineeringTemplates = () => {
+            document.getElementById('tmpl-main-view').style.display = 'none';
+            document.getElementById('tmpl-cs-view').style.display = 'none';
+            document.getElementById('tmpl-med-view').style.display = 'none';
+            document.getElementById('tmpl-dentistry-view').style.display = 'none';
+            document.getElementById('tmpl-eng-view').style.display = 'block';
         };
 
         window.showMainTemplates = () => {
@@ -1626,6 +1715,7 @@
             document.getElementById('tmpl-cs-view').style.display = 'none';
             document.getElementById('tmpl-med-view').style.display = 'none';
             document.getElementById('tmpl-dentistry-view').style.display = 'none';
+            document.getElementById('tmpl-eng-view').style.display = 'none';
         };
 
         window.applyTemplate = async (key) => {
@@ -1669,7 +1759,16 @@
                 prostho_plan: { title: "Prostho Plan", content: "<h2 class='styled-header'>Edentulous Space</h2><p>...</p><h2 class='styled-header'>Abutment Evaluation</h2><p>...</p><h2 class='styled-header'>Design Components</h2><p>Major Connector: ...</p><p>Clasps: ...</p>", type: PAGE_TYPES.PROSTHO_PLAN },
                 endo_case: { title: "Endo Case", content: "<h2 class='styled-header'>Tooth & Diagnosis</h2><p>...</p><h2 class='styled-header'>Access & WL</h2><p>Working Length: ...mm</p><h2 class='styled-header'>Instrumentation</h2><p>MAF: ...</p><h2 class='styled-header'>Obturation</h2><p>Technique: ...</p>", type: PAGE_TYPES.ENDO_CASE },
                 perio_case: { title: "Perio Charting", content: "<h2 class='styled-header'>Periodontal Status</h2><p>Pockets > 4mm: ...</p><h2 class='styled-header'>Diagnosis</h2><p>Stage: ... Grade: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scaling & Root Planing</div></div>", type: PAGE_TYPES.PERIO_CASE },
-                oral_radiology: { title: "Radiographic Report", content: "<h2 class='styled-header'>Image Type</h2><p>IOPA / OPG / CBCT</p><h2 class='styled-header'>Findings</h2><p>Radio-opacity/lucency: ...</p><h2 class='styled-header'>Interpretation</h2><p>...</p>", type: PAGE_TYPES.ORAL_RADIOLOGY }
+                oral_radiology: { title: "Radiographic Report", content: "<h2 class='styled-header'>Image Type</h2><p>IOPA / OPG / CBCT</p><h2 class='styled-header'>Findings</h2><p>Radio-opacity/lucency: ...</p><h2 class='styled-header'>Interpretation</h2><p>...</p>", type: PAGE_TYPES.ORAL_RADIOLOGY },
+                
+                // ENGINEERING TEMPLATES
+                prob_sol: { title: "Problem Solution", content: "<h2 class='styled-header'>Problem Statement</h2><p>...</p><h2 class='styled-header'>Given & Assumptions</h2><p>...</p><h2 class='styled-header'>Diagram</h2><p>(Use Sketch Mode)</p><h2 class='styled-header'>Governing Equations</h2><p>...</p><h2 class='styled-header'>Solution</h2><p>...</p><h2 class='styled-header'>Final Answer</h2><div class='sticky-note'>Result: ...</div>", type: PAGE_TYPES.PROBLEM_SOLUTION },
+                circuit: { title: "Circuit Analysis", content: "<h2 class='styled-header'>Circuit Diagram</h2><p>(Draw Schematic)</p><h2 class='styled-header'>Known Values</h2><p>R1 = ...</p><h2 class='styled-header'>Laws Applied</h2><p>KCL / KVL</p><h2 class='styled-header'>Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CIRCUIT_ANALYSIS },
+                mech_sys: { title: "Mechanical System", content: "<h2 class='styled-header'>System Description</h2><p>...</p><h2 class='styled-header'>Free Body Diagram</h2><p>(Draw FBD)</p><h2 class='styled-header'>Equations of Motion</h2><p>F = ma...</p><h2 class='styled-header'>Solution</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.MECHANICAL_SYSTEM },
+                struct: { title: "Structural Analysis", content: "<h2 class='styled-header'>Structure Description</h2><p>...</p><h2 class='styled-header'>Load Diagram</h2><p>...</p><h2 class='styled-header'>Calculations</h2><p>...</p><h2 class='styled-header'>Design Checks</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Safety Factor OK</div></div>", type: PAGE_TYPES.STRUCTURAL_ANALYSIS },
+                control: { title: "Control System", content: "<h2 class='styled-header'>Block Diagram</h2><p>...</p><h2 class='styled-header'>Transfer Function</h2><p>G(s) = ...</p><h2 class='styled-header'>Stability Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CONTROL_SYSTEM },
+                process: { title: "Process Flow", content: "<h2 class='styled-header'>Overview</h2><p>...</p><h2 class='styled-header'>Flow Diagram</h2><p>...</p><h2 class='styled-header'>Inputs / Outputs</h2><p>...</p><h2 class='styled-header'>Bottlenecks</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.PROCESS_FLOW },
+                lab_exp: { title: "Lab Experiment", content: "<h2 class='styled-header'>Objective</h2><p>...</p><h2 class='styled-header'>Apparatus</h2><p>...</p><h2 class='styled-header'>Procedure</h2><p>1. ...</p><h2 class='styled-header'>Observations</h2><p>...</p><h2 class='styled-header'>Calculations & Conclusion</h2><p>...</p>", type: PAGE_TYPES.LAB_EXPERIMENT },
             };
             
             const selected = temps[key];
@@ -1689,11 +1788,21 @@
                 let disc = 'general';
                 if(['algo', 'codeStudy', 'sysDesign', 'project'].includes(key)) disc = 'cs';
                 if(['anatomy', 'disease', 'drug', 'physio', 'pathway', 'lab'].includes(key)) disc = 'medical';
-                if(['dental_anatomy', 'oral_pathology', 'dental_procedure', 'dental_case', 'prostho_plan', 'endo_case', 'perio_case', 'oral_radiology'].includes(key)) disc = 'medical'; // Dentistry falls under medical discipline
+                if(['dental_anatomy', 'oral_pathology', 'dental_procedure', 'dental_case', 'prostho_plan', 'endo_case', 'perio_case', 'oral_radiology'].includes(key)) disc = 'medical'; 
+                if(['prob_sol', 'circuit', 'mech_sys', 'struct', 'control', 'process', 'lab_exp'].includes(key)) disc = 'engineering';
                 
                 chapter.metadata.discipline = disc;
                 chapter.metadata.type = selected.type || PAGE_TYPES.NOTE;
                 
+                // Set default branch for engineering templates to avoid empty state
+                if (disc === 'engineering') {
+                    if (key === 'circuit' || key === 'control') chapter.metadata.branch = 'Electrical';
+                    else if (key === 'mech_sys') chapter.metadata.branch = 'Mechanical';
+                    else if (key === 'struct') chapter.metadata.branch = 'Civil';
+                    else if (key === 'process') chapter.metadata.branch = 'Industrial';
+                    else chapter.metadata.branch = 'General';
+                }
+
                 await saveChapterToDB(chapter);
                 renderSidebar();
                 updateToolVisibility(chapter);
@@ -1716,36 +1825,26 @@
                 if (categoryFilter !== 'all') {
                     // Map filter values to discipline/category logic
                     if (['Algorithms', 'Systems', 'Projects'].includes(categoryFilter)) {
-                        // CS specific categories, assuming we used old 'category' field or implied
-                        // For v17, we rely on metadata mostly. 
-                        // If user selects "Algorithms", show CS algo pages.
-                        // Ideally we should map these better. For now simple check:
                         matchesCat = (ch.category === categoryFilter); 
-                        // Fallback to metadata type check if category is generic
                          if(ch.metadata?.type === PAGE_TYPES.ALGORITHM && categoryFilter === 'Algorithms') matchesCat = true;
                          if(ch.metadata?.type === PAGE_TYPES.SYSTEM && categoryFilter === 'Systems') matchesCat = true;
                          if(ch.metadata?.type === PAGE_TYPES.PROJECT && categoryFilter === 'Projects') matchesCat = true;
                     } else if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter)) {
-                        // Medical Filters
                         if (ch.metadata?.discipline !== 'medical') return false;
-                        // Since we don't strictly sub-categorize medical yet in metadata.category, 
-                        // we can approximate by type or just show all medical for now if granular data missing
-                        // Or rely on user manually setting system/course in metadata.
-                        // For simplicity in this phase, let's assume if discipline is medical, show it if filter is a med one, 
-                        // or refine logic later.
-                        // BETTER LOGIC: If filter is Anatomy, show ANATOMY type.
                         if (categoryFilter === 'Anatomy' && ch.metadata?.type !== PAGE_TYPES.ANATOMY) matchesCat = false;
                         if (categoryFilter === 'Pathology' && ch.metadata?.type !== PAGE_TYPES.DISEASE) matchesCat = false;
                         if (categoryFilter === 'Pharmacology' && ch.metadata?.type !== PAGE_TYPES.DRUG) matchesCat = false;
                         if (categoryFilter === 'Clinical' && ![PAGE_TYPES.CLINICAL_CASE, PAGE_TYPES.LAB].includes(ch.metadata?.type)) matchesCat = false;
                     } else if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter)) {
-                         // Dentistry Filters
-                         if (ch.metadata?.discipline !== 'medical') return false; // Dentistry is medical
-
+                         if (ch.metadata?.discipline !== 'medical') return false; 
                          if (categoryFilter === 'Dental Anatomy' && ch.metadata?.type !== PAGE_TYPES.DENTAL_ANATOMY) matchesCat = false;
                          if (categoryFilter === 'Procedures' && ![PAGE_TYPES.DENTAL_PROCEDURE, PAGE_TYPES.PROSTHO_PLAN].includes(ch.metadata?.type)) matchesCat = false;
                          if (categoryFilter === 'Dental Cases' && ![PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.ENDO_CASE, PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY, PAGE_TYPES.ORAL_PATHOLOGY].includes(ch.metadata?.type)) matchesCat = false;
 
+                    } else if (['Electrical', 'Mechanical', 'Civil', 'Electronics', 'Mechatronics', 'Industrial'].includes(categoryFilter)) {
+                        // Engineering Filters
+                        if (ch.metadata?.discipline !== 'engineering') return false;
+                        if (ch.metadata?.branch !== categoryFilter) matchesCat = false;
                     } else if (categoryFilter === 'General') {
                         matchesCat = ch.metadata?.discipline === 'general';
                     }
