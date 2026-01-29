@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Notebook - Med, Dent, CS & Eng Edition</title>
+    <title>Notebook - Engineering Math Edition</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Patrick+Hand&family=Caveat:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Kalam:wght@300;400;700&family=Architects+Daughter&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
@@ -19,9 +19,9 @@
             --sidebar-text: #ecf0f1;
             --accent-color: #e74c3c;
             --cs-accent: #3498db;
-            --med-accent: #2ecc71; /* Green for Medical features */
-            --dent-accent: #9b59b6; /* Purple for Dentistry */
-            --eng-accent: #d35400; /* Burnt Orange for Engineering */
+            --med-accent: #2ecc71; 
+            --dent-accent: #9b59b6; 
+            --eng-accent: #d35400; 
             --code-bg: #282c34;
             --code-text: #abb2bf;
             --toolbar-bg: #d4a373;
@@ -34,6 +34,8 @@
             --chalk-text: #dfe6e9;
             --save-color: #27ae60;
             --highlighter-color: rgba(255, 235, 59, 0.4);
+            --math-cluster-color: rgba(52, 152, 219, 0.1);
+            --math-border-color: rgba(52, 152, 219, 0.5);
         }
 
         body.dark-mode {
@@ -75,9 +77,11 @@
         .cs-code-editor { padding: 15px; color: var(--code-text); font-size: 0.9rem; min-height: 60px; outline: none; white-space: pre-wrap; }
         .cs-code-output { background: #1e2127; color: #98c379; padding: 10px; font-size: 0.8rem; border-top: 1px dashed #3e4451; }
         .cs-code-output::before { content: "➜ OUTPUT:"; display: block; font-size: 0.7rem; opacity: 0.5; margin-bottom: 5px; }
-
-        /* Algorithm Badge */
-        .algo-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; background: var(--cs-accent); color: white; font-family: sans-serif; font-size: 0.75rem; font-weight: bold; margin-right: 5px; }
+        
+        /* Trace Table */
+        .trace-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-family: 'Fira Code', monospace; font-size: 0.85rem; }
+        .trace-table th, .trace-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .trace-table th { background: rgba(0,0,0,0.05); }
 
         /* Sidebar */
         .sidebar { width: 280px; background-color: var(--sidebar-bg); color: var(--sidebar-text); height: 100%; display: flex; flex-direction: column; padding: 1.5rem; box-shadow: 4px 0 15px rgba(0,0,0,0.3); z-index: 20; flex-shrink: 0; transition: background-color 0.3s ease, transform 0.3s ease; position: absolute; left: 0; top: 0; overflow: hidden; }
@@ -196,7 +200,28 @@
         @media (max-width: 768px) { .tool-tray-container.collapsed { left: -15px; } }
         .tool-tray-toggle { background: white; border: 1px solid #ddd; width: 24px; height: 60px; border-radius: 0 8px 8px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 4px 0 10px rgba(0,0,0,0.1); font-size: 0.8rem; color: #666; transition: 0.3s; }
         body.dark-mode .tool-tray-toggle { background: #34495e; color: white; border-color: #444; }
-        .tool-tray { background: white; padding: 15px 10px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 4px 4px 20px rgba(0,0,0,0.1); border: 1px solid #eee; transition: transform 0.3s ease, opacity 0.3s ease; transform-origin: left center; }
+        
+        /* Updated Tool Tray with Scrollbar */
+        .tool-tray { 
+            background: white; 
+            padding: 15px 10px; 
+            border-radius: 12px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            box-shadow: 4px 4px 20px rgba(0,0,0,0.1); 
+            border: 1px solid #eee; 
+            transition: transform 0.3s ease, opacity 0.3s ease; 
+            transform-origin: left center;
+            max-height: 80vh; 
+            overflow-y: auto; 
+        }
+        
+        .tool-tray::-webkit-scrollbar { width: 4px; }
+        .tool-tray::-webkit-scrollbar-track { background: transparent; }
+        .tool-tray::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+        body.dark-mode .tool-tray::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
+
         body.dark-mode .tool-tray { background: #34495e; border-color: #444; }
         .tool-tray-container.collapsed .tool-tray { transform: scaleX(0); opacity: 0; pointer-events: none; width: 0; padding: 0; margin: 0; }
 
@@ -224,7 +249,12 @@
         body.dark-mode .tool-btn:hover { background: rgba(255,255,255,0.1); }
         .tool-btn.active { background: var(--toolbar-bg); color: white; font-weight: bold; }
         body.dark-mode .tool-btn.active { background: var(--toolbar-bg); color: white; }
-
+        
+        /* Discipline Specific Styles for Tools */
+        #tools-cs .tool-btn { color: var(--cs-accent); }
+        #tools-med .tool-btn { color: var(--med-accent); }
+        #tools-eng .tool-btn { color: var(--eng-accent); }
+        
         .paper-title { font-size: 2.4rem; border: none; border-bottom: 2px solid var(--accent-color); width: 100%; background: transparent; font-family: inherit; margin-bottom: 2rem; color: var(--ink-color); }
         .content-area { min-height: 800px; outline: none; line-height: 1.8; font-size: 1.3rem; color: var(--ink-color); }
         
@@ -271,6 +301,93 @@
         .tag-chip { background: var(--template-color); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; }
         .tag-remove { cursor: pointer; opacity: 0.7; }
         .tag-remove:hover { opacity: 1; }
+
+        /* Engineering Ruler */
+        #engRuler {
+            position: absolute;
+            width: 400px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid #999;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            top: 300px;
+            left: 200px;
+            transform-origin: center;
+            display: none;
+            z-index: 20;
+            cursor: grab;
+            backdrop-filter: blur(5px);
+            border-radius: 4px;
+        }
+        #engRuler::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background-image: repeating-linear-gradient(90deg, #333 0, #333 1px, transparent 1px, transparent 10px);
+            opacity: 0.5;
+        }
+        #engRuler .rotate-handle {
+            position: absolute;
+            right: -15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            background: var(--eng-accent);
+            border-radius: 50%;
+            cursor: col-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+        
+        /* Math Cluster Highlight */
+        .math-cluster-active {
+            border: 2px dashed #3498db;
+            background-color: rgba(52, 152, 219, 0.05);
+            position: absolute;
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 6;
+        }
+        
+        /* Structured Math Display */
+        .structured-math {
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+            font-size: 1.5rem;
+            position: absolute;
+            background: white;
+            padding: 5px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 7;
+        }
+        
+        /* Anatomy Pin */
+        .anatomy-pin {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: var(--med-accent);
+            color: white;
+            border-radius: 50% 50% 0 50%;
+            transform: rotate(45deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            z-index: 10;
+            cursor: pointer;
+        }
+        .anatomy-pin span { transform: rotate(-45deg); }
     </style>
 </head>
 <body class="cursor-pen">
@@ -278,6 +395,22 @@
     <button class="btn-dark-circle" id="darkModeToggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
     <button class="btn-menu-mobile" id="mobileMenuBtn" onclick="toggleMobileSidebar()" title="Toggle Menu">☰</button>
     <button class="btn-exit-focus" onclick="toggleFocusMode()">Exit Focus</button>
+    
+    <!-- ENGINEERING RULER -->
+    <div id="engRuler">
+        <div class="rotate-handle" id="rulerRotate">⟳</div>
+    </div>
+
+    <!-- MATH CONVERSION MODAL -->
+    <div id="mathModal" class="floating-pane" style="display:none; width: 300px; z-index: 1001;">
+        <h3 style="margin-bottom: 15px;">Convert to Math</h3>
+        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">Transcribe your equation (LaTeX-like):</p>
+        <textarea id="mathInput" style="width:100%; height:80px; padding:8px; margin-bottom:10px; border:1px solid #ddd; font-family:monospace;" placeholder="E = mc^2"></textarea>
+        <div style="display:flex; gap:10px;">
+            <button class="tool-btn" onclick="saveMathConversion()" style="background: var(--save-color); color: white; justify-content: center; flex:1;">Convert</button>
+            <button class="tool-btn" onclick="closeMathModal()" style="background: #eee; justify-content: center; flex:1;">Cancel</button>
+        </div>
+    </div>
 
     <div class="text-bubble" id="textBubble">
         <button class="bubble-btn" onclick="formatText('bold')">B</button>
@@ -311,7 +444,6 @@
                 <option value="Procedures">🛠️ Procedures</option>
                 <option value="Dental Cases">🧾 Cases</option>
             </optgroup>
-            <!-- ENGINEERING -->
             <optgroup label="Engineering">
                 <option value="Electrical">⚡ Electrical (EE)</option>
                 <option value="Mechanical">⚙️ Mechanical (ME)</option>
@@ -402,8 +534,34 @@
             
             <button class="tool-btn" onclick="insertBlock('header')"><span>🏷️</span> Title</button>
             <button class="tool-btn" onclick="insertBlock('todo')"><span>✅</span> To-Do</button>
-            <!-- NEW CS TOOLS (Initially Hidden) -->
-            <button class="tool-btn" id="btnCSCode" onclick="insertCSCodeBlock()" style="color:var(--cs-accent); display:none;"><span>&lt;&gt;</span> Code</button>
+            
+            <!-- CS TOOLS -->
+            <div id="tools-cs" style="display:none; flex-direction:column; gap:8px;">
+                <hr style="opacity: 0.2;">
+                <button class="tool-btn" onclick="insertCSCodeBlock()"><span>&lt;&gt;</span> Code Block</button>
+                <button class="tool-btn" onclick="insertAlgoStep()"><span>🔢</span> Algorithm Step</button>
+                <button class="tool-btn" onclick="insertComplexity()"><span>O(n)</span> Complexity</button>
+                <button class="tool-btn" onclick="insertTraceTable()"><span>📉</span> Trace Table</button>
+            </div>
+            
+            <!-- ENG TOOLS -->
+            <div id="tools-eng" style="display:none; flex-direction:column; gap:8px;">
+                 <hr style="opacity: 0.2;">
+                 <button class="tool-btn" onclick="toggleMathMode()" id="mathModeBtn"><span>∑</span> Math Mode</button>
+                 <button class="tool-btn" onclick="toggleRuler()"><span>📏</span> Ruler</button>
+                 <button class="tool-btn" onclick="insertEquation()"><span>∑</span> Eq Block</button>
+                 <button class="tool-btn" onclick="insertConstants()"><span>π</span> Constants</button>
+            </div>
+
+            <!-- MED TOOLS -->
+            <div id="tools-med" style="display:none; flex-direction:column; gap:8px;">
+                 <hr style="opacity: 0.2;">
+                 <button class="tool-btn" onclick="activateAnatomyPin()"><span>📍</span> Pin</button>
+                 <button class="tool-btn" onclick="setHighlightPreset('symptom')"><span>🟡</span> Sx</button>
+                 <button class="tool-btn" onclick="setHighlightPreset('drug')"><span>🔴</span> Rx</button>
+                 <button class="tool-btn" onclick="insertTimeline()"><span>⏳</span> Timeline</button>
+                 <button class="tool-btn" onclick="insertComparison()"><span>⚖️</span> Compare</button>
+            </div>
             
             <button class="tool-btn" onclick="insertBlock('note')"><span>📌</span> Note</button>
             <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
@@ -417,6 +575,9 @@
     <div class="main-container" id="mainContainer">
         <main class="workspace" id="workspace">
             <div class="paper" id="paper">
+                <!-- MATH LAYER CONTAINER -->
+                <div id="mathLayer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:6;"></div>
+                
                 <canvas id="sketchCanvas"></canvas>
                 
                 <div class="status-bar">
@@ -443,7 +604,6 @@
 
                 <input type="file" id="imageInput" style="display: none;" accept="image/*" onchange="handleImageUpload(event)">
                 <input type="text" class="paper-title" id="pageTitle" placeholder="Untitled Page" oninput="markUnsaved(); saveCurrentToCloud()">
-                <!-- CRITICAL FOR iPAD: Event delegation added, inline handlers removed -->
                 <div class="content-area writing-tool-pen" id="editor" contenteditable="true" spellcheck="false" oninput="markUnsaved(); saveCurrentToCloud()"></div>
             </div>
         </main>
@@ -848,6 +1008,18 @@
         let undoStack = [];
         let redoStack = [];
         let isTrayCollapsed = false;
+        
+        // Engineering Ruler State
+        let isRulerActive = false;
+        let rulerX = 200, rulerY = 300, rulerAngle = 0;
+        let isDraggingRuler = false, isRotatingRuler = false;
+        let rulerDragStartX, rulerDragStartY;
+        let rulerStartAngle;
+
+        // Math Mode State
+        let isMathMode = false;
+        let mathClusters = [];
+        let activeClusterId = null;
 
         const canvas = document.getElementById('sketchCanvas');
         const ctx = canvas.getContext('2d');
@@ -919,6 +1091,8 @@
                         saveCurrentToCloud();
                     }
                 });
+                
+                setupRulerEvents();
 
                 document.addEventListener('selectionchange', handleSelectionChange);
                 
@@ -927,15 +1101,265 @@
             }
         }
 
-        // --- COMPUTER SCIENCE FUNCTIONS ---
+        // --- DISCIPLINE TOOLBAR FUNCTIONS ---
+        // CS Tools
+        window.insertAlgoStep = () => {
+            const html = `<div class="chalk-code" contenteditable="true">1. Step description...<br>   ↳ Logic/Condition</div>`;
+            insertHtml(html);
+        }
+        window.insertComplexity = () => {
+            const html = `<span class="algo-badge" contenteditable="true">Time: O(n)</span>&nbsp;`;
+            insertHtml(html);
+        }
+        window.insertTraceTable = () => {
+            const html = `
+                <table class="trace-table">
+                    <thead><tr><th>Line</th><th>Variable</th><th>Value</th><th>Output</th></tr></thead>
+                    <tbody>
+                        <tr><td>1</td><td>x</td><td>0</td><td>-</td></tr>
+                        <tr><td>2</td><td>i</td><td>0</td><td>-</td></tr>
+                    </tbody>
+                </table><p><br></p>`;
+            insertHtml(html);
+        }
+        
+        // Medical Tools
+        window.activeAnatomyPinMode = false;
+        window.activateAnatomyPin = () => {
+            window.activeAnatomyPinMode = true;
+            document.getElementById('paper').style.cursor = 'crosshair';
+            showToast("Tap paper to place pin");
+        }
+        
+        document.getElementById('paper').addEventListener('click', function(e) {
+            if(!window.activeAnatomyPinMode) return;
+            if(e.target.closest('.writing-tools') || e.target.closest('.tool-tray-container')) return;
+            
+            const rect = this.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const count = document.getElementsByClassName('anatomy-pin').length + 1;
+            const pin = document.createElement('div');
+            pin.className = 'anatomy-pin';
+            pin.style.left = (x - 12) + 'px';
+            pin.style.top = (y - 12) + 'px';
+            pin.innerHTML = `<span>${count}</span>`;
+            this.appendChild(pin);
+            
+            const legendHtml = `<div class="checklist-item">
+                <div style="background:var(--med-accent); color:white; width:20px; height:20px; border-radius:50%; text-align:center; font-size:0.7rem; line-height:20px; margin-right:10px;">${count}</div>
+                <div class="checklist-text" contenteditable="true">Label...</div>
+            </div>`;
+            
+            const editor = document.getElementById('editor');
+            editor.innerHTML += legendHtml;
+            
+            window.activeAnatomyPinMode = false;
+            document.getElementById('paper').style.cursor = 'default';
+            saveCurrentToCloud();
+        });
+
+        window.setHighlightPreset = (type) => {
+            customStrokeStyle = (type === 'symptom') ? 'rgba(255, 235, 59, 0.4)' : 'rgba(231, 76, 60, 0.4)';
+            activeSketchTool = 'custom';
+            const highlighterBtn = document.querySelector('.tool-opt.highlighter');
+            if(highlighterBtn) highlighterBtn.click();
+        }
+        window.insertTimeline = () => {
+            const html = `<div style="border-left: 2px solid #ccc; padding-left: 10px; margin: 10px 0;">
+                <p><strong>00:00</strong> - Presentation</p>
+                <p><strong>00:30</strong> - Investigation</p>
+            </div>`;
+            insertHtml(html);
+        }
+        window.insertComparison = () => {
+             const html = `<table style="width:100%; border-collapse:collapse; margin:10px 0; font-size:0.9rem;">
+                <tr><th style="border-bottom:2px solid #ccc; text-align:left;">Normal</th><th style="border-bottom:2px solid #ccc; text-align:left;">Abnormal</th></tr>
+                <tr><td style="padding:5px; border-bottom:1px solid #eee;">Value</td><td style="padding:5px; border-bottom:1px solid #eee;">Value</td></tr>
+            </table><p><br></p>`;
+            insertHtml(html);
+        }
+
+        // Engineering Tools
+        window.toggleRuler = () => {
+            isRulerActive = !isRulerActive;
+            document.getElementById('engRuler').style.display = isRulerActive ? 'block' : 'none';
+        }
+        
+        function setupRulerEvents() {
+            const ruler = document.getElementById('engRuler');
+            const rotateHandle = document.getElementById('rulerRotate');
+            
+            ruler.addEventListener('mousedown', (e) => {
+                if(e.target === rotateHandle) return; 
+                isDraggingRuler = true;
+                rulerDragStartX = e.clientX - ruler.offsetLeft;
+                rulerDragStartY = e.clientY - ruler.offsetTop;
+            });
+            
+            rotateHandle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                isRotatingRuler = true;
+                const rect = ruler.getBoundingClientRect();
+                const centerX = rect.left + rect.width/2;
+                const centerY = rect.top + rect.height/2;
+                rulerStartAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) - (rulerAngle * Math.PI / 180);
+            });
+            
+            window.addEventListener('mousemove', (e) => {
+                if(isDraggingRuler) {
+                    rulerX = e.clientX - rulerDragStartX;
+                    rulerY = e.clientY - rulerDragStartY;
+                    ruler.style.left = rulerX + 'px';
+                    ruler.style.top = rulerY + 'px';
+                }
+                if(isRotatingRuler) {
+                    const rect = ruler.getBoundingClientRect();
+                    const centerX = rect.left + rect.width/2;
+                    const centerY = rect.top + rect.height/2;
+                    const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+                    rulerAngle = (angle - rulerStartAngle) * 180 / Math.PI;
+                    ruler.style.transform = `rotate(${rulerAngle}deg)`;
+                }
+            });
+            
+            window.addEventListener('mouseup', () => {
+                isDraggingRuler = false;
+                isRotatingRuler = false;
+            });
+        }
+
+        // --- MATH MODE LOGIC ---
+        window.toggleMathMode = () => {
+            isMathMode = !isMathMode;
+            document.getElementById('mathModeBtn').classList.toggle('active', isMathMode);
+            showToast(isMathMode ? "Math Mode: ON" : "Math Mode: OFF");
+        };
+
+        window.closeMathModal = () => {
+             document.getElementById('mathModal').style.display = 'none';
+        };
+
+        window.saveMathConversion = () => {
+             const input = document.getElementById('mathInput').value;
+             if(input && activeClusterId) {
+                 // Create HTML representation (Pseudo-LaTeX)
+                 const mathHtml = `<div class="structured-math">${input}</div>`;
+                 
+                 // Find cluster visual and attach html
+                 const layer = document.getElementById('mathLayer');
+                 const clusterDiv = document.createElement('div');
+                 clusterDiv.innerHTML = mathHtml;
+                 
+                 // Position it near the last known cluster center (simplification)
+                 // In a full implementation, we'd use the bounding box of the active cluster
+                 // For now, center of screen as placeholder or last stroke
+                 
+                 // Hide the ink for this cluster - requires advanced redraw logic not fully in scope
+                 // Instead, we just append the structured math as an overlay
+                 
+                 // Update the strokes in this cluster to be 'converted' so they don't draw?
+                 // That requires re-saving the chapter.
+                 
+                 // Simple implementation: Add text block to editor
+                 const editor = document.getElementById('editor');
+                 editor.innerHTML += `<p style="font-family:'Times New Roman'; font-style:italic; font-size:1.2rem;">${input}</p>`;
+                 
+                 closeMathModal();
+                 showToast("Math Inserted");
+                 saveCurrentToCloud();
+             }
+        };
+
+        function detectMathCluster(stroke) {
+             if(!isMathMode) return;
+             
+             // Simple clustering: close in time and space
+             // We just grab the bounding box of the stroke
+             // And see if it overlaps with recent math strokes
+             
+             // Create a visual indicator for "Active Equation"
+             // This is a simplified visual feedback
+             const points = stroke.points;
+             if(points.length < 2) return;
+             
+             let minX = points[0].x, maxX = points[0].x, minY = points[0].y, maxY = points[0].y;
+             points.forEach(p => {
+                 if(p.x < minX) minX = p.x;
+                 if(p.x > maxX) maxX = p.x;
+                 if(p.y < minY) minY = p.y;
+                 if(p.y > maxY) maxY = p.y;
+             });
+             
+             // Add padding
+             minX -= 10; maxX += 10; minY -= 10; maxY += 10;
+             
+             // Draw temporary blue box on math layer
+             const layer = document.getElementById('mathLayer');
+             const box = document.createElement('div');
+             box.className = 'math-cluster-active';
+             box.style.left = minX + 'px';
+             box.style.top = minY + 'px';
+             box.style.width = (maxX - minX) + 'px';
+             box.style.height = (maxY - minY) + 'px';
+             box.title = "Tap to Convert";
+             box.onclick = function() {
+                 activeClusterId = Date.now(); // Dummy ID
+                 document.getElementById('mathModal').style.display = 'flex';
+                 // Clean up box
+                 this.remove();
+             };
+             
+             layer.appendChild(box);
+             
+             // Auto-remove box after 5 seconds if not clicked
+             setTimeout(() => {
+                 if(box.parentNode) box.remove();
+             }, 5000);
+        }
+        
+        window.insertEquation = () => {
+            const html = `<div style="font-family:'Times New Roman', serif; font-style:italic; font-size:1.1rem; text-align:center; background:rgba(0,0,0,0.03); padding:10px; border-radius:4px;">
+                x = (-b ± √(b² - 4ac)) / 2a
+            </div><p><br></p>`;
+            insertHtml(html);
+        }
+        window.insertAssumptions = () => {
+            const html = `<h3 style="color:#7f8c8d; border-bottom:1px solid #eee;">Assumptions</h3><ul><li>Steady state</li><li>Adiabatic</li></ul>`;
+            insertHtml(html);
+        }
+        window.insertConstants = () => {
+            const html = `<div class="chalk-code">g = 9.81 m/s²<br>π = 3.14159</div>`;
+            insertHtml(html);
+        }
+        
+        // --- TOOLBAR SWITCHING ---
         function updateToolVisibility(chapter) {
-            const btn = document.getElementById('btnCSCode');
-            // Check metadata discipline instead of category
-            if (chapter && chapter.metadata && chapter.metadata.discipline === 'cs') {
-                btn.style.display = 'flex';
-            } else {
-                btn.style.display = 'none';
-            }
+            // Safe hiding
+            const csTools = document.getElementById('tools-cs');
+            if(csTools) csTools.style.display = 'none';
+
+            const medTools = document.getElementById('tools-med');
+            if(medTools) medTools.style.display = 'none';
+
+            const engTools = document.getElementById('tools-eng');
+            if(engTools) engTools.style.display = 'none';
+            
+            document.getElementById('engRuler').style.display = 'none';
+            isRulerActive = false;
+            isMathMode = false; 
+            const mathBtn = document.getElementById('mathModeBtn');
+            if(mathBtn) mathBtn.classList.remove('active');
+            
+            const disc = chapter?.metadata?.discipline;
+            if(disc === 'cs' && csTools) csTools.style.display = 'flex';
+            if(disc === 'medical' && medTools) medTools.style.display = 'flex';
+            if(disc === 'engineering' && engTools) engTools.style.display = 'flex';
+            
+            // Legacy/Fallback for Code Button if container doesn't exist
+            const btnCSCode = document.getElementById('btnCSCode');
+            if(btnCSCode && !csTools) btnCSCode.style.display = (disc === 'cs') ? 'flex' : 'none';
         }
 
         window.insertCSCodeBlock = () => {
@@ -968,7 +1392,6 @@
             document.getElementById('metaSystem').value = chapter.metadata?.system || '';
             document.getElementById('metaCreated').innerText = new Date(chapter.metadata?.createdAt).toLocaleString();
             
-            // Dentistry Metadata Visibility
             const dentalTypes = [
                 PAGE_TYPES.DENTAL_ANATOMY, PAGE_TYPES.ORAL_PATHOLOGY, PAGE_TYPES.DENTAL_PROCEDURE,
                 PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.PROSTHO_PLAN, PAGE_TYPES.ENDO_CASE,
@@ -984,7 +1407,6 @@
                 dentalGroup.style.display = 'none';
             }
 
-            // Engineering Metadata Visibility
              const engTypes = [
                 PAGE_TYPES.PROBLEM_SOLUTION, PAGE_TYPES.CIRCUIT_ANALYSIS, PAGE_TYPES.MECHANICAL_SYSTEM,
                 PAGE_TYPES.STRUCTURAL_ANALYSIS, PAGE_TYPES.CONTROL_SYSTEM, PAGE_TYPES.PROCESS_FLOW,
@@ -1012,18 +1434,15 @@
                 chapter.metadata.difficulty = document.getElementById('metaDifficulty').value;
                 chapter.metadata.system = document.getElementById('metaSystem').value;
                 
-                // Save dental meta
                 chapter.metadata.toothNumber = document.getElementById('metaTooth').value;
                 chapter.metadata.quadrant = document.getElementById('metaQuadrant').value;
                 chapter.metadata.specialty = document.getElementById('metaSpecialty').value;
 
-                // Save Engineering meta
                 chapter.metadata.branch = document.getElementById('metaEngBranch').value;
 
                 saveChapterToDB(chapter);
                 
-                // Update UI visibility for fields
-                openMetadataModal(); // Refresh modal state
+                openMetadataModal(); 
             }
         };
 
@@ -1348,14 +1767,11 @@
             } else {
                 document.getElementById('handBtn').classList.remove('active');
             }
-
             if(tool !== 'highlighter') customStrokeStyle = null; 
             activeSketchTool = tool === activeSketchTool ? 'brush' : tool;
-            
             document.getElementById('eraserBtn').classList.toggle('active', activeSketchTool === 'eraser');
             const highlighterBtn = document.querySelector('.tool-opt.highlighter');
             if(highlighterBtn) highlighterBtn.classList.toggle('active', activeSketchTool === 'highlighter');
-
             if (!isSketchMode) toggleSketchMode();
         };
 
@@ -1611,9 +2027,13 @@
         };
 
         window.toggleVoiceTranscription = () => {
+            // Fallback for API absence
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                showToast("Use Keyboard Mic 🎙️");
+                return;
+            }
             if (!recognition) {
                 const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!Speech) return showToast("Speech API not supported on this browser");
                 recognition = new Speech();
                 recognition.continuous = true;
                 recognition.interimResults = false;
