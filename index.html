@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Notebook - Medical & CS Edition</title>
+    <title>Notebook - Medical (Dentistry) & CS Edition</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Patrick+Hand&family=Caveat:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Kalam:wght@300;400;700&family=Architects+Daughter&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
@@ -20,6 +20,7 @@
             --accent-color: #e74c3c;
             --cs-accent: #3498db;
             --med-accent: #2ecc71; /* Green for Medical features */
+            --dent-accent: #9b59b6; /* Purple for Dentistry */
             --code-bg: #282c34;
             --code-text: #abb2bf;
             --toolbar-bg: #d4a373;
@@ -119,12 +120,16 @@
         .btn-sketch { background: var(--toolbar-bg); color: white; }
         .btn-sketch.active { background: #e67e22; border: 2px solid white; }
         .btn-secondary { background: rgba(255,255,255,0.15); color: #ecf0f1; font-size: 0.9rem; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.25); }
         .btn-danger { background: rgba(231, 76, 60, 0.2); color: #e74c3c; font-size: 0.8rem; margin-top: 10px; }
+        .btn-danger:hover { background: rgba(231, 76, 60, 0.4); }
 
         .btn-dark-circle { position: fixed; top: 20px; right: 20px; width: 45px; height: 45px; border-radius: 50%; background: white; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer; z-index: 50; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: 0.3s; }
         body.dark-mode .btn-dark-circle { background: var(--sidebar-bg); color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        
+        .btn-dark-circle:hover { transform: scale(1.1); }
+
         .btn-exit-focus { position: fixed; top: 20px; right: 80px; background: var(--accent-color); color: white; padding: 10px 20px; border-radius: 30px; border: none; cursor: pointer; z-index: 60; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-weight: bold; }
+
         .btn-menu-mobile { position: fixed; top: 20px; left: 20px; width: 45px; height: 45px; border-radius: 50%; background: var(--sidebar-bg); color: white; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer; z-index: 60; display: none; align-items: center; justify-content: center; font-size: 1.2rem; }
         @media (max-width: 768px) { .btn-menu-mobile { display: flex; } }
 
@@ -300,6 +305,12 @@
                 <option value="Pharmacology">💊 Pharmacology</option>
                 <option value="Clinical">🏥 Clinical</option>
             </optgroup>
+            <!-- DENTISTRY -->
+            <optgroup label="Dentistry">
+                <option value="Dental Anatomy">🦷 Dental Anatomy</option>
+                <option value="Procedures">🛠️ Procedures</option>
+                <option value="Dental Cases">🧾 Cases</option>
+            </optgroup>
         </select>
 
         <div class="search-container">
@@ -382,6 +393,7 @@
             
             <button class="tool-btn" onclick="insertBlock('header')"><span>🏷️</span> Title</button>
             <button class="tool-btn" onclick="insertBlock('todo')"><span>✅</span> To-Do</button>
+            <!-- NEW CS TOOLS (Initially Hidden) -->
             <button class="tool-btn" id="btnCSCode" onclick="insertCSCodeBlock()" style="color:var(--cs-accent); display:none;"><span>&lt;&gt;</span> Code</button>
             
             <button class="tool-btn" onclick="insertBlock('note')"><span>📌</span> Note</button>
@@ -422,10 +434,12 @@
 
                 <input type="file" id="imageInput" style="display: none;" accept="image/*" onchange="handleImageUpload(event)">
                 <input type="text" class="paper-title" id="pageTitle" placeholder="Untitled Page" oninput="markUnsaved(); saveCurrentToCloud()">
+                <!-- CRITICAL FOR iPAD: Event delegation added, inline handlers removed -->
                 <div class="content-area writing-tool-pen" id="editor" contenteditable="true" spellcheck="false" oninput="markUnsaved(); saveCurrentToCloud()"></div>
             </div>
         </main>
 
+        <!-- LECTURE PANE (RIGHT SPLIT) -->
         <div class="lecture-pane" id="lecturePane">
             <div class="lecture-header">
                 <span>📚 Lecture Reader</span>
@@ -455,18 +469,60 @@
                 <option value="system">System Design</option>
                 <option value="project">Project</option>
                 <option value="whiteboard">Whiteboard</option>
-                <option value="anatomy">Anatomy</option>
-                <option value="disease">Disease Profile</option>
-                <option value="drug">Drug Monograph</option>
-                <option value="pathway">Pathway</option>
-                <option value="clinical_case">Clinical Case</option>
-                <option value="lab">Lab Interpretation</option>
+                <optgroup label="Medical">
+                    <option value="anatomy">Anatomy</option>
+                    <option value="disease">Disease Profile</option>
+                    <option value="drug">Drug Monograph</option>
+                    <option value="pathway">Pathway</option>
+                    <option value="clinical_case">Clinical Case</option>
+                    <option value="lab">Lab Interpretation</option>
+                </optgroup>
+                <optgroup label="Dentistry">
+                    <option value="dental_anatomy">Dental Anatomy</option>
+                    <option value="oral_pathology">Oral Pathology</option>
+                    <option value="dental_procedure">Procedure</option>
+                    <option value="dental_case">Dental Case</option>
+                    <option value="prostho_plan">Prostho Plan</option>
+                    <option value="endo_case">Endo Case</option>
+                    <option value="perio_case">Perio Case</option>
+                    <option value="oral_radiology">Oral Radiology</option>
+                </optgroup>
             </select>
         </div>
         <div class="meta-group">
             <label class="meta-label">System / Course</label>
             <input type="text" id="metaSystem" class="meta-value" placeholder="e.g. Cardio, Neuro..." onchange="updatePageMeta()">
         </div>
+        <!-- DENTISTRY SPECIFIC METADATA -->
+        <div id="dentalMetaGroup" style="display:none; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px;">
+            <div class="meta-group">
+                <label class="meta-label">Tooth # (FDI/Universal)</label>
+                <input type="text" id="metaTooth" class="meta-value" placeholder="e.g. 11, 46, #3..." onchange="updatePageMeta()">
+            </div>
+            <div class="meta-group">
+                <label class="meta-label">Quadrant</label>
+                <select id="metaQuadrant" class="meta-value" onchange="updatePageMeta()">
+                    <option value="">None</option>
+                    <option value="UR">UR (1)</option>
+                    <option value="UL">UL (2)</option>
+                    <option value="LL">LL (3)</option>
+                    <option value="LR">LR (4)</option>
+                </select>
+            </div>
+             <div class="meta-group">
+                <label class="meta-label">Specialty</label>
+                <select id="metaSpecialty" class="meta-value" onchange="updatePageMeta()">
+                    <option value="">General</option>
+                    <option value="Endo">Endodontics</option>
+                    <option value="Perio">Periodontics</option>
+                    <option value="Prostho">Prosthodontics</option>
+                    <option value="Ortho">Orthodontics</option>
+                    <option value="Surgery">Oral Surgery</option>
+                    <option value="Pedo">Pedodontics</option>
+                </select>
+            </div>
+        </div>
+
         <div class="meta-group">
             <label class="meta-label">Difficulty</label>
             <select id="metaDifficulty" class="meta-value" onchange="updatePageMeta()">
@@ -497,6 +553,10 @@
                 <span>⚕️ Medical</span>
                 <span>▶</span>
             </button>
+            <button class="tool-btn" onclick="showDentistryTemplates()" style="justify-content:space-between; background: var(--dent-accent); color: white; border: none;">
+                <span>🦷 Dentistry</span>
+                <span>▶</span>
+            </button>
             <hr style="width:100%; opacity:0.1; margin: 8px 0;">
             <button class="tool-btn" onclick="applyTemplate('default')">📄 Default Page</button>
             <button class="tool-btn" onclick="applyTemplate('whiteboard')">♾️ Infinite Whiteboard</button>
@@ -523,6 +583,19 @@
             <button class="tool-btn" onclick="applyTemplate('physio')">🦵 Physiotherapy Case</button>
             <button class="tool-btn" onclick="applyTemplate('pathway')">🧬 Pathway Breakdown</button>
             <button class="tool-btn" onclick="applyTemplate('lab')">🧪 Lab Interpretation</button>
+        </div>
+        
+        <!-- Dentistry Sub-Menu View -->
+        <div id="tmpl-dentistry-view" style="display:none;">
+            <button class="tool-btn" onclick="showMainTemplates()" style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <button class="tool-btn" onclick="applyTemplate('dental_anatomy')">🦷 Dental Anatomy</button>
+            <button class="tool-btn" onclick="applyTemplate('oral_pathology')">🧬 Oral Pathology</button>
+            <button class="tool-btn" onclick="applyTemplate('dental_procedure')">🛠️ Procedure</button>
+            <button class="tool-btn" onclick="applyTemplate('dental_case')">🧾 Dental Case</button>
+            <button class="tool-btn" onclick="applyTemplate('prostho_plan')">🦷 Prostho Plan</button>
+            <button class="tool-btn" onclick="applyTemplate('endo_case')">🦠 Endo Case</button>
+            <button class="tool-btn" onclick="applyTemplate('perio_case')">🪥 Perio Case</button>
+            <button class="tool-btn" onclick="applyTemplate('oral_radiology')">🩻 Oral Radiology</button>
         </div>
 
         <button class="tool-btn" onclick="toggleTemplates()" style="margin-top: 10px; background: #eee;">Close</button>
@@ -551,7 +624,16 @@
             DRUG: 'drug',
             PATHWAY: 'pathway',
             CLINICAL_CASE: 'clinical_case',
-            LAB: 'lab'
+            LAB: 'lab',
+            // Dentistry
+            DENTAL_ANATOMY: 'dental_anatomy',
+            ORAL_PATHOLOGY: 'oral_pathology',
+            DENTAL_PROCEDURE: 'dental_procedure',
+            DENTAL_CASE: 'dental_case',
+            PROSTHO_PLAN: 'prosthodontic_plan',
+            ENDO_CASE: 'endodontic_case',
+            PERIO_CASE: 'periodontal_case',
+            ORAL_RADIOLOGY: 'oral_radiology'
         };
 
         // --- INDEXEDDB STORAGE ENGINE (DB v2 - Schema Update) ---
@@ -823,6 +905,23 @@
             document.getElementById('metaSystem').value = chapter.metadata?.system || '';
             document.getElementById('metaCreated').innerText = new Date(chapter.metadata?.createdAt).toLocaleString();
             
+            // Dentistry Metadata
+            const dentalTypes = [
+                PAGE_TYPES.DENTAL_ANATOMY, PAGE_TYPES.ORAL_PATHOLOGY, PAGE_TYPES.DENTAL_PROCEDURE,
+                PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.PROSTHO_PLAN, PAGE_TYPES.ENDO_CASE,
+                PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY
+            ];
+            
+            const dentalGroup = document.getElementById('dentalMetaGroup');
+            if(dentalTypes.includes(chapter.metadata?.type)) {
+                dentalGroup.style.display = 'block';
+                document.getElementById('metaTooth').value = chapter.metadata?.toothNumber || '';
+                document.getElementById('metaQuadrant').value = chapter.metadata?.quadrant || '';
+                document.getElementById('metaSpecialty').value = chapter.metadata?.specialty || '';
+            } else {
+                dentalGroup.style.display = 'none';
+            }
+
             document.getElementById('metadataModal').style.display = 'flex';
         };
 
@@ -836,7 +935,25 @@
                 chapter.metadata.type = document.getElementById('metaType').value;
                 chapter.metadata.difficulty = document.getElementById('metaDifficulty').value;
                 chapter.metadata.system = document.getElementById('metaSystem').value;
+                
+                // Save dental meta
+                chapter.metadata.toothNumber = document.getElementById('metaTooth').value;
+                chapter.metadata.quadrant = document.getElementById('metaQuadrant').value;
+                chapter.metadata.specialty = document.getElementById('metaSpecialty').value;
+
                 saveChapterToDB(chapter);
+                // Update UI visibility for dental fields
+                 const dentalTypes = [
+                    PAGE_TYPES.DENTAL_ANATOMY, PAGE_TYPES.ORAL_PATHOLOGY, PAGE_TYPES.DENTAL_PROCEDURE,
+                    PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.PROSTHO_PLAN, PAGE_TYPES.ENDO_CASE,
+                    PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY
+                ];
+                const dentalGroup = document.getElementById('dentalMetaGroup');
+                if(dentalTypes.includes(chapter.metadata.type)) {
+                    dentalGroup.style.display = 'block';
+                } else {
+                    dentalGroup.style.display = 'none';
+                }
             }
         };
 
@@ -1289,7 +1406,8 @@
             // Apply discipline if category implies it
             if(['Algorithms','Systems','Projects'].includes(category)) newChapter.metadata.discipline = 'cs';
             if(['Anatomy','Pathology','Pharmacology','Clinical'].includes(category)) newChapter.metadata.discipline = 'medical';
-            
+            if(['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(category)) newChapter.metadata.discipline = 'medical'; // Dentistry is a specialization of medical
+
             chapters.unshift(newChapter); 
             saveChapterToDB(newChapter);
             renderSidebar();
@@ -1415,13 +1533,9 @@
         };
 
         window.toggleVoiceTranscription = () => {
-            // Fallback for API absence
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                showToast("Use Keyboard Mic 🎙️");
-                return;
-            }
             if (!recognition) {
                 const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!Speech) return showToast("Speech API not supported on this browser");
                 recognition = new Speech();
                 recognition.continuous = true;
                 recognition.interimResults = false;
@@ -1490,18 +1604,28 @@
             document.getElementById('tmpl-main-view').style.display = 'none';
             document.getElementById('tmpl-cs-view').style.display = 'block';
             document.getElementById('tmpl-med-view').style.display = 'none';
+            document.getElementById('tmpl-dentistry-view').style.display = 'none';
         };
 
         window.showMedTemplates = () => {
             document.getElementById('tmpl-main-view').style.display = 'none';
             document.getElementById('tmpl-cs-view').style.display = 'none';
             document.getElementById('tmpl-med-view').style.display = 'block';
+            document.getElementById('tmpl-dentistry-view').style.display = 'none';
+        };
+
+        window.showDentistryTemplates = () => {
+            document.getElementById('tmpl-main-view').style.display = 'none';
+            document.getElementById('tmpl-cs-view').style.display = 'none';
+            document.getElementById('tmpl-med-view').style.display = 'none';
+            document.getElementById('tmpl-dentistry-view').style.display = 'block';
         };
 
         window.showMainTemplates = () => {
             document.getElementById('tmpl-main-view').style.display = 'block';
             document.getElementById('tmpl-cs-view').style.display = 'none';
             document.getElementById('tmpl-med-view').style.display = 'none';
+            document.getElementById('tmpl-dentistry-view').style.display = 'none';
         };
 
         window.applyTemplate = async (key) => {
@@ -1535,7 +1659,17 @@
                 drug: { title: "Drug Monograph", content: "<h2 class='styled-header'>Class & Mechanism</h2><p>...</p><h2 class='styled-header'>Indications</h2><p>...</p><h2 class='styled-header'>Contraindications & Side Effects</h2><div class='sticky-note'>Warning: ...</div><h2 class='styled-header'>Dosage</h2><p>...</p>", type: PAGE_TYPES.DRUG },
                 physio: { title: "Physio Case", content: "<h2 class='styled-header'>Patient Profile</h2><p>Age, Gender, Occupation...</p><h2 class='styled-header'>Assessment (SOAP)</h2><p>Subjective: ...</p><p>Objective: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Exercise 1</div></div>", type: PAGE_TYPES.CLINICAL_CASE },
                 pathway: { title: "Pathway Breakdown", content: "<h2 class='styled-header'>Overview</h2><p>...</p><h2 class='styled-header'>Steps</h2><div class='chalk-code'>1. Signal -> Receptor</div><h2 class='styled-header'>Regulation</h2><p>...</p>", type: PAGE_TYPES.PATHWAY },
-                lab: { title: "Lab Interpretation", content: "<h2 class='styled-header'>Test Name</h2><p>...</p><h2 class='styled-header'>Normal Range</h2><p>...</p><h2 class='styled-header'>Interpretation</h2><p>High: ...</p><p>Low: ...</p>", type: PAGE_TYPES.LAB }
+                lab: { title: "Lab Interpretation", content: "<h2 class='styled-header'>Test Name</h2><p>...</p><h2 class='styled-header'>Normal Range</h2><p>...</p><h2 class='styled-header'>Interpretation</h2><p>High: ...</p><p>Low: ...</p>", type: PAGE_TYPES.LAB },
+
+                // DENTISTRY TEMPLATES
+                dental_anatomy: { title: "Dental Anatomy", content: "<h2 class='styled-header'>Tooth Name / Number</h2><p>...</p><h2 class='styled-header'>Morphology & Surfaces</h2><p>...</p><h2 class='styled-header'>Root Anatomy</h2><p>...</p><h2 class='styled-header'>Clinical Notes</h2><div class='sticky-note'>Eruption: ...</div>", type: PAGE_TYPES.DENTAL_ANATOMY },
+                oral_pathology: { title: "Oral Pathology", content: "<h2 class='styled-header'>Condition</h2><p>...</p><h2 class='styled-header'>Etiology</h2><p>...</p><h2 class='styled-header'>Clinical Appearance</h2><p>...</p><h2 class='styled-header'>Radiographic Features</h2><p>...</p><h2 class='styled-header'>Management</h2><p>...</p>", type: PAGE_TYPES.ORAL_PATHOLOGY },
+                dental_procedure: { title: "Dental Procedure", content: "<h2 class='styled-header'>Procedure Name</h2><p>...</p><h2 class='styled-header'>Indications</h2><p>...</p><h2 class='styled-header'>Instruments Required</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Mirror/Probe</div></div><h2 class='styled-header'>Step-by-Step</h2><p>1. Anesthesia...</p>", type: PAGE_TYPES.DENTAL_PROCEDURE },
+                dental_case: { title: "Dental Case", content: "<h2 class='styled-header'>Patient Profile</h2><p>...</p><h2 class='styled-header'>Chief Complaint (C/O)</h2><p>...</p><h2 class='styled-header'>Examination (O/E)</h2><p>Intraoral: ...</p><h2 class='styled-header'>Diagnosis & Plan</h2><p>...</p>", type: PAGE_TYPES.DENTAL_CASE },
+                prostho_plan: { title: "Prostho Plan", content: "<h2 class='styled-header'>Edentulous Space</h2><p>...</p><h2 class='styled-header'>Abutment Evaluation</h2><p>...</p><h2 class='styled-header'>Design Components</h2><p>Major Connector: ...</p><p>Clasps: ...</p>", type: PAGE_TYPES.PROSTHO_PLAN },
+                endo_case: { title: "Endo Case", content: "<h2 class='styled-header'>Tooth & Diagnosis</h2><p>...</p><h2 class='styled-header'>Access & WL</h2><p>Working Length: ...mm</p><h2 class='styled-header'>Instrumentation</h2><p>MAF: ...</p><h2 class='styled-header'>Obturation</h2><p>Technique: ...</p>", type: PAGE_TYPES.ENDO_CASE },
+                perio_case: { title: "Perio Charting", content: "<h2 class='styled-header'>Periodontal Status</h2><p>Pockets > 4mm: ...</p><h2 class='styled-header'>Diagnosis</h2><p>Stage: ... Grade: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scaling & Root Planing</div></div>", type: PAGE_TYPES.PERIO_CASE },
+                oral_radiology: { title: "Radiographic Report", content: "<h2 class='styled-header'>Image Type</h2><p>IOPA / OPG / CBCT</p><h2 class='styled-header'>Findings</h2><p>Radio-opacity/lucency: ...</p><h2 class='styled-header'>Interpretation</h2><p>...</p>", type: PAGE_TYPES.ORAL_RADIOLOGY }
             };
             
             const selected = temps[key];
@@ -1555,6 +1689,7 @@
                 let disc = 'general';
                 if(['algo', 'codeStudy', 'sysDesign', 'project'].includes(key)) disc = 'cs';
                 if(['anatomy', 'disease', 'drug', 'physio', 'pathway', 'lab'].includes(key)) disc = 'medical';
+                if(['dental_anatomy', 'oral_pathology', 'dental_procedure', 'dental_case', 'prostho_plan', 'endo_case', 'perio_case', 'oral_radiology'].includes(key)) disc = 'medical'; // Dentistry falls under medical discipline
                 
                 chapter.metadata.discipline = disc;
                 chapter.metadata.type = selected.type || PAGE_TYPES.NOTE;
@@ -1603,6 +1738,14 @@
                         if (categoryFilter === 'Pathology' && ch.metadata?.type !== PAGE_TYPES.DISEASE) matchesCat = false;
                         if (categoryFilter === 'Pharmacology' && ch.metadata?.type !== PAGE_TYPES.DRUG) matchesCat = false;
                         if (categoryFilter === 'Clinical' && ![PAGE_TYPES.CLINICAL_CASE, PAGE_TYPES.LAB].includes(ch.metadata?.type)) matchesCat = false;
+                    } else if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter)) {
+                         // Dentistry Filters
+                         if (ch.metadata?.discipline !== 'medical') return false; // Dentistry is medical
+
+                         if (categoryFilter === 'Dental Anatomy' && ch.metadata?.type !== PAGE_TYPES.DENTAL_ANATOMY) matchesCat = false;
+                         if (categoryFilter === 'Procedures' && ![PAGE_TYPES.DENTAL_PROCEDURE, PAGE_TYPES.PROSTHO_PLAN].includes(ch.metadata?.type)) matchesCat = false;
+                         if (categoryFilter === 'Dental Cases' && ![PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.ENDO_CASE, PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY, PAGE_TYPES.ORAL_PATHOLOGY].includes(ch.metadata?.type)) matchesCat = false;
+
                     } else if (categoryFilter === 'General') {
                         matchesCat = ch.metadata?.discipline === 'general';
                     }
