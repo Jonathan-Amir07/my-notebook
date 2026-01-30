@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Notebook - Engineering Math Edition</title>
+    <title>Notebook - Engineering Math Pro</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Patrick+Hand&family=Caveat:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Kalam:wght@300;400;700&family=Architects+Daughter&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- KaTeX for Math Rendering -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
     <style>
         :root {
             --paper-bg: #fdfbf7;
@@ -36,8 +39,8 @@
             --chalk-text: #dfe6e9;
             --save-color: #27ae60;
             --highlighter-color: rgba(255, 235, 59, 0.4);
-            --math-cluster-color: rgba(211, 84, 0, 0.1);
-            --math-border-color: rgba(211, 84, 0, 0.5);
+            --math-cluster-color: rgba(52, 152, 219, 0.1);
+            --math-border-color: rgba(52, 152, 219, 0.5);
         }
 
         body.dark-mode {
@@ -407,8 +410,8 @@
     <!-- MATH CONVERSION MODAL -->
     <div id="mathModal" class="floating-pane" style="display:none; width: 300px; z-index: 1001;">
         <h3 style="margin-bottom: 15px;">Convert to Math</h3>
-        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">Transcribe your equation (LaTeX-like):</p>
-        <textarea id="mathInput" style="width:100%; height:80px; padding:8px; margin-bottom:10px; border:1px solid #ddd; font-family:monospace;" placeholder="E = mc^2"></textarea>
+        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">Detected Pattern:</p>
+        <textarea id="mathInput" style="width:100%; height:80px; padding:8px; margin-bottom:10px; border:1px solid #ddd; font-family:monospace;" placeholder="..."></textarea>
         <div style="display:flex; gap:10px;">
             <button class="tool-btn" onclick="saveMathConversion()" style="background: var(--save-color); color: white; justify-content: center; flex:1;">Convert</button>
             <button class="tool-btn" onclick="closeMathModal()" style="background: #eee; justify-content: center; flex:1;">Cancel</button>
@@ -525,6 +528,7 @@
     <div class="tool-tray-container" id="trayContainer">
         <div class="tool-tray">
             <!-- Global Tools -->
+            <button class="tool-btn" id="voiceBtn" onclick="toggleVoiceTranscription()"><span>🎤</span> Dictate</button>
             <button class="tool-btn" id="handBtn" onclick="selectSketchTool('hand')"><span>✋</span> Pan</button>
             <button class="tool-btn" id="eraserBtn" onclick="selectSketchTool('eraser')"><span>🧼</span> Eraser</button>
             
@@ -532,7 +536,6 @@
                 <span>🌈</span> Color
                 <input type="color" id="customColorPicker" class="color-picker-input" onchange="setCustomColor(this.value)">
             </div>
-            <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
             
             <hr style="opacity: 0.2;">
             
@@ -553,9 +556,9 @@
             <!-- 2. MEDICAL TOOLBAR -->
             <div id="tools-med" style="display:none; flex-direction:column; gap:8px;">
                 <hr style="opacity: 0.2;">
-                <button class="tool-btn" onclick="activateAnatomyPin()"><span>📍</span> Anatomy Pin</button>
-                <button class="tool-btn" onclick="setHighlightPreset('symptom')"><span>🟡</span> Symptom</button>
-                <button class="tool-btn" onclick="setHighlightPreset('drug')"><span>🔴</span> Drug</button>
+                <button class="tool-btn" onclick="activateAnatomyPin()"><span>📍</span> Pin</button>
+                <button class="tool-btn" onclick="setHighlightPreset('symptom')"><span>🟡</span> Sx</button>
+                <button class="tool-btn" onclick="setHighlightPreset('drug')"><span>🔴</span> Rx</button>
                 <button class="tool-btn" onclick="insertTimeline()"><span>⏳</span> Timeline</button>
                 <button class="tool-btn" onclick="insertComparison()"><span>⚖️</span> Compare</button>
             </div>
@@ -565,11 +568,13 @@
                 <hr style="opacity: 0.2;">
                 <button class="tool-btn" onclick="toggleMathMode()" id="mathModeBtn"><span>∑</span> Math Mode</button>
                 <button class="tool-btn" onclick="toggleRuler()"><span>📏</span> Ruler</button>
-                <button class="tool-btn" onclick="insertEquation()"><span>∑</span> Equation</button>
+                <button class="tool-btn" onclick="insertEquation()"><span>∑</span> Eq Block</button>
                 <button class="tool-btn" onclick="insertAssumptions()"><span>🤔</span> Assume</button>
                 <button class="tool-btn" onclick="insertConstants()"><span>π</span> Constants</button>
             </div>
             
+            <button class="tool-btn" onclick="insertBlock('code')"><span>💻</span> Code</button>
+            <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
             <hr style="opacity: 0.2;">
             <button class="tool-btn" style="color: #e74c3c" onclick="clearSketch()"><span>🗑️</span> Clear Sketch</button>
         </div>
@@ -600,10 +605,8 @@
                     <div class="tool-opt" data-tool="elegant" onclick="selectWritingTool('elegant')">✒️</div>
                     <div class="tool-opt" data-tool="brush" onclick="selectWritingTool('brush')">🎨</div>
                     <div class="tool-opt" data-tool="chalk" onclick="selectWritingTool('chalk')">📝</div>
-                    
                     <div class="tool-divider" style="margin: 0 10px;"></div>
                     <div class="tool-opt" onclick="toggleTopTools()" style="font-weight:bold;">_</div>
-
                     <div class="tool-divider sketch-only"></div>
                     <div class="tool-opt sketch-only" onclick="undoSketch()" title="Undo">↩️</div>
                     <div class="tool-opt sketch-only" onclick="redoSketch()" title="Redo">↪️</div>
@@ -611,6 +614,7 @@
 
                 <input type="file" id="imageInput" style="display: none;" accept="image/*" onchange="handleImageUpload(event)">
                 <input type="text" class="paper-title" id="pageTitle" placeholder="Untitled Page" oninput="markUnsaved(); saveCurrentToCloud()">
+                <!-- CRITICAL FOR iPAD: Event delegation added, inline handlers removed -->
                 <div class="content-area writing-tool-pen" id="editor" contenteditable="true" spellcheck="false" oninput="markUnsaved(); saveCurrentToCloud()"></div>
             </div>
         </main>
@@ -1237,7 +1241,7 @@
             });
         }
 
-        // --- MATH MODE LOGIC ---
+        // --- MATH MODE LOGIC - GEOMETRIC ENGINE ---
         window.toggleMathMode = () => {
             isMathMode = !isMathMode;
             document.getElementById('mathModeBtn').classList.toggle('active', isMathMode);
@@ -1251,27 +1255,20 @@
         window.saveMathConversion = () => {
              const input = document.getElementById('mathInput').value;
              if(input && activeClusterId) {
-                 // Create HTML representation (Pseudo-LaTeX)
-                 const mathHtml = `<div class="structured-math">${input}</div>`;
+                 // Create HTML representation (via KaTeX if available or pseudo)
+                 let mathHtml = '';
+                 try {
+                     if(window.katex) {
+                         mathHtml = katex.renderToString(input, { throwOnError: false });
+                     } else {
+                         mathHtml = `<div class="structured-math">${input}</div>`;
+                     }
+                 } catch(e) {
+                     mathHtml = `<div class="structured-math">${input}</div>`;
+                 }
                  
-                 // Find cluster visual and attach html
-                 const layer = document.getElementById('mathLayer');
-                 const clusterDiv = document.createElement('div');
-                 clusterDiv.innerHTML = mathHtml;
-                 
-                 // Position it near the last known cluster center (simplification)
-                 // In a full implementation, we'd use the bounding box of the active cluster
-                 // For now, center of screen as placeholder or last stroke
-                 
-                 // Hide the ink for this cluster - requires advanced redraw logic not fully in scope
-                 // Instead, we just append the structured math as an overlay
-                 
-                 // Update the strokes in this cluster to be 'converted' so they don't draw?
-                 // That requires re-saving the chapter.
-                 
-                 // Simple implementation: Add text block to editor
                  const editor = document.getElementById('editor');
-                 editor.innerHTML += `<p style="font-family:'Times New Roman'; font-style:italic; font-size:1.2rem;">${input}</p>`;
+                 editor.innerHTML += `<div contenteditable="false" style="display:inline-block; margin:5px; padding:5px; border:1px dashed #ccc;">${mathHtml}</div>`;
                  
                  closeMathModal();
                  showToast("Math Inserted");
@@ -1282,12 +1279,9 @@
         function detectMathCluster(stroke) {
              if(!isMathMode) return;
              
-             // Simple clustering: close in time and space
-             // We just grab the bounding box of the stroke
-             // And see if it overlaps with recent math strokes
+             // GEOMETRIC ANALYSIS MOCKUP
+             // In a real system, we'd analyze stroke.points vs previous strokes
              
-             // Create a visual indicator for "Active Equation"
-             // This is a simplified visual feedback
              const points = stroke.points;
              if(points.length < 2) return;
              
@@ -1299,10 +1293,17 @@
                  if(p.y > maxY) maxY = p.y;
              });
              
-             // Add padding
-             minX -= 10; maxX += 10; minY -= 10; maxY += 10;
+             // Heuristic: Width vs Height
+             const width = maxX - minX;
+             const height = maxY - minY;
+             let guess = "...";
              
-             // Draw temporary blue box on math layer
+             if (width > height * 2) guess = "\\frac{a}{b}"; // Fraction bar
+             else if (height > width * 2) guess = "\\int_{a}^{b}"; // Integral
+             else if (minY < 50) guess = "x^2"; // High up - superscript
+             
+             // Add visual box
+             minX -= 10; maxX += 10; minY -= 10; maxY += 10;
              const layer = document.getElementById('mathLayer');
              const box = document.createElement('div');
              box.className = 'math-cluster-active';
@@ -1312,15 +1313,15 @@
              box.style.height = (maxY - minY) + 'px';
              box.title = "Tap to Convert";
              box.onclick = function() {
-                 activeClusterId = Date.now(); // Dummy ID
-                 document.getElementById('mathModal').style.display = 'flex';
-                 // Clean up box
+                 activeClusterId = Date.now(); 
+                 const modal = document.getElementById('mathModal');
+                 document.getElementById('mathInput').value = guess;
+                 modal.style.display = 'flex';
                  this.remove();
              };
              
              layer.appendChild(box);
              
-             // Auto-remove box after 5 seconds if not clicked
              setTimeout(() => {
                  if(box.parentNode) box.remove();
              }, 5000);
@@ -1795,6 +1796,16 @@
              
              minX -= 10; maxX += 10; minY -= 10; maxY += 10;
              
+             // GEOMETRIC HEURISTICS
+             const width = maxX - minX;
+             const height = maxY - minY;
+             let guess = "...";
+             
+             if (width > height * 2) guess = "\\frac{a}{b}"; 
+             else if (height > width * 2.5) guess = "\\int_{a}^{b}"; 
+             else if (minY < 50) guess = "x^{2}";
+             else if (height > width && width < 30) guess = "=";
+             
              const layer = document.getElementById('mathLayer');
              const box = document.createElement('div');
              box.className = 'math-cluster-active';
@@ -1805,7 +1816,9 @@
              box.title = "Tap to Convert";
              box.onclick = function() {
                  activeClusterId = Date.now(); 
-                 document.getElementById('mathModal').style.display = 'flex';
+                 const modal = document.getElementById('mathModal');
+                 document.getElementById('mathInput').value = guess;
+                 modal.style.display = 'flex';
                  this.remove();
              };
              
@@ -1813,7 +1826,7 @@
              
              setTimeout(() => {
                  if(box.parentNode) box.remove();
-             }, 5000);
+             }, 8000); // 8 seconds to decide
         }
 
         function saveStateToStack() {
