@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Patrick+Hand&family=Caveat:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Kalam:wght@300;400;700&family=Architects+Daughter&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <style>
         :root {
             --paper-bg: #fdfbf7;
@@ -34,8 +36,8 @@
             --chalk-text: #dfe6e9;
             --save-color: #27ae60;
             --highlighter-color: rgba(255, 235, 59, 0.4);
-            --math-cluster-color: rgba(52, 152, 219, 0.1);
-            --math-border-color: rgba(52, 152, 219, 0.5);
+            --math-cluster-color: rgba(211, 84, 0, 0.1);
+            --math-border-color: rgba(211, 84, 0, 0.5);
         }
 
         body.dark-mode {
@@ -348,12 +350,13 @@
         
         /* Math Cluster Highlight */
         .math-cluster-active {
-            border: 2px dashed #3498db;
-            background-color: rgba(52, 152, 219, 0.05);
+            border: 2px dashed #d35400;
+            background-color: rgba(211, 84, 0, 0.05);
             position: absolute;
             pointer-events: auto;
             cursor: pointer;
             z-index: 6;
+            border-radius: 4px;
         }
         
         /* Structured Math Display */
@@ -521,7 +524,7 @@
 
     <div class="tool-tray-container" id="trayContainer">
         <div class="tool-tray">
-            <button class="tool-btn" id="voiceBtn" onclick="toggleVoiceTranscription()"><span>🎤</span> Dictate</button>
+            <!-- Global Tools -->
             <button class="tool-btn" id="handBtn" onclick="selectSketchTool('hand')"><span>✋</span> Pan</button>
             <button class="tool-btn" id="eraserBtn" onclick="selectSketchTool('eraser')"><span>🧼</span> Eraser</button>
             
@@ -529,13 +532,16 @@
                 <span>🌈</span> Color
                 <input type="color" id="customColorPicker" class="color-picker-input" onchange="setCustomColor(this.value)">
             </div>
+            <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
             
             <hr style="opacity: 0.2;">
             
+            <!-- Standard Block Tools -->
             <button class="tool-btn" onclick="insertBlock('header')"><span>🏷️</span> Title</button>
+            <button class="tool-btn" onclick="insertBlock('note')"><span>📌</span> Note</button>
             <button class="tool-btn" onclick="insertBlock('todo')"><span>✅</span> To-Do</button>
-            
-            <!-- CS TOOLS -->
+
+            <!-- 1. CS TOOLBAR -->
             <div id="tools-cs" style="display:none; flex-direction:column; gap:8px;">
                 <hr style="opacity: 0.2;">
                 <button class="tool-btn" onclick="insertCSCodeBlock()"><span>&lt;&gt;</span> Code Block</button>
@@ -543,28 +549,27 @@
                 <button class="tool-btn" onclick="insertComplexity()"><span>O(n)</span> Complexity</button>
                 <button class="tool-btn" onclick="insertTraceTable()"><span>📉</span> Trace Table</button>
             </div>
-            
-            <!-- ENG TOOLS -->
-            <div id="tools-eng" style="display:none; flex-direction:column; gap:8px;">
-                 <hr style="opacity: 0.2;">
-                 <button class="tool-btn" onclick="toggleMathMode()" id="mathModeBtn"><span>∑</span> Math Mode</button>
-                 <button class="tool-btn" onclick="toggleRuler()"><span>📏</span> Ruler</button>
-                 <button class="tool-btn" onclick="insertEquation()"><span>∑</span> Eq Block</button>
-                 <button class="tool-btn" onclick="insertConstants()"><span>π</span> Constants</button>
+
+            <!-- 2. MEDICAL TOOLBAR -->
+            <div id="tools-med" style="display:none; flex-direction:column; gap:8px;">
+                <hr style="opacity: 0.2;">
+                <button class="tool-btn" onclick="activateAnatomyPin()"><span>📍</span> Anatomy Pin</button>
+                <button class="tool-btn" onclick="setHighlightPreset('symptom')"><span>🟡</span> Symptom</button>
+                <button class="tool-btn" onclick="setHighlightPreset('drug')"><span>🔴</span> Drug</button>
+                <button class="tool-btn" onclick="insertTimeline()"><span>⏳</span> Timeline</button>
+                <button class="tool-btn" onclick="insertComparison()"><span>⚖️</span> Compare</button>
             </div>
 
-            <!-- MED TOOLS -->
-            <div id="tools-med" style="display:none; flex-direction:column; gap:8px;">
-                 <hr style="opacity: 0.2;">
-                 <button class="tool-btn" onclick="activateAnatomyPin()"><span>📍</span> Pin</button>
-                 <button class="tool-btn" onclick="setHighlightPreset('symptom')"><span>🟡</span> Sx</button>
-                 <button class="tool-btn" onclick="setHighlightPreset('drug')"><span>🔴</span> Rx</button>
-                 <button class="tool-btn" onclick="insertTimeline()"><span>⏳</span> Timeline</button>
-                 <button class="tool-btn" onclick="insertComparison()"><span>⚖️</span> Compare</button>
+            <!-- 3. ENGINEERING TOOLBAR -->
+            <div id="tools-eng" style="display:none; flex-direction:column; gap:8px;">
+                <hr style="opacity: 0.2;">
+                <button class="tool-btn" onclick="toggleMathMode()" id="mathModeBtn"><span>∑</span> Math Mode</button>
+                <button class="tool-btn" onclick="toggleRuler()"><span>📏</span> Ruler</button>
+                <button class="tool-btn" onclick="insertEquation()"><span>∑</span> Equation</button>
+                <button class="tool-btn" onclick="insertAssumptions()"><span>🤔</span> Assume</button>
+                <button class="tool-btn" onclick="insertConstants()"><span>π</span> Constants</button>
             </div>
             
-            <button class="tool-btn" onclick="insertBlock('note')"><span>📌</span> Note</button>
-            <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
             <hr style="opacity: 0.2;">
             <button class="tool-btn" style="color: #e74c3c" onclick="clearSketch()"><span>🗑️</span> Clear Sketch</button>
         </div>
@@ -595,8 +600,10 @@
                     <div class="tool-opt" data-tool="elegant" onclick="selectWritingTool('elegant')">✒️</div>
                     <div class="tool-opt" data-tool="brush" onclick="selectWritingTool('brush')">🎨</div>
                     <div class="tool-opt" data-tool="chalk" onclick="selectWritingTool('chalk')">📝</div>
+                    
                     <div class="tool-divider" style="margin: 0 10px;"></div>
                     <div class="tool-opt" onclick="toggleTopTools()" style="font-weight:bold;">_</div>
+
                     <div class="tool-divider sketch-only"></div>
                     <div class="tool-opt sketch-only" onclick="undoSketch()" title="Undo">↩️</div>
                     <div class="tool-opt sketch-only" onclick="redoSketch()" title="Redo">↪️</div>
@@ -1434,15 +1441,18 @@
                 chapter.metadata.difficulty = document.getElementById('metaDifficulty').value;
                 chapter.metadata.system = document.getElementById('metaSystem').value;
                 
+                // Save dental meta
                 chapter.metadata.toothNumber = document.getElementById('metaTooth').value;
                 chapter.metadata.quadrant = document.getElementById('metaQuadrant').value;
                 chapter.metadata.specialty = document.getElementById('metaSpecialty').value;
 
+                // Save Engineering meta
                 chapter.metadata.branch = document.getElementById('metaEngBranch').value;
 
                 saveChapterToDB(chapter);
                 
-                openMetadataModal(); 
+                // Update UI visibility for fields
+                openMetadataModal(); // Refresh modal state
             }
         };
 
@@ -1591,6 +1601,9 @@
             if(!isSketchMode) toggleSketchMode();
         };
 
+        // --- NEW VECTOR DRAWING LOGIC ---
+        let currentStroke = null;
+
         function resizeCanvas() {
             const paper = document.getElementById('paper');
             const dpr = window.devicePixelRatio || 1;
@@ -1636,6 +1649,16 @@
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX || e.touches[0].clientX) - rect.left;
             const y = (e.clientY || e.touches[0].clientY) - rect.top;
+            
+            // Start new stroke object
+            currentStroke = {
+                points: [{x, y}],
+                color: ctx.strokeStyle,
+                width: ctx.lineWidth,
+                tool: activeSketchTool,
+                isMath: isMathMode
+            };
+
             ctx.beginPath();
             ctx.moveTo(x, y);
         }
@@ -1660,6 +1683,9 @@
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX || e.touches[0].clientX) - rect.left;
             const y = (e.clientY || e.touches[0].clientY) - rect.top;
+            
+            // Record Point
+            if(currentStroke) currentStroke.points.push({x, y});
 
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -1685,6 +1711,48 @@
             } else {
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50';
+                
+                // RULER SNAPPING
+                if (isRulerActive && activeSketchTool !== 'eraser' && activeSketchTool !== 'highlighter') {
+                    const ruler = document.getElementById('engRuler');
+                    const rRect = ruler.getBoundingClientRect();
+                    const cRect = canvas.getBoundingClientRect();
+                    
+                    const rx = (rRect.left - cRect.left) + rRect.width/2;
+                    const ry = (rRect.top - cRect.top) + rRect.height/2;
+                    
+                    const dx = x - rx;
+                    const dy = y - ry;
+                    
+                    const rad = -rulerAngle * Math.PI / 180;
+                    const localX = dx * Math.cos(rad) - dy * Math.sin(rad);
+                    const localY = dx * Math.sin(rad) + dy * Math.cos(rad);
+                    
+                    const halfH = rRect.height / 2;
+                    let snapped = false;
+                    
+                    if (Math.abs(localY + halfH) < 20) {
+                         const snapY = -halfH;
+                         const snapXWorld = localX * Math.cos(-rad) - snapY * Math.sin(-rad) + rx;
+                         const snapYWorld = localX * Math.sin(-rad) + snapY * Math.cos(-rad) + ry;
+                         ctx.lineTo(snapXWorld, snapYWorld);
+                         ctx.stroke();
+                         // Update stroke point to snapped pos
+                         if(currentStroke) currentStroke.points[currentStroke.points.length-1] = {x: snapXWorld, y: snapYWorld};
+                         snapped = true;
+                    } else if (Math.abs(localY - halfH) < 20) {
+                         const snapY = halfH;
+                         const snapXWorld = localX * Math.cos(-rad) - snapY * Math.sin(-rad) + rx;
+                         const snapYWorld = localX * Math.sin(-rad) + snapY * Math.cos(-rad) + ry;
+                         ctx.lineTo(snapXWorld, snapYWorld);
+                         ctx.stroke();
+                         if(currentStroke) currentStroke.points[currentStroke.points.length-1] = {x: snapXWorld, y: snapYWorld};
+                         snapped = true;
+                    }
+                    
+                    if(snapped) return;
+                }
+
                 ctx.lineTo(x, y);
                 ctx.stroke();
             }
@@ -1702,8 +1770,50 @@
             if (drawing) {
                 drawing = false;
                 ctx.globalCompositeOperation = 'source-over';
+                
+                // Math Mode Clustering
+                if(currentStroke && currentStroke.isMath) {
+                    detectMathCluster(currentStroke);
+                }
+                
                 saveSketchToCloud();
+                currentStroke = null;
             }
+        }
+        
+        function detectMathCluster(stroke) {
+             const points = stroke.points;
+             if(points.length < 2) return;
+             
+             let minX = points[0].x, maxX = points[0].x, minY = points[0].y, maxY = points[0].y;
+             points.forEach(p => {
+                 if(p.x < minX) minX = p.x;
+                 if(p.x > maxX) maxX = p.x;
+                 if(p.y < minY) minY = p.y;
+                 if(p.y > maxY) maxY = p.y;
+             });
+             
+             minX -= 10; maxX += 10; minY -= 10; maxY += 10;
+             
+             const layer = document.getElementById('mathLayer');
+             const box = document.createElement('div');
+             box.className = 'math-cluster-active';
+             box.style.left = minX + 'px';
+             box.style.top = minY + 'px';
+             box.style.width = (maxX - minX) + 'px';
+             box.style.height = (maxY - minY) + 'px';
+             box.title = "Tap to Convert";
+             box.onclick = function() {
+                 activeClusterId = Date.now(); 
+                 document.getElementById('mathModal').style.display = 'flex';
+                 this.remove();
+             };
+             
+             layer.appendChild(box);
+             
+             setTimeout(() => {
+                 if(box.parentNode) box.remove();
+             }, 5000);
         }
 
         function saveStateToStack() {
@@ -1767,11 +1877,14 @@
             } else {
                 document.getElementById('handBtn').classList.remove('active');
             }
+
             if(tool !== 'highlighter') customStrokeStyle = null; 
             activeSketchTool = tool === activeSketchTool ? 'brush' : tool;
+            
             document.getElementById('eraserBtn').classList.toggle('active', activeSketchTool === 'eraser');
             const highlighterBtn = document.querySelector('.tool-opt.highlighter');
             if(highlighterBtn) highlighterBtn.classList.toggle('active', activeSketchTool === 'highlighter');
+
             if (!isSketchMode) toggleSketchMode();
         };
 
@@ -2027,13 +2140,9 @@
         };
 
         window.toggleVoiceTranscription = () => {
-            // Fallback for API absence
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                showToast("Use Keyboard Mic 🎙️");
-                return;
-            }
             if (!recognition) {
                 const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!Speech) return showToast("Speech API not supported on this browser");
                 recognition = new Speech();
                 recognition.continuous = true;
                 recognition.interimResults = false;
@@ -2092,9 +2201,6 @@
         window.toggleTemplates = () => {
             const p = document.getElementById('templatePopup');
             p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
-            if (p.style.display === 'flex') {
-                showMainTemplates(); // Reset to main view on open
-            }
         };
 
         // NEW: TEMPLATE NAVIGATION LOGIC
