@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Notebook - Engineering Math Pro</title>
+    <title>Notebook - Smart Math Edition</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Patrick+Hand&family=Caveat:wght@400;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Kalam:wght@300;400;700&family=Architects+Daughter&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
@@ -353,8 +353,8 @@
         
         /* Math Cluster Highlight */
         .math-cluster-active {
-            border: 2px dashed #d35400;
-            background-color: rgba(211, 84, 0, 0.05);
+            border: 2px dashed #3498db;
+            background-color: rgba(52, 152, 219, 0.05);
             position: absolute;
             pointer-events: auto;
             cursor: pointer;
@@ -394,6 +394,24 @@
             cursor: pointer;
         }
         .anatomy-pin span { transform: rotate(-45deg); }
+        
+        /* Math Keypad Styling */
+        .math-keypad {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .key-btn {
+            padding: 8px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Times New Roman', serif;
+            font-size: 1.1rem;
+        }
+        .key-btn:hover { background: #e0e0e0; }
     </style>
 </head>
 <body class="cursor-pen">
@@ -408,10 +426,27 @@
     </div>
 
     <!-- MATH CONVERSION MODAL -->
-    <div id="mathModal" class="floating-pane" style="display:none; width: 300px; z-index: 1001;">
+    <div id="mathModal" class="floating-pane" style="display:none; width: 320px; z-index: 1001;">
         <h3 style="margin-bottom: 15px;">Convert to Math</h3>
-        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">Detected Pattern:</p>
-        <textarea id="mathInput" style="width:100%; height:80px; padding:8px; margin-bottom:10px; border:1px solid #ddd; font-family:monospace;" placeholder="..."></textarea>
+        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">Detected Structure:</p>
+        
+        <textarea id="mathInput" style="width:100%; height:60px; padding:8px; margin-bottom:10px; border:1px solid #ddd; font-family:monospace;" placeholder="\frac{a}{b}"></textarea>
+        
+        <!-- Virtual Math Keypad -->
+        <div class="math-keypad">
+            <button class="key-btn" onclick="insertMathKey('\\frac{}{}')">a/b</button>
+            <button class="key-btn" onclick="insertMathKey('^{}')">xʸ</button>
+            <button class="key-btn" onclick="insertMathKey('\\sqrt{}')">√</button>
+            <button class="key-btn" onclick="insertMathKey('\\int_{}^{}')">∫</button>
+            <button class="key-btn" onclick="insertMathKey('\\sum')">Σ</button>
+            
+            <button class="key-btn" onclick="insertMathKey('\\pi')">π</button>
+            <button class="key-btn" onclick="insertMathKey('\\theta')">θ</button>
+            <button class="key-btn" onclick="insertMathKey('\\infty')">∞</button>
+            <button class="key-btn" onclick="insertMathKey('\\approx')">≈</button>
+            <button class="key-btn" onclick="insertMathKey('\\neq')">≠</button>
+        </div>
+
         <div style="display:flex; gap:10px;">
             <button class="tool-btn" onclick="saveMathConversion()" style="background: var(--save-color); color: white; justify-content: center; flex:1;">Convert</button>
             <button class="tool-btn" onclick="closeMathModal()" style="background: #eee; justify-content: center; flex:1;">Cancel</button>
@@ -614,7 +649,6 @@
 
                 <input type="file" id="imageInput" style="display: none;" accept="image/*" onchange="handleImageUpload(event)">
                 <input type="text" class="paper-title" id="pageTitle" placeholder="Untitled Page" oninput="markUnsaved(); saveCurrentToCloud()">
-                <!-- CRITICAL FOR iPAD: Event delegation added, inline handlers removed -->
                 <div class="content-area writing-tool-pen" id="editor" contenteditable="true" spellcheck="false" oninput="markUnsaved(); saveCurrentToCloud()"></div>
             </div>
         </main>
@@ -1000,6 +1034,7 @@
                 const usage = estimate.usage || 0;
                 const percent = Math.min(100, (usage / (estimate.quota || 1024*1024*1000)) * 100).toFixed(1);
                 const mb = (usage / 1024 / 1024).toFixed(2);
+                
                 document.getElementById('storageBar').style.width = percent + '%';
                 document.getElementById('storageText').innerText = `${mb} MB (${percent}%)`;
                 if(percent > 90) document.getElementById('storageBar').style.background = '#e74c3c';
@@ -1275,6 +1310,12 @@
                  saveCurrentToCloud();
              }
         };
+        
+        window.insertMathKey = (key) => {
+            const input = document.getElementById('mathInput');
+            input.value += key;
+            input.focus();
+        };
 
         function detectMathCluster(stroke) {
              if(!isMathMode) return;
@@ -1298,10 +1339,15 @@
              const height = maxY - minY;
              let guess = "...";
              
-             if (width > height * 2) guess = "\\frac{a}{b}"; // Fraction bar
-             else if (height > width * 2) guess = "\\int_{a}^{b}"; // Integral
-             else if (minY < 50) guess = "x^2"; // High up - superscript
-             
+             // Structural Guessing
+             if (width > height * 2.5) guess = "\\frac{a}{b}"; // Fraction bar
+             else if (height > width * 3) guess = "\\int_{a}^{b}"; // Integral
+             else if (minY < 50) guess = "x^{2}"; // High up - superscript
+             else if (width > 20 && height > 20 && Math.abs(width-height) < 20) guess = "\\sqrt{x}"; // Box-like root
+             else if (height < 10 && width < 10) guess = "."; // Dot
+             else if (height > width && width < 15) guess = "1"; // Vertical Line
+             else if (height > width && width > 20) guess = "=";
+
              // Add visual box
              minX -= 10; maxX += 10; minY -= 10; maxY += 10;
              const layer = document.getElementById('mathLayer');
@@ -1324,7 +1370,7 @@
              
              setTimeout(() => {
                  if(box.parentNode) box.remove();
-             }, 5000);
+             }, 8000); // 8 seconds to decide
         }
         
         window.insertEquation = () => {
@@ -1601,9 +1647,6 @@
             document.querySelectorAll('.tool-opt').forEach(o => o.classList.remove('active'));
             if(!isSketchMode) toggleSketchMode();
         };
-
-        // --- NEW VECTOR DRAWING LOGIC ---
-        let currentStroke = null;
 
         function resizeCanvas() {
             const paper = document.getElementById('paper');
@@ -2214,6 +2257,9 @@
         window.toggleTemplates = () => {
             const p = document.getElementById('templatePopup');
             p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+            if (p.style.display === 'flex') {
+                showMainTemplates(); // Reset to main view on open
+            }
         };
 
         // NEW: TEMPLATE NAVIGATION LOGIC
