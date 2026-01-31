@@ -39,6 +39,8 @@
             --chalk-text: #dfe6e9;
             --save-color: #27ae60;
             --highlighter-color: rgba(255, 235, 59, 0.4);
+            --math-cluster-color: rgba(52, 152, 219, 0.1);
+            --math-border-color: rgba(52, 152, 219, 0.5);
         }
 
         body.dark-mode {
@@ -503,6 +505,17 @@
         </div>
         <div id="mathKeys" class="math-keys-grid"></div>
     </div>
+    
+    <!-- TRACE TABLE MODAL -->
+    <div id="traceModal" class="floating-pane" style="display:none; width: 300px; z-index: 1002;">
+        <h3 style="margin-bottom: 15px;">New Trace Table</h3>
+        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">Number of Variables:</p>
+        <input type="number" id="traceVarCount" class="meta-value" value="3" min="1" max="10" style="margin-bottom:15px;">
+        <div style="display:flex; gap:10px;">
+            <button class="tool-btn" onclick="confirmTraceTable()" style="background: var(--save-color); color: white; justify-content: center; flex:1;">Insert</button>
+            <button class="tool-btn" onclick="closeTraceModal()" style="background: #eee; justify-content: center; flex:1;">Cancel</button>
+        </div>
+    </div>
 
     <div class="text-bubble" id="textBubble">
         <button class="bubble-btn" onclick="formatText('bold')">B</button>
@@ -613,6 +626,7 @@
 
     <div class="tool-tray-container" id="trayContainer">
         <div class="tool-tray">
+            <!-- Global Tools -->
             <button class="tool-btn" id="voiceBtn" onclick="toggleVoiceTranscription()"><span>🎤</span> Dictate</button>
             <button class="tool-btn" id="handBtn" onclick="selectSketchTool('hand')"><span>✋</span> Pan</button>
             <button class="tool-btn" id="eraserBtn" onclick="selectSketchTool('eraser')"><span>🧼</span> Eraser</button>
@@ -624,10 +638,12 @@
             
             <hr style="opacity: 0.2;">
             
+            <!-- Standard Block Tools -->
             <button class="tool-btn" onclick="insertBlock('header')"><span>🏷️</span> Title</button>
+            <button class="tool-btn" onclick="insertBlock('note')"><span>📌</span> Note</button>
             <button class="tool-btn" onclick="insertBlock('todo')"><span>✅</span> To-Do</button>
-            
-            <!-- CS TOOLS -->
+
+            <!-- 1. CS TOOLBAR -->
             <div id="tools-cs" style="display:none; flex-direction:column; gap:8px;">
                 <hr style="opacity: 0.2;">
                 <button class="tool-btn" onclick="insertCSCodeBlock()"><span>&lt;&gt;</span> Code Block</button>
@@ -697,6 +713,7 @@
 
                 <input type="file" id="imageInput" style="display: none;" accept="image/*" onchange="handleImageUpload(event)">
                 <input type="text" class="paper-title" id="pageTitle" placeholder="Untitled Page" oninput="markUnsaved(); saveCurrentToCloud()">
+                <!-- CRITICAL FOR iPAD: Event delegation added, inline handlers removed -->
                 <div class="content-area writing-tool-pen" id="editor" contenteditable="true" spellcheck="false" oninput="markUnsaved(); saveCurrentToCloud()"></div>
             </div>
         </main>
@@ -1140,6 +1157,9 @@
                     else if (k === '\\pm') label = '±';
                     else if (k === '\\times') label = '×';
                     else if (k === '\\div') label = '÷';
+                } else if (category === 'trig') {
+                    // Remove slashes for cleaner look
+                    label = label;
                 } else if (category === 'calc') {
                     if (k === '\\int') label = '∫';
                     else if (k === '\\sum') label = 'Σ';
@@ -1176,7 +1196,9 @@
                 // Clicking key puts raw latex into buffer
                 btn.onclick = () => {
                     const buffer = document.getElementById('mathBuffer');
-                    buffer.value += k + ' ';
+                    // Add space for functions to avoid merging
+                    const val = k.startsWith('\\') && category === 'trig' ? k + ' ' : k;
+                    buffer.value += val;
                     updateMathPreview();
                     buffer.focus();
                 };
@@ -1263,7 +1285,49 @@
         // CS Tools
         window.insertAlgoStep = () => { insertHtml(`<div class="chalk-code" contenteditable="true">1. Step description...<br>   ↳ Logic/Condition</div>`); }
         window.insertComplexity = () => { insertHtml(`<span class="algo-badge" contenteditable="true">Time: O(n)</span>&nbsp;`); }
-        window.insertTraceTable = () => { insertHtml(`<table class="trace-table"><thead><tr><th>Line</th><th>Variable</th><th>Value</th><th>Output</th></tr></thead><tbody><tr><td>1</td><td>x</td><td>0</td><td>-</td></tr><tr><td>2</td><td>i</td><td>0</td><td>-</td></tr></tbody></table><p><br></p>`); }
+        
+        // TRACE TABLE FIX
+        window.insertTraceTable = () => {
+            document.getElementById('traceModal').style.display = 'flex';
+            document.getElementById('traceVarCount').focus();
+        }
+
+        window.closeTraceModal = () => {
+            document.getElementById('traceModal').style.display = 'none';
+        }
+
+        window.confirmTraceTable = () => {
+            const count = document.getElementById('traceVarCount').value;
+            const n = parseInt(count);
+            if (isNaN(n) || n < 1) return;
+
+            let headers = "<th>Line</th>";
+            let cells = "<td>1</td>";
+            
+            for(let i=1; i<=n; i++) {
+                headers += `<th>Var ${i}</th>`;
+                cells += `<td>-</td>`;
+            }
+            
+            headers += "<th>Output</th>";
+            cells += "<td>-</td>";
+
+            const html = `
+                <div style="overflow-x:auto; margin:10px 0;">
+                    <table class="trace-table" style="width:100%; min-width:100%;">
+                        <thead><tr>${headers}</tr></thead>
+                        <tbody>
+                            <tr>${cells}</tr>
+                            <tr>${cells.replace('1', '2')}</tr>
+                            <tr>${cells.replace('1', '3')}</tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><br></p>
+            `;
+            insertHtml(html);
+            closeTraceModal();
+        }
         
         // Medical Tools
         window.activeAnatomyPinMode = false;
@@ -1294,7 +1358,9 @@
                 <div class="checklist-text" contenteditable="true">Label...</div>
             </div>`;
             
-            document.getElementById('editor').innerHTML += legendHtml;
+            const editor = document.getElementById('editor');
+            editor.innerHTML += legendHtml;
+            
             window.activeAnatomyPinMode = false;
             document.getElementById('paper').style.cursor = 'default';
             saveCurrentToCloud();
@@ -1364,6 +1430,7 @@
         
         // --- TOOLBAR SWITCHING ---
         function updateToolVisibility(chapter) {
+            // Safe hiding
             const csTools = document.getElementById('tools-cs');
             if(csTools) csTools.style.display = 'none';
 
@@ -1375,17 +1442,16 @@
             
             document.getElementById('engRuler').style.display = 'none';
             isRulerActive = false;
-            
-            // Close keyboard if switching
-            isMathMode = false;
-            const keyb = document.getElementById('mathKeyboard');
-            if(keyb) keyb.style.display = 'none';
+            isMathMode = false; 
+            const mathBtn = document.getElementById('mathModeBtn');
+            if(mathBtn) mathBtn.classList.remove('active');
             
             const disc = chapter?.metadata?.discipline;
             if(disc === 'cs' && csTools) csTools.style.display = 'flex';
             if(disc === 'medical' && medTools) medTools.style.display = 'flex';
             if(disc === 'engineering' && engTools) engTools.style.display = 'flex';
             
+            // Legacy/Fallback for Code Button if container doesn't exist
             const btnCSCode = document.getElementById('btnCSCode');
             if(btnCSCode && !csTools) btnCSCode.style.display = (disc === 'cs') ? 'flex' : 'none';
         }
@@ -1622,9 +1688,6 @@
             if(!isSketchMode) toggleSketchMode();
         };
 
-        // --- NEW VECTOR DRAWING LOGIC ---
-        let currentStroke = null;
-
         function resizeCanvas() {
             const paper = document.getElementById('paper');
             const dpr = window.devicePixelRatio || 1;
@@ -1670,16 +1733,6 @@
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX || e.touches[0].clientX) - rect.left;
             const y = (e.clientY || e.touches[0].clientY) - rect.top;
-            
-            // Start new stroke object
-            currentStroke = {
-                points: [{x, y}],
-                color: ctx.strokeStyle,
-                width: ctx.lineWidth,
-                tool: activeSketchTool,
-                isMath: false // No longer using handwriting math mode
-            };
-
             ctx.beginPath();
             ctx.moveTo(x, y);
         }
@@ -1704,9 +1757,6 @@
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX || e.touches[0].clientX) - rect.left;
             const y = (e.clientY || e.touches[0].clientY) - rect.top;
-            
-            // Record Point
-            if(currentStroke) currentStroke.points.push({x, y});
 
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -1732,48 +1782,6 @@
             } else {
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50';
-                
-                // RULER SNAPPING
-                if (isRulerActive && activeSketchTool !== 'eraser' && activeSketchTool !== 'highlighter') {
-                    const ruler = document.getElementById('engRuler');
-                    const rRect = ruler.getBoundingClientRect();
-                    const cRect = canvas.getBoundingClientRect();
-                    
-                    const rx = (rRect.left - cRect.left) + rRect.width/2;
-                    const ry = (rRect.top - cRect.top) + rRect.height/2;
-                    
-                    const dx = x - rx;
-                    const dy = y - ry;
-                    
-                    const rad = -rulerAngle * Math.PI / 180;
-                    const localX = dx * Math.cos(rad) - dy * Math.sin(rad);
-                    const localY = dx * Math.sin(rad) + dy * Math.cos(rad);
-                    
-                    const halfH = rRect.height / 2;
-                    let snapped = false;
-                    
-                    if (Math.abs(localY + halfH) < 20) {
-                         const snapY = -halfH;
-                         const snapXWorld = localX * Math.cos(-rad) - snapY * Math.sin(-rad) + rx;
-                         const snapYWorld = localX * Math.sin(-rad) + snapY * Math.cos(-rad) + ry;
-                         ctx.lineTo(snapXWorld, snapYWorld);
-                         ctx.stroke();
-                         // Update stroke point to snapped pos
-                         if(currentStroke) currentStroke.points[currentStroke.points.length-1] = {x: snapXWorld, y: snapYWorld};
-                         snapped = true;
-                    } else if (Math.abs(localY - halfH) < 20) {
-                         const snapY = halfH;
-                         const snapXWorld = localX * Math.cos(-rad) - snapY * Math.sin(-rad) + rx;
-                         const snapYWorld = localX * Math.sin(-rad) + snapY * Math.cos(-rad) + ry;
-                         ctx.lineTo(snapXWorld, snapYWorld);
-                         ctx.stroke();
-                         if(currentStroke) currentStroke.points[currentStroke.points.length-1] = {x: snapXWorld, y: snapYWorld};
-                         snapped = true;
-                    }
-                    
-                    if(snapped) return;
-                }
-
                 ctx.lineTo(x, y);
                 ctx.stroke();
             }
@@ -1791,70 +1799,8 @@
             if (drawing) {
                 drawing = false;
                 ctx.globalCompositeOperation = 'source-over';
-                
-                // Math Mode Clustering
-                if(currentStroke && currentStroke.isMath) {
-                    detectMathCluster(currentStroke);
-                }
-                
                 saveSketchToCloud();
-                currentStroke = null;
             }
-        }
-        
-        function detectMathCluster(stroke) {
-             const points = stroke.points;
-             if(points.length < 2) return;
-             
-             let minX = points[0].x, maxX = points[0].x, minY = points[0].y, maxY = points[0].y;
-             points.forEach(p => {
-                 if(p.x < minX) minX = p.x;
-                 if(p.x > maxX) maxX = p.x;
-                 if(p.y < minY) minY = p.y;
-                 if(p.y > maxY) maxY = p.y;
-             });
-             
-             minX -= 10; maxX += 10; minY -= 10; maxY += 10;
-             
-             // GEOMETRIC HEURISTICS
-             const width = maxX - minX;
-             const height = maxY - minY;
-             let guess = "...";
-             
-             if (width > height * 2.5) guess = "\\frac{a}{b}"; // Fraction bar
-             else if (height > width * 3) guess = "\\int_{a}^{b}"; // Integral
-             else if (minY < 50) guess = "x^{2}"; // High up - superscript
-             else if (width > 20 && height > 20 && Math.abs(width-height) < 20) guess = "\\sqrt{x}"; // Box-like root
-             else if (height < 10 && width < 10) guess = "."; // Dot
-             else if (height > width && width < 15) guess = "1"; // Vertical Line
-             else if (height > width && width > 20) guess = "=";
-
-             // Add visual box
-             const layer = document.getElementById('mathLayer');
-             const box = document.createElement('div');
-             box.className = 'math-cluster-active';
-             box.style.left = minX + 'px';
-             box.style.top = minY + 'px';
-             box.style.width = (maxX - minX) + 'px';
-             box.style.height = (maxY - minY) + 'px';
-             box.title = "Tap to Convert";
-             box.onclick = function() {
-                 activeClusterId = Date.now(); 
-                 const modal = document.getElementById('mathModal');
-                 document.getElementById('mathInput').value = guess;
-                 // Trigger preview update
-                 const event = new Event('input');
-                 document.getElementById('mathInput').dispatchEvent(event);
-                 
-                 modal.style.display = 'flex';
-                 this.remove();
-             };
-             
-             layer.appendChild(box);
-             
-             setTimeout(() => {
-                 if(box.parentNode) box.remove();
-             }, 8000); // 8 seconds to decide
         }
 
         function saveStateToStack() {
