@@ -2490,6 +2490,10 @@
         let gestureIsDrag = false;
         let lastGestureTapTime = 0;
         let lastGestureTapFingers = 0;
+        
+        // New variables for triple tap detection
+        let gestureTapCount = 0;
+        let gestureTapTimeout = null;
 
         window.addEventListener('touchstart', (e) => {
             // FIX: Removed restriction so gestures work everywhere (text & sketch)
@@ -2521,35 +2525,36 @@
                     const now = Date.now();
                     const timeBetweenTaps = now - lastGestureTapTime;
 
-                    // CHECK FOR DOUBLE TAP (Time between taps < 500ms, same finger count)
+                    // Check for sequential taps (Time between taps < 500ms, same finger count)
                     if (timeBetweenTaps < 500 && timeBetweenTaps > 50 && lastGestureTapFingers === gestureMaxFingers) {
-                        
-                        // 2 Fingers Double Tap -> UNDO
-                        if (gestureMaxFingers === 2) {
-                            if (isSketchMode) {
-                                undoSketch();
-                            } else {
-                                document.execCommand('undo'); // Native Text Undo
-                            }
-                            showToast("Undo ↩️");
-                        } 
-                        // 3 Fingers Double Tap -> REDO
-                        else if (gestureMaxFingers === 3) {
-                            if (isSketchMode) {
-                                redoSketch();
-                            } else {
-                                document.execCommand('redo'); // Native Text Redo
-                            }
-                            showToast("Redo ↪️");
-                        }
-                        
-                        // Reset to prevent triple-tap chaining
-                        lastGestureTapTime = 0;
-                        lastGestureTapFingers = 0;
+                        gestureTapCount++;
                     } else {
-                        // First Tap Recorded
-                        lastGestureTapTime = now;
-                        lastGestureTapFingers = gestureMaxFingers;
+                        gestureTapCount = 1;
+                    }
+                    
+                    lastGestureTapTime = now;
+                    lastGestureTapFingers = gestureMaxFingers;
+
+                    // 2 FINGERS GESTURES
+                    if (gestureMaxFingers === 2) {
+                        if (gestureTapCount === 2) {
+                            // Double Tap detected - Schedule Undo (wait for potential 3rd tap)
+                            clearTimeout(gestureTapTimeout);
+                            gestureTapTimeout = setTimeout(() => {
+                                if (isSketchMode) undoSketch();
+                                else document.execCommand('undo'); // Native Text Undo
+                                showToast("Undo ↩️");
+                                gestureTapCount = 0; // Reset
+                            }, 400); // 400ms window for triple tap
+                        } 
+                        else if (gestureTapCount === 3) {
+                            // Triple Tap detected - Cancel pending Undo and trigger Redo
+                            clearTimeout(gestureTapTimeout);
+                            if (isSketchMode) redoSketch();
+                            else document.execCommand('redo'); // Native Text Redo
+                            showToast("Redo ↪️");
+                            gestureTapCount = 0; // Reset
+                        }
                     }
                 }
                 
