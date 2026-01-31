@@ -88,6 +88,12 @@
         .trace-table th, .trace-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         .trace-table th { background: rgba(0,0,0,0.05); }
 
+        /* Dynamic Trace Table Controls */
+        .trace-table-container { position: relative; }
+        .btn-trace-add { position: absolute; top: -10px; right: 0; width: 22px; height: 22px; background: var(--cs-accent); color: white; border: 2px solid white; border-radius: 50%; font-weight: bold; font-size: 14px; line-height: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
+        .trace-table-container:hover .btn-trace-add { opacity: 1; }
+        @media (hover: none) { .btn-trace-add { opacity: 0.6; } }
+
         /* Sidebar */
         .sidebar { width: 280px; background-color: var(--sidebar-bg); color: var(--sidebar-text); height: 100%; display: flex; flex-direction: column; padding: 1.5rem; box-shadow: 4px 0 15px rgba(0,0,0,0.3); z-index: 20; flex-shrink: 0; transition: background-color 0.3s ease, transform 0.3s ease; position: absolute; left: 0; top: 0; overflow: hidden; }
         @media (max-width: 768px) { .sidebar { transform: translateX(-100%); position: fixed; width: 80%; max-width: 300px; } .sidebar.open { transform: translateX(0); } }
@@ -1301,8 +1307,8 @@
             const n = parseInt(count);
             if (isNaN(n) || n < 1) return;
 
-            let headers = "<th>Line</th>";
-            let cells = "<td>1</td>";
+            let headers = "";
+            let cells = "";
             
             for(let i=1; i<=n; i++) {
                 headers += `<th>Var ${i}</th>`;
@@ -1312,14 +1318,16 @@
             headers += "<th>Output</th>";
             cells += "<td>-</td>";
 
+            // UPDATED: Wrapped in relative container with add button
             const html = `
-                <div style="overflow-x:auto; margin:10px 0;">
+                <div class="trace-table-container" style="overflow-x:auto; margin:10px 0;">
+                    <button contenteditable="false" onclick="addTraceColumn(this)" class="btn-trace-add" title="Add Variable">+</button>
                     <table class="trace-table" style="width:100%; min-width:100%;">
                         <thead><tr>${headers}</tr></thead>
                         <tbody>
                             <tr>${cells}</tr>
-                            <tr>${cells.replace('1', '2')}</tr>
-                            <tr>${cells.replace('1', '3')}</tr>
+                            <tr>${cells}</tr>
+                            <tr>${cells}</tr>
                         </tbody>
                     </table>
                 </div>
@@ -1328,6 +1336,45 @@
             insertHtml(html);
             closeTraceModal();
         }
+
+        // NEW: Helper function to add column dynamically
+        window.addTraceColumn = (btn) => {
+            const container = btn.closest('.trace-table-container');
+            if(!container) return;
+            const table = container.querySelector('table');
+            if(!table) return;
+            
+            const headRow = table.tHead.rows[0];
+            const bodyRows = table.tBodies[0].rows;
+            
+            // Find insert index (before Output, which is typically the last column)
+            let insertIndex = headRow.cells.length - 1;
+            
+            // Generate new variable name based on max existing var number
+            let maxVar = 0;
+            for(let cell of headRow.cells) {
+                const match = cell.innerText.trim().match(/^Var\s+(\d+)/);
+                if(match) {
+                    const num = parseInt(match[1]);
+                    if(num > maxVar) maxVar = num;
+                }
+            }
+            const newVarName = `Var ${maxVar + 1}`;
+
+            // Insert Header
+            const newTh = document.createElement('th');
+            newTh.innerText = newVarName;
+            headRow.insertBefore(newTh, headRow.cells[insertIndex]);
+
+            // Insert Cells
+            for (let row of bodyRows) {
+                const newTd = document.createElement('td');
+                newTd.innerText = '-';
+                row.insertBefore(newTd, row.cells[insertIndex]);
+            }
+            
+            window.saveCurrentToCloud();
+        };
         
         // Medical Tools
         window.activeAnatomyPinMode = false;
