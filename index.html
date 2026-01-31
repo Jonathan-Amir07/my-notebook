@@ -282,9 +282,18 @@
         .checkbox.checked::after { transform: scale(1); }
         
         .checklist-text { position: relative; transition: opacity 0.3s ease; }
-        .checkbox.checked + .checklist-text { opacity: 0.6; }
-        .checklist-text::after { content: ''; position: absolute; left: 0; top: 50%; width: 0; height: 2px; background: currentColor; transition: width 0.3s ease; pointer-events: none; border-radius: 2px; }
-        .checkbox.checked + .checklist-text::after { width: 100%; }
+        .checklist-text.completed { opacity: 0.6; text-decoration: line-through; text-decoration-thickness: 2px; }
+
+        /* Timeline Styles */
+        .timeline-container { border-left: 3px solid var(--med-accent); padding-left: 15px; margin: 15px 0; }
+        .timeline-entry { margin-bottom: 6px; display: flex; gap: 8px; align-items: baseline; }
+        .time-label { white-space: nowrap; font-family: 'Fira Code', monospace; color: var(--med-accent); cursor: text; min-width: 45px; }
+        .event-desc { flex-grow: 1; outline: none; }
+
+        /* Compare Table Styles */
+        .comparison-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.9rem; }
+        .comparison-table th { border-bottom: 2px solid var(--med-accent); text-align: left; padding: 8px; color: var(--med-accent); width: 50%; }
+        .comparison-table td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
 
         .uploaded-img { max-width: 100%; border-radius: 8px; margin: 10px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         /* Resizable Image Container */
@@ -1154,6 +1163,85 @@
                         saveCurrentToCloud();
                     }
                 });
+
+                // Timeline Auto-Increment Logic
+                document.getElementById('editor').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        const selection = window.getSelection();
+                        if (!selection.rangeCount) return;
+                        
+                        let node = selection.anchorNode;
+                        if(node.nodeType === 3) node = node.parentElement; // Ensure we have an element
+                        
+                        // 1. Comparison Table Auto-Row Logic
+                        const compRow = node.closest('.comparison-table tr');
+                        if (compRow && compRow.closest('tbody')) {
+                            e.preventDefault();
+                            
+                            const newRow = document.createElement('tr');
+                            newRow.innerHTML = '<td></td><td></td>';
+                            
+                            if (compRow.nextSibling) {
+                                compRow.parentElement.insertBefore(newRow, compRow.nextSibling);
+                            } else {
+                                compRow.parentElement.appendChild(newRow);
+                            }
+                            
+                            // Move cursor to first cell of new row
+                            const firstCell = newRow.cells[0];
+                            const range = document.createRange();
+                            range.setStart(firstCell, 0);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            
+                            saveCurrentToCloud();
+                            return;
+                        }
+
+                        // 2. Timeline Auto-Increment Logic
+                        const entry = node.closest('.timeline-entry');
+                        
+                        if (entry) {
+                            e.preventDefault(); // Stop default new paragraph
+                            
+                            // 1. Get previous time
+                            const timeLabel = entry.querySelector('.time-label');
+                            let prevTimeStr = timeLabel ? timeLabel.innerText.trim() : "00:00";
+                            
+                            // 2. Parse and Increment (+10 mins)
+                            let [h, m] = prevTimeStr.split(':').map(x => parseInt(x));
+                            if(isNaN(h)) h = 0; if(isNaN(m)) m = 0;
+                            
+                            m += 10;
+                            if(m >= 60) { h += Math.floor(m/60); m %= 60; }
+                            h %= 24; // 24-hour wrap
+                            
+                            const newTimeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                            
+                            // 3. Create New Entry
+                            const newEntry = document.createElement('div');
+                            newEntry.className = 'timeline-entry';
+                            newEntry.innerHTML = `<strong class="time-label">${newTimeStr}</strong> - <span class="event-desc">...</span>`;
+                            
+                            // 4. Insert after current
+                            if(entry.nextSibling) {
+                                entry.parentElement.insertBefore(newEntry, entry.nextSibling);
+                            } else {
+                                entry.parentElement.appendChild(newEntry);
+                            }
+                            
+                            // 5. Move Cursor to new description
+                            const newDesc = newEntry.querySelector('.event-desc');
+                            const range = document.createRange();
+                            range.selectNodeContents(newDesc);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            
+                            saveCurrentToCloud();
+                        }
+                    }
+                });
                 
                 setupRulerEvents();
                 switchMathTab('basic'); // Init keys
@@ -1467,8 +1555,27 @@
             const highlighterBtn = document.querySelector('.tool-opt.highlighter');
             if(highlighterBtn) highlighterBtn.click();
         }
-        window.insertTimeline = () => { insertHtml(`<div style="border-left: 2px solid #ccc; padding-left: 10px; margin: 10px 0;"><p><strong>00:00</strong> - Presentation</p><p><strong>00:30</strong> - Investigation</p></div>`); }
-        window.insertComparison = () => { insertHtml(`<table style="width:100%; border-collapse:collapse; margin:10px 0; font-size:0.9rem;"><tr><th style="border-bottom:2px solid #ccc; text-align:left;">Normal</th><th style="border-bottom:2px solid #ccc; text-align:left;">Abnormal</th></tr><tr><td style="padding:5px; border-bottom:1px solid #eee;">Value</td><td style="padding:5px; border-bottom:1px solid #eee;">Value</td></tr></table><p><br></p>`); }
+        window.insertTimeline = () => { 
+            insertHtml(`
+                <div class="timeline-container">
+                    <div class="timeline-entry"><strong class="time-label">00:00</strong> - <span class="event-desc">Presentation</span></div>
+                </div>
+                <p><br></p>
+            `); 
+        }
+        window.insertComparison = () => { 
+            insertHtml(`
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Normal</th><th>Abnormal</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Value</td><td>Value</td></tr>
+                    </tbody>
+                </table>
+                <p><br></p>
+            `); 
+        }
 
         // Engineering Tools
         window.toggleRuler = () => {
@@ -2205,26 +2312,11 @@
             showToast("Page Deleted");
         };
 
-        window.triggerImageUpload = () => document.getElementById('imageInput').click();
-        window.handleImageUpload = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const html = `<div class="uploaded-container" contenteditable="false"><img src="${event.target.result}" /></div>`;
-                insertHtml(html);
-            };
-            reader.readAsDataURL(file);
-        };
-
         function loadChapter(id) {
             currentId = id;
             undoStack = []; redoStack = [];
             const chapter = chapters.find(c => c.id === id);
             if (!chapter) return;
-
-            // FIX: Remove stray pins from paper background (cleanup from old bug)
-            document.querySelectorAll('#paper > .anatomy-pin').forEach(p => p.remove());
 
             setTimeout(() => resizeCanvas(), 0);
 
@@ -2343,6 +2435,18 @@
                 document.getElementById('voiceBtn').classList.add('active-voice');
                 showToast("Listening...");
             }
+        };
+
+        window.triggerImageUpload = () => document.getElementById('imageInput').click();
+        window.handleImageUpload = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const html = `<div class="uploaded-container" contenteditable="false"><img src="${event.target.result}" /></div>`;
+                insertHtml(html);
+            };
+            reader.readAsDataURL(file);
         };
 
         window.insertBlock = (type) => {
