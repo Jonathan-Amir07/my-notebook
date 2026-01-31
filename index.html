@@ -185,7 +185,8 @@
         @media (max-width: 768px) { .paper { padding: 4rem 2rem; } }
 
         #sketchCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
-        body.sketch-mode #sketchCanvas { pointer-events: auto; cursor: crosshair; }
+        /* FIX: Added touch-action: none to prevent iPad scrolling while drawing */
+        body.sketch-mode #sketchCanvas { pointer-events: auto; cursor: crosshair; touch-action: none; }
 
         /* Toolbar */
         .writing-tools { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 10px 20px; border-radius: 40px; display: flex; gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 15; overflow-x: auto; max-width: 90%; transition: opacity 0.3s, transform 0.3s; }
@@ -1869,12 +1870,18 @@
         canvas.addEventListener('mouseup', stopDrawing);
         
         // UPDATED: Prevent drawing if multiple fingers are used (allows for gestures)
+        // FIX: Added { passive: false } and e.preventDefault() to stop screen moving on iPad
         canvas.addEventListener('touchstart', (e) => {
-            if (e.touches.length > 1) return; 
+            if (e.touches.length > 1) return;
+            if (isSketchMode) e.preventDefault();
             startDrawing(e.touches[0]);
-        });
+        }, { passive: false });
         
-        canvas.addEventListener('touchmove', (e) => draw(e.touches[0]));
+        canvas.addEventListener('touchmove', (e) => {
+            if (isSketchMode) e.preventDefault(); 
+            draw(e.touches[0]);
+        }, { passive: false });
+        
         canvas.addEventListener('touchend', stopDrawing);
 
         let isPanning = false;
