@@ -653,6 +653,7 @@
             <div id="tools-cs" style="display:none; flex-direction:column; gap:8px;">
                 <hr style="opacity: 0.2;">
                 <button class="tool-btn" onclick="insertCSCodeBlock()"><span>&lt;&gt;</span> Code Block</button>
+                <!-- Code button removed here as requested -->
                 <button class="tool-btn" onclick="insertAlgoStep()"><span>🔢</span> Algorithm Step</button>
                 <button class="tool-btn" onclick="insertComplexity()"><span>O(n)</span> Complexity</button>
                 <button class="tool-btn" onclick="insertTraceTable()"><span>📉</span> Trace Table</button>
@@ -678,6 +679,7 @@
                 <button class="tool-btn" onclick="insertConstants()"><span>π</span> Constants</button>
             </div>
             
+            <!-- Code button removed here as requested -->
             <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
             <hr style="opacity: 0.2;">
             <button class="tool-btn" style="color: #e74c3c" onclick="clearSketch()"><span>🗑️</span> Clear Sketch</button>
@@ -1327,6 +1329,7 @@
             let headers = "";
             let cells = "";
             
+            // Fix: No Line Column
             for(let i=1; i<=n; i++) {
                 headers += `<th>Var ${i}</th>`;
                 cells += `<td>-</td>`;
@@ -1350,7 +1353,7 @@
                 </div>
                 <p><br></p>
             `;
-            restoreSelection();
+            restoreSelection(); // Restore cursor position
             insertHtml(html);
             closeTraceModal();
         }
@@ -1413,7 +1416,7 @@
             const count = document.getElementsByClassName('anatomy-pin').length + 1;
             const pin = document.createElement('div');
             pin.className = 'anatomy-pin';
-            pin.setAttribute('contenteditable', 'false'); // Prevent editing inside the pin
+            pin.setAttribute('contenteditable', 'false'); // FIX: Prevent editing inside the pin
             pin.style.left = (x - 12) + 'px';
             pin.style.top = (y - 12) + 'px';
             pin.innerHTML = `<span>${count}</span>`;
@@ -2489,7 +2492,8 @@
         let lastGestureTapFingers = 0;
 
         window.addEventListener('touchstart', (e) => {
-            if (!isSketchMode) return;
+            // FIX: Removed restriction so gestures work everywhere (text & sketch)
+            
             // Track maximum fingers touching during this gesture
             if (e.touches.length > gestureMaxFingers) gestureMaxFingers = e.touches.length;
             
@@ -2506,7 +2510,7 @@
         }, { passive: true });
 
         window.addEventListener('touchend', (e) => {
-            if (!isSketchMode) return;
+            // FIX: Removed restriction so gestures work everywhere (text & sketch)
             
             // Execute logic only when ALL fingers have lifted
             if (e.touches.length === 0) {
@@ -2522,12 +2526,20 @@
                         
                         // 2 Fingers Double Tap -> UNDO
                         if (gestureMaxFingers === 2) {
-                            undoSketch();
+                            if (isSketchMode) {
+                                undoSketch();
+                            } else {
+                                document.execCommand('undo'); // Native Text Undo
+                            }
                             showToast("Undo ↩️");
                         } 
                         // 3 Fingers Double Tap -> REDO
                         else if (gestureMaxFingers === 3) {
-                            redoSketch();
+                            if (isSketchMode) {
+                                redoSketch();
+                            } else {
+                                document.execCommand('redo'); // Native Text Redo
+                            }
                             showToast("Redo ↪️");
                         }
                         
