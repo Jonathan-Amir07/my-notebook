@@ -1719,17 +1719,19 @@
 
         function setupDragAndDrop() {
             const paper = document.getElementById('paper');
+            const editor = document.getElementById('editor');
             let dragCounter = 0;
 
             paper.addEventListener('dragenter', (e) => { 
                 e.preventDefault(); 
                 dragCounter++;
                 paper.classList.add('drag-over'); 
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; // Essential for iPad/iOS
             });
 
             paper.addEventListener('dragover', (e) => { 
                 e.preventDefault(); 
-                // Necessary to allow dropping
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; // Essential for iPad/iOS
             });
 
             paper.addEventListener('dragleave', (e) => { 
@@ -1744,23 +1746,25 @@
                 paper.classList.remove('drag-over');
 
                 // 1. Position Cursor at Drop Point
+                let range = null;
                 if (document.caretRangeFromPoint) {
-                    const range = document.caretRangeFromPoint(e.clientX, e.clientY);
-                    if (range) {
-                        const sel = window.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                    }
+                    range = document.caretRangeFromPoint(e.clientX, e.clientY);
                 } else if (document.caretPositionFromPoint) { // Firefox fallback
-                    const range = document.createRange();
                     const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
                     if (pos) {
+                        range = document.createRange();
                         range.setStart(pos.offsetNode, pos.offset);
                         range.collapse(true);
-                        const sel = window.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(range);
                     }
+                }
+
+                // Only set range if it points to inside the editor
+                if (range && (editor.contains(range.commonAncestorContainer) || range.commonAncestorContainer === editor)) {
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                } else {
+                    editor.focus();
                 }
 
                 // 2. Handle Local Files
