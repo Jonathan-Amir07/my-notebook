@@ -12,6 +12,30 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 
+    <!-- PDF.js for Lecture Mode 2.0 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <!-- Prism.js for Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+
+    <!-- PWA MANIFEST & SETTINGS -->
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Notebook">
+    <link rel="icon" id="appIcon" href="">
+    <link rel="apple-touch-icon" id="appleIcon" href="">
+    <link rel="manifest" id="appManifest" href="">
+
     <style>
         :root {
             --paper-bg: #fdfbf7;
@@ -80,9 +104,16 @@
         .cs-code-container { font-family: 'Fira Code', monospace; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; margin: 15px 0; background: var(--code-bg); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .cs-code-header { background: #21252b; color: #9da5b4; padding: 5px 10px; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #181a1f; }
         .cs-code-editor { padding: 15px; color: var(--code-text); font-size: 0.9rem; min-height: 60px; outline: none; white-space: pre-wrap; }
+        /* Prism overrides */
+        .cs-code-editor code, .cs-code-editor pre { font-family: 'Fira Code', monospace !important; text-shadow: none !important; }
+        
         .cs-code-output { background: #1e2127; color: #98c379; padding: 10px; font-size: 0.8rem; border-top: 1px dashed #3e4451; }
         .cs-code-output::before { content: "➜ OUTPUT:"; display: block; font-size: 0.7rem; opacity: 0.5; margin-bottom: 5px; }
         
+        .cs-lang-select { background: #2c3e50; color: white; border: 1px solid #444; border-radius: 4px; font-size: 0.7rem; margin-right: 5px; padding: 2px; }
+        .cs-format-btn { background: #e67e22; color: white; border: none; border-radius: 4px; font-size: 0.7rem; padding: 2px 8px; cursor: pointer; }
+        .cs-format-btn:hover { background: #d35400; }
+
         /* Trace Table */
         .trace-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-family: 'Fira Code', monospace; font-size: 0.85rem; }
         .trace-table th, .trace-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -112,6 +143,9 @@
         .section-content { display: flex; flex-direction: column; transition: all 0.3s ease; }
         .section-content.collapsed { display: none !important; }
         
+        /* Install Button (Hidden by default) */
+        #installAppBtn { display: none; background: #27ae60; color: white; font-weight: bold; margin-bottom: 10px; }
+
         #pagesContent { overflow-y: auto; flex-grow: 1; padding-right: 2px; }
         #pagesContent::-webkit-scrollbar { width: 4px; }
         #pagesContent::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
@@ -187,6 +221,26 @@
         #sketchCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
         /* FIX: Added touch-action: none to prevent iPad scrolling while drawing */
         body.sketch-mode #sketchCanvas { pointer-events: auto; cursor: crosshair; touch-action: none; }
+
+        /* PDF Background Layer */
+        #pdfBackground {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 0; /* Behind editor and canvas */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 2rem;
+            pointer-events: none; /* Allows drawing through this layer */
+        }
+        .pdf-page-render {
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            background: white;
+            max-width: 95%;
+        }
 
         /* Toolbar */
         .writing-tools { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 10px 20px; border-radius: 40px; display: flex; gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 15; overflow-x: auto; max-width: 90%; transition: opacity 0.3s, transform 0.3s; }
@@ -268,7 +322,7 @@
         #tools-eng .tool-btn { color: var(--eng-accent); }
         
         .paper-title { font-size: 2.4rem; border: none; border-bottom: 2px solid var(--accent-color); width: 100%; background: transparent; font-family: inherit; margin-bottom: 2rem; color: var(--ink-color); }
-        .content-area { min-height: 800px; outline: none; line-height: 1.8; font-size: 1.3rem; color: var(--ink-color); }
+        .content-area { min-height: 800px; outline: none; line-height: 1.8; font-size: 1.3rem; color: var(--ink-color); position: relative; z-index: 2; }
         
         .styled-header { color: var(--accent-color); border-bottom: 1px dashed #ccc; margin: 15px 0; }
         .sticky-note { background: var(--highlight-bg); padding: 15px; border-left: 5px solid #f1c40f; transform: rotate(-1deg); margin: 15px 0; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
@@ -294,6 +348,38 @@
         .comparison-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.9rem; }
         .comparison-table th { border-bottom: 2px solid var(--med-accent); text-align: left; padding: 8px; color: var(--med-accent); width: 50%; }
         .comparison-table td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+
+        /* Active Recall Stickers */
+        .recall-sticker {
+            position: absolute;
+            background-color: #2c3e50;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 50;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .recall-sticker::after {
+            content: '?';
+            color: rgba(255,255,255,0.3);
+            font-weight: bold;
+            font-size: 1.2rem;
+            pointer-events: none;
+        }
+        .recall-sticker.revealed {
+            background-color: rgba(231, 76, 60, 0.1);
+            border: 2px dashed #e74c3c;
+            box-shadow: none;
+        }
+        .recall-sticker.revealed::after {
+            content: '';
+        }
+        .recall-sticker:hover {
+            transform: scale(1.02);
+        }
 
         .uploaded-img { max-width: 100%; border-radius: 8px; margin: 10px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         /* Resizable Image Container */
@@ -576,6 +662,24 @@
         </div>
     </div>
 
+    <!-- PDF MODE SELECTION MODAL -->
+    <div id="pdfModeModal" class="floating-pane" style="display:none; width: 320px; z-index: 2005; text-align: center;">
+        <h3 style="margin-bottom: 10px;">📚 Import PDF</h3>
+        <p style="font-size:0.9rem; color:#666; margin-bottom:20px;">How would you like to use this file?</p>
+        
+        <button class="tool-btn" onclick="resolvePdfMode('annotate')" style="background: var(--template-color); color: white; justify-content: center; width:100%; margin-bottom:5px; font-weight:bold;">
+            🖍 Annotate on Paper
+        </button>
+        <p style="font-size:0.75rem; color:#888; margin-bottom: 15px;">Render slides as background to draw over them.</p>
+
+        <button class="tool-btn" onclick="resolvePdfMode('split')" style="background: var(--sidebar-bg); color: white; justify-content: center; width:100%; margin-bottom:5px; font-weight:bold;">
+            📖 Split Screen Reader
+        </button>
+        <p style="font-size:0.75rem; color:#888; margin-bottom: 15px;">Open PDF on the side while you take notes.</p>
+        
+        <button class="tool-btn" onclick="closePdfModeModal()" style="background: #eee; justify-content: center; width:100%;">Cancel</button>
+    </div>
+
     <div class="text-bubble" id="textBubble">
         <button class="bubble-btn" onclick="formatText('bold')">B</button>
         <button class="bubble-btn" onclick="formatText('italic')">I</button>
@@ -639,6 +743,7 @@
             </div>
             <div class="section-content" id="toolsContent">
                 <div class="sidebar-actions">
+                    <button class="btn" id="installAppBtn" onclick="installPWA()">📲 Install App</button>
                     <button class="btn btn-add" onclick="createNewChapter()">+ New Page</button>
                     <button class="btn btn-secondary" onclick="toggleFocusMode()">👁️ Focus Mode</button>
                     <button class="btn btn-secondary" onclick="cyclePaperStyle()" id="paperStyleBtn">📄 Paper: Grid</button>
@@ -646,8 +751,9 @@
                     <button class="btn btn-secondary" onclick="toggleReadMode()" id="readModeBtn">🔓 Lock / Read</button>
                     <button class="btn btn-secondary" onclick="openMetadataModal()">ⓘ Page Details</button>
                     
+                    <!-- UPDATED PDF TOOLS: CONSOLIDATED -->
                     <button class="btn btn-secondary" style="position: relative; border: 1px solid var(--template-color);">
-                        📚 Load Lecture (PDF)
+                        📚 Load Lecture
                         <input type="file" onchange="loadLecturePdf(this)" accept="application/pdf" style="position: absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                     </button>
 
@@ -732,7 +838,7 @@
                 <button class="tool-btn" onclick="insertConstants()"><span>π</span> Constants</button>
             </div>
             
-            <!-- Code button removed here as requested -->
+            <button class="tool-btn" id="stickerBtn" onclick="toggleStickerMode()"><span>👁️</span> Sticker</button>
             <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
             <hr style="opacity: 0.2;">
             <button class="tool-btn" style="color: #e74c3c" onclick="clearSketch()"><span>🗑️</span> Clear Sketch</button>
@@ -744,6 +850,9 @@
     <div class="main-container" id="mainContainer">
         <main class="workspace" id="workspace">
             <div class="paper" id="paper">
+                <!-- PDF BACKGROUND LAYER -->
+                <div id="pdfBackground"></div>
+
                 <!-- MATH LAYER CONTAINER -->
                 <div id="mathLayer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:6;"></div>
                 
@@ -1626,54 +1735,6 @@
         }
 
         // Engineering Tools
-        window.toggleRuler = () => {
-            isRulerActive = !isRulerActive;
-            document.getElementById('engRuler').style.display = isRulerActive ? 'block' : 'none';
-        }
-        
-        function setupRulerEvents() {
-            const ruler = document.getElementById('engRuler');
-            const rotateHandle = document.getElementById('rulerRotate');
-            
-            ruler.addEventListener('mousedown', (e) => {
-                if(e.target === rotateHandle) return; 
-                isDraggingRuler = true;
-                rulerDragStartX = e.clientX - ruler.offsetLeft;
-                rulerDragStartY = e.clientY - ruler.offsetTop;
-            });
-            
-            rotateHandle.addEventListener('mousedown', (e) => {
-                e.stopPropagation();
-                isRotatingRuler = true;
-                const rect = ruler.getBoundingClientRect();
-                const centerX = rect.left + rect.width/2;
-                const centerY = rect.top + rect.height/2;
-                rulerStartAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) - (rulerAngle * Math.PI / 180);
-            });
-            
-            window.addEventListener('mousemove', (e) => {
-                if(isDraggingRuler) {
-                    rulerX = e.clientX - rulerDragStartX;
-                    rulerY = e.clientY - rulerDragStartY;
-                    ruler.style.left = rulerX + 'px';
-                    ruler.style.top = rulerY + 'px';
-                }
-                if(isRotatingRuler) {
-                    const rect = ruler.getBoundingClientRect();
-                    const centerX = rect.left + rect.width/2;
-                    const centerY = rect.top + rect.height/2;
-                    const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-                    rulerAngle = (angle - rulerStartAngle) * 180 / Math.PI;
-                    ruler.style.transform = `rotate(${rulerAngle}deg)`;
-                }
-            });
-            
-            window.addEventListener('mouseup', () => {
-                isDraggingRuler = false;
-                isRotatingRuler = false;
-            });
-        }
-
         window.insertEquation = () => { 
             const latex = "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}";
             let mathHtml = "";
@@ -1738,6 +1799,147 @@
             }
             closeConstantModal();
         };
+
+        window.toggleRuler = () => {
+            isRulerActive = !isRulerActive;
+            document.getElementById('engRuler').style.display = isRulerActive ? 'block' : 'none';
+        }
+        
+        function setupRulerEvents() {
+            const ruler = document.getElementById('engRuler');
+            const rotateHandle = document.getElementById('rulerRotate');
+            
+            ruler.addEventListener('mousedown', (e) => {
+                if(e.target === rotateHandle) return; 
+                isDraggingRuler = true;
+                rulerDragStartX = e.clientX - ruler.offsetLeft;
+                rulerDragStartY = e.clientY - ruler.offsetTop;
+            });
+            
+            rotateHandle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                isRotatingRuler = true;
+                const rect = ruler.getBoundingClientRect();
+                const centerX = rect.left + rect.width/2;
+                const centerY = rect.top + rect.height/2;
+                rulerStartAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) - (rulerAngle * Math.PI / 180);
+            });
+            
+            window.addEventListener('mousemove', (e) => {
+                if(isDraggingRuler) {
+                    rulerX = e.clientX - rulerDragStartX;
+                    rulerY = e.clientY - rulerDragStartY;
+                    ruler.style.left = rulerX + 'px';
+                    ruler.style.top = rulerY + 'px';
+                }
+                if(isRotatingRuler) {
+                    const rect = ruler.getBoundingClientRect();
+                    const centerX = rect.left + rect.width/2;
+                    const centerY = rect.top + rect.height/2;
+                    const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+                    rulerAngle = (angle - rulerStartAngle) * 180 / Math.PI;
+                    ruler.style.transform = `rotate(${rulerAngle}deg)`;
+                }
+            });
+            
+            window.addEventListener('mouseup', () => {
+                isDraggingRuler = false;
+                isRotatingRuler = false;
+            });
+        }
+        
+        // --- NEW PDF IMPORT LOGIC ---
+        window.importPdfToCanvas = async (input) => {
+            const file = input.files[0];
+            if (!file) return;
+            
+            showToast("Rendering PDF...");
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                const container = document.getElementById('pdfBackground');
+                container.innerHTML = ''; // Clear old
+                
+                // Set paper style to plain so grid lines don't conflict
+                const paper = document.getElementById('paper');
+                paper.classList.remove('grid', 'lined', 'dotted');
+                paper.classList.add('plain');
+                
+                const pdfPagesData = []; // Store base64 images of pages
+
+                // Render pages
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const scale = 1.5; // Good quality scale
+                    const viewport = page.getViewport({ scale });
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.className = 'pdf-page-render';
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+                    
+                    container.appendChild(canvas);
+                    
+                    // Save rendered image to array (compressed jpeg to save space)
+                    pdfPagesData.push(canvas.toDataURL('image/jpeg', 0.8));
+                }
+                
+                // Save PDF data to current chapter
+                const chapter = chapters.find(c => c.id === currentId);
+                if (chapter) {
+                    chapter.pdfPages = pdfPagesData; // Persist pages
+                    await saveChapterToDB(chapter);
+                }
+
+                // Force resize of the drawing canvas to match the new content height
+                setTimeout(resizeCanvas, 100);
+                showToast(`Imported ${pdf.numPages} pages`);
+                
+            } catch (err) {
+                console.error(err);
+                showToast("Error reading PDF");
+            }
+        };
+
+        let pendingPdfInput = null;
+
+        window.loadLecturePdf = (input) => {
+            if (!input.files || !input.files[0]) return;
+            pendingPdfInput = input;
+            document.getElementById('pdfModeModal').style.display = 'flex';
+        };
+
+        window.closePdfModeModal = () => {
+            document.getElementById('pdfModeModal').style.display = 'none';
+            if (pendingPdfInput) {
+                pendingPdfInput.value = ''; // Allow re-selecting same file
+                pendingPdfInput = null;
+            }
+        };
+
+        window.resolvePdfMode = (mode) => {
+            if (!pendingPdfInput) return;
+            
+            if (mode === 'annotate') {
+                importPdfToCanvas(pendingPdfInput);
+            } else {
+                const file = pendingPdfInput.files[0];
+                const url = URL.createObjectURL(file);
+                document.getElementById('lectureFrame').src = url;
+                document.body.classList.add('split-mode');
+                showToast("Lecture Loaded in Split View");
+            }
+            document.getElementById('pdfModeModal').style.display = 'none';
+            pendingPdfInput = null;
+        };
         
         // --- TOOLBAR SWITCHING ---
         function updateToolVisibility(chapter) {
@@ -1771,15 +1973,66 @@
             const html = `
                 <div class="cs-code-container" contenteditable="false">
                     <div class="cs-code-header">
-                        <span>Code Snippet</span>
-                        <span style="font-size:0.7rem; opacity:0.7">Editable</span>
+                        <div style="display:flex; align-items:center;">
+                            <span style="margin-right:10px;">Code Snippet</span>
+                            <select class="cs-lang-select" onchange="updateCodeLanguage(this)">
+                                <option value="javascript">JS</option>
+                                <option value="python">Python</option>
+                                <option value="java">Java</option>
+                                <option value="cpp">C++</option>
+                                <option value="html">HTML</option>
+                                <option value="css">CSS</option>
+                                <option value="sql">SQL</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span style="font-size:0.7rem; opacity:0.7; margin-right:5px;">Editable</span>
+                            <button class="cs-format-btn" onclick="formatCodeBlock(this)">⚡ Format</button>
+                        </div>
                     </div>
-                    <div class="cs-code-editor" contenteditable="true">// Write code here...</div>
+                    <div class="cs-code-editor language-javascript" contenteditable="true" onfocus="unformatCode(this)" onblur="formatCodeBlock(this)">// Write code here...</div>
                     <div class="cs-code-output" contenteditable="true">Result...</div>
                 </div>
                 <p><br></p>
             `;
             insertHtml(html);
+        };
+
+        window.updateCodeLanguage = (select) => {
+            const container = select.closest('.cs-code-container');
+            const editor = container.querySelector('.cs-code-editor');
+            // Remove old language classes
+            editor.classList.forEach(cls => {
+                if(cls.startsWith('language-')) editor.classList.remove(cls);
+            });
+            editor.classList.add(`language-${select.value}`);
+            // Re-format if not currently editing
+            if(document.activeElement !== editor) {
+                formatCodeBlock(select); // Pass any element inside container
+            }
+        };
+
+        window.formatCodeBlock = (el) => {
+            const container = el.closest('.cs-code-container');
+            const editor = container.querySelector('.cs-code-editor');
+            const langSelect = container.querySelector('.cs-lang-select');
+            const lang = langSelect.value;
+
+            // Save plain text
+            const code = editor.innerText;
+            
+            // Highlight
+            if (Prism && Prism.languages[lang]) {
+                const highlighted = Prism.highlight(code, Prism.languages[lang], lang);
+                editor.innerHTML = highlighted;
+            }
+        };
+
+        window.unformatCode = (editor) => {
+            // When user clicks to edit, strip formatting to avoid HTML tag mess
+            // We use textContent to get plain text
+            const code = editor.innerText;
+            editor.innerText = code;
         };
 
         window.filterChapters = () => {
@@ -1832,6 +2085,191 @@
              document.getElementById('metadataModal').style.display = 'none';
         };
 
+        // --- ACTIVE RECALL STICKER LOGIC ---
+        let isStickerMode = false;
+        let stickerStartX = 0;
+        let stickerStartY = 0;
+        let stickerPreview = null;
+
+        window.toggleStickerMode = () => {
+            isStickerMode = !isStickerMode;
+            const btn = document.getElementById('stickerBtn');
+            const editor = document.getElementById('editor');
+            
+            if (isStickerMode) {
+                btn.classList.add('active');
+                editor.contentEditable = "false"; // Lock text to allow dragging
+                document.getElementById('paper').style.cursor = "crosshair";
+                showToast("Draw stickers over text/images");
+                
+                // Disable sketch mode if active
+                if(isSketchMode) toggleSketchMode();
+            } else {
+                btn.classList.remove('active');
+                editor.contentEditable = "true";
+                document.getElementById('paper').style.cursor = "default";
+            }
+        };
+
+        // Event Listeners for Sticker Creation
+        const paper = document.getElementById('paper');
+        const editor = document.getElementById('editor');
+
+        paper.addEventListener('mousedown', (e) => {
+            if (!isStickerMode) return;
+            if (e.target.closest('.tool-tray') || e.target.closest('.writing-tools')) return;
+            if (e.target.classList.contains('recall-sticker')) return; // Don't draw over existing stickers
+            
+            e.preventDefault();
+            
+            // FIX: Calculate coordinates relative to EDITOR (where it will be saved), not PAPER
+            const rect = editor.getBoundingClientRect();
+            stickerStartX = e.clientX - rect.left;
+            stickerStartY = e.clientY - rect.top;
+            
+            // Create Preview Element
+            stickerPreview = document.createElement('div');
+            stickerPreview.className = 'recall-sticker';
+            stickerPreview.style.left = stickerStartX + 'px';
+            stickerPreview.style.top = stickerStartY + 'px';
+            stickerPreview.style.width = '0px';
+            stickerPreview.style.height = '0px';
+            stickerPreview.style.opacity = '0.5';
+            stickerPreview.style.pointerEvents = 'none'; // Prevent interfering with mousemove
+            
+            // FIX: Append directly to editor so preview matches final position
+            editor.appendChild(stickerPreview);
+        });
+
+        paper.addEventListener('mousemove', (e) => {
+            if (!isStickerMode || !stickerPreview) return;
+            
+            // FIX: Calculate relative to EDITOR
+            const rect = editor.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            
+            const width = currentX - stickerStartX;
+            const height = currentY - stickerStartY;
+            
+            stickerPreview.style.width = Math.abs(width) + 'px';
+            stickerPreview.style.height = Math.abs(height) + 'px';
+            stickerPreview.style.left = (width < 0 ? currentX : stickerStartX) + 'px';
+            stickerPreview.style.top = (height < 0 ? currentY : stickerStartY) + 'px';
+        });
+
+        paper.addEventListener('mouseup', (e) => {
+            if (!isStickerMode || !stickerPreview) return;
+            
+            // Finalize Sticker
+            const width = parseFloat(stickerPreview.style.width);
+            const height = parseFloat(stickerPreview.style.height);
+            
+            if (width > 20 && height > 20) {
+                // Finalize style
+                stickerPreview.style.opacity = '1';
+                stickerPreview.style.pointerEvents = 'auto'; // Re-enable clicking
+                stickerPreview.setAttribute('contenteditable', 'false');
+                
+                // Add removal capability on right click
+                stickerPreview.oncontextmenu = (ev) => {
+                    ev.preventDefault();
+                    if(confirm('Remove this sticker?')) ev.target.remove();
+                    saveCurrentToCloud();
+                };
+
+                // It's already in the editor, so we just save state
+                saveCurrentToCloud();
+            } else {
+                // Too small, remove
+                stickerPreview.remove();
+            }
+            
+            stickerPreview = null;
+        });
+
+        // --- DRAGGABLE OBJECTS LOGIC (Stickers) ---
+        let dragItem = null;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let dragInitialLeft = 0;
+        let dragInitialTop = 0;
+        let isDraggingObject = false;
+
+        function handleObjectDragStart(e) {
+            // Check if target is draggable (currently only stickers)
+            if (!e.target.classList.contains('recall-sticker')) return;
+            
+            // If in creation mode, avoid dragging existing ones unless necessary
+            // But usually, user expects to be able to move them even in sticker mode
+            
+            e.preventDefault(); 
+            e.stopPropagation(); // Stop bubbling to paper (prevents new sticker creation start)
+
+            dragItem = e.target;
+            const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+            const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+            
+            dragStartX = clientX;
+            dragStartY = clientY;
+            
+            // Get current positions
+            dragInitialLeft = parseFloat(dragItem.style.left) || 0;
+            dragInitialTop = parseFloat(dragItem.style.top) || 0;
+            
+            isDraggingObject = false; // Reset status
+        }
+
+        function handleObjectDragMove(e) {
+            if (!dragItem) return;
+            
+            e.preventDefault(); // Stop scroll on touch devices
+            
+            const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+            const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+            
+            const dx = clientX - dragStartX;
+            const dy = clientY - dragStartY;
+            
+            // Threshold to switch from "Click" to "Drag"
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                isDraggingObject = true;
+            }
+            
+            if (isDraggingObject) {
+                dragItem.style.left = (dragInitialLeft + dx) + 'px';
+                dragItem.style.top = (dragInitialTop + dy) + 'px';
+            }
+        }
+
+        function handleObjectDragEnd(e) {
+            if (!dragItem) return;
+            
+            if (!isDraggingObject) {
+                // Minimal movement = Click/Tap = Toggle Reveal
+                dragItem.classList.toggle('revealed');
+            } else {
+                // Movement occurred = Drag = Save Position
+                saveCurrentToCloud();
+            }
+            
+            dragItem = null;
+            isDraggingObject = false;
+        }
+
+        // Attach listeners to Editor (delegation for existing and future stickers)
+        const editorEl = document.getElementById('editor');
+        
+        // Mouse Events
+        editorEl.addEventListener('mousedown', handleObjectDragStart);
+        window.addEventListener('mousemove', handleObjectDragMove);
+        window.addEventListener('mouseup', handleObjectDragEnd);
+        
+        // Touch Events (iPad support)
+        editorEl.addEventListener('touchstart', handleObjectDragStart, {passive: false});
+        window.addEventListener('touchmove', handleObjectDragMove, {passive: false});
+        window.addEventListener('touchend', handleObjectDragEnd);
+
         window.updatePageMeta = () => {
             const chapter = chapters.find(c => c.id === currentId);
             if (chapter) {
@@ -1872,15 +2310,6 @@
                 location.reload();
             }
         }
-
-        window.loadLecturePdf = (input) => {
-            const file = input.files[0];
-            if (!file) return;
-            const url = URL.createObjectURL(file);
-            document.getElementById('lectureFrame').src = url;
-            document.body.classList.add('split-mode');
-            showToast("Lecture Loaded");
-        };
 
         window.closeLecturePane = () => {
             document.body.classList.remove('split-mode');
@@ -2477,6 +2906,18 @@
             showToast("Page Deleted");
         };
 
+        window.triggerImageUpload = () => document.getElementById('imageInput').click();
+        window.handleImageUpload = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const html = `<div class="uploaded-container" contenteditable="false"><img src="${event.target.result}" /></div>`;
+                insertHtml(html);
+            };
+            reader.readAsDataURL(file);
+        };
+
         function loadChapter(id) {
             currentId = id;
             undoStack = []; redoStack = [];
@@ -2486,6 +2927,10 @@
             // FIX: Remove stray pins from paper background (cleanup from old bug)
             document.querySelectorAll('#paper > .anatomy-pin').forEach(p => p.remove());
 
+            // FIX: Clear previous PDF background
+            const pdfContainer = document.getElementById('pdfBackground');
+            pdfContainer.innerHTML = '';
+
             setTimeout(() => resizeCanvas(), 0);
 
             document.getElementById('editor').innerHTML = chapter.content;
@@ -2494,7 +2939,21 @@
             if(chapter.isWhiteboard) document.getElementById('paper').classList.add('infinite');
             else document.getElementById('paper').classList.remove('infinite');
 
-            if(chapter.backgroundImage) {
+            // Handle Background Image or PDF
+            if (chapter.pdfPages && chapter.pdfPages.length > 0) {
+                // Restore PDF Pages
+                chapter.pdfPages.forEach(dataUrl => {
+                    const img = document.createElement('img');
+                    img.src = dataUrl;
+                    img.className = 'pdf-page-render';
+                    pdfContainer.appendChild(img);
+                });
+                document.getElementById('paper').classList.remove('grid', 'lined', 'dotted');
+                document.getElementById('paper').classList.add('plain');
+                document.getElementById('paper').classList.remove('annotate-mode');
+                document.getElementById('paper').style.backgroundImage = '';
+            } 
+            else if(chapter.backgroundImage) {
                 document.getElementById('paper').style.backgroundImage = `url('${chapter.backgroundImage}')`;
                 document.getElementById('paper').classList.add('annotate-mode');
             } else {
@@ -2603,18 +3062,6 @@
                 document.getElementById('voiceBtn').classList.add('active-voice');
                 showToast("Listening...");
             }
-        };
-
-        window.triggerImageUpload = () => document.getElementById('imageInput').click();
-        window.handleImageUpload = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const html = `<div class="uploaded-container" contenteditable="false"><img src="${event.target.result}" /></div>`;
-                insertHtml(html);
-            };
-            reader.readAsDataURL(file);
         };
 
         window.insertBlock = (type) => {
@@ -2854,6 +3301,60 @@
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
         };
+
+        // --- PWA LOGIC ---
+        // 1. Generate Icons and Manifest on the fly (Single File Architecture)
+        const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#2c3e50"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="300">📝</text></svg>`;
+        const iconUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(iconSVG)}`;
+        
+        document.getElementById('appIcon').href = iconUrl;
+        document.getElementById('appleIcon').href = iconUrl;
+
+        const manifest = {
+            "name": "Academic Notebook",
+            "short_name": "Notebook",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#fdfbf7",
+            "theme_color": "#2c3e50",
+            "orientation": "any",
+            "icons": [
+                {
+                    "src": iconUrl,
+                    "sizes": "512x512",
+                    "type": "image/svg+xml",
+                    "purpose": "any maskable"
+                }
+            ]
+        };
+        
+        const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        document.getElementById('appManifest').href = URL.createObjectURL(manifestBlob);
+
+        // 2. Install Prompt Handler
+        let deferredPrompt;
+        const installBtn = document.getElementById('installAppBtn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'flex'; // Show button
+        });
+
+        window.installPWA = async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                installBtn.style.display = 'none';
+            }
+            deferredPrompt = null;
+        };
+
+        window.addEventListener('appinstalled', () => {
+            installBtn.style.display = 'none';
+            showToast("App Installed Successfully!");
+        });
 
         initApp();
         setTimeout(resizeCanvas, 500);
