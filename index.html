@@ -678,7 +678,6 @@
                 <button class="tool-btn" onclick="insertConstants()"><span>π</span> Constants</button>
             </div>
             
-            <button class="tool-btn" onclick="insertBlock('code')"><span>💻</span> Code</button>
             <button class="tool-btn" onclick="triggerImageUpload()"><span>📸</span> Photo</button>
             <hr style="opacity: 0.2;">
             <button class="tool-btn" style="color: #e74c3c" onclick="clearSketch()"><span>🗑️</span> Clear Sketch</button>
@@ -1293,7 +1292,25 @@
         window.insertComplexity = () => { insertHtml(`<span class="algo-badge" contenteditable="true">Time: O(n)</span>&nbsp;`); }
         
         // TRACE TABLE FIX
+        let savedRange = null;
+
+        function saveSelection() {
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+                savedRange = sel.getRangeAt(0);
+            }
+        }
+
+        function restoreSelection() {
+            if (savedRange) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedRange);
+            }
+        }
+
         window.insertTraceTable = () => {
+            saveSelection();
             document.getElementById('traceModal').style.display = 'flex';
             document.getElementById('traceVarCount').focus();
         }
@@ -1333,6 +1350,7 @@
                 </div>
                 <p><br></p>
             `;
+            restoreSelection();
             insertHtml(html);
             closeTraceModal();
         }
@@ -1395,10 +1413,13 @@
             const count = document.getElementsByClassName('anatomy-pin').length + 1;
             const pin = document.createElement('div');
             pin.className = 'anatomy-pin';
+            pin.setAttribute('contenteditable', 'false'); // Prevent editing inside the pin
             pin.style.left = (x - 12) + 'px';
             pin.style.top = (y - 12) + 'px';
             pin.innerHTML = `<span>${count}</span>`;
-            this.appendChild(pin);
+            
+            // FIX: Append to editor so it is saved with page content, not stuck on paper
+            document.getElementById('editor').appendChild(pin);
             
             const legendHtml = `<div class="checklist-item">
                 <div style="background:var(--med-accent); color:white; width:20px; height:20px; border-radius:50%; text-align:center; font-size:0.7rem; line-height:20px; margin-right:10px;">${count}</div>
@@ -1751,7 +1772,13 @@
         canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
-        canvas.addEventListener('touchstart', (e) => startDrawing(e.touches[0]));
+        
+        // UPDATED: Prevent drawing if multiple fingers are used (allows for gestures)
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) return; 
+            startDrawing(e.touches[0]);
+        });
+        
         canvas.addEventListener('touchmove', (e) => draw(e.touches[0]));
         canvas.addEventListener('touchend', stopDrawing);
 
@@ -2081,6 +2108,9 @@
             undoStack = []; redoStack = [];
             const chapter = chapters.find(c => c.id === id);
             if (!chapter) return;
+
+            // FIX: Remove stray pins from paper background (cleanup from old bug)
+            document.querySelectorAll('#paper > .anatomy-pin').forEach(p => p.remove());
 
             setTimeout(() => resizeCanvas(), 0);
 
@@ -2450,6 +2480,72 @@
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
         };
+
+        // --- MULTI-TOUCH GESTURES (iPad/Tablet) ---
+        let gestureMaxFingers = 0;
+        let gestureStartTime = 0;
+        let gestureIsDrag = false;
+        let lastGestureTapTime = 0;
+        let lastGestureTapFingers = 0;
+
+        window.addEventListener('touchstart', (e) => {
+            if (!isSketchMode) return;
+            // Track maximum fingers touching during this gesture
+            if (e.touches.length > gestureMaxFingers) gestureMaxFingers = e.touches.length;
+            
+            // Reset gesture state on initial touch
+            if (e.touches.length === 1) {
+                gestureStartTime = Date.now();
+                gestureIsDrag = false;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+             // If movement occurs, mark as drag to prevent accidental tap detection
+             gestureIsDrag = true;
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (!isSketchMode) return;
+            
+            // Execute logic only when ALL fingers have lifted
+            if (e.touches.length === 0) {
+                const duration = Date.now() - gestureStartTime;
+                
+                // Detect Short Tap (ignoring drags)
+                if (duration < 300 && !gestureIsDrag) {
+                    const now = Date.now();
+                    const timeBetweenTaps = now - lastGestureTapTime;
+
+                    // CHECK FOR DOUBLE TAP (Time between taps < 500ms, same finger count)
+                    if (timeBetweenTaps < 500 && timeBetweenTaps > 50 && lastGestureTapFingers === gestureMaxFingers) {
+                        
+                        // 2 Fingers Double Tap -> UNDO
+                        if (gestureMaxFingers === 2) {
+                            undoSketch();
+                            showToast("Undo ↩️");
+                        } 
+                        // 3 Fingers Double Tap -> REDO
+                        else if (gestureMaxFingers === 3) {
+                            redoSketch();
+                            showToast("Redo ↪️");
+                        }
+                        
+                        // Reset to prevent triple-tap chaining
+                        lastGestureTapTime = 0;
+                        lastGestureTapFingers = 0;
+                    } else {
+                        // First Tap Recorded
+                        lastGestureTapTime = now;
+                        lastGestureTapFingers = gestureMaxFingers;
+                    }
+                }
+                
+                // Reset gesture tracking
+                gestureMaxFingers = 0;
+                gestureIsDrag = false;
+            }
+        });
 
         initApp();
         setTimeout(resizeCanvas, 500);
