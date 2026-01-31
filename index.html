@@ -556,6 +556,26 @@
         </div>
     </div>
 
+    <!-- CONSTANTS MODAL -->
+    <div id="constantModal" class="floating-pane" style="display:none; width: 300px; z-index: 1002;">
+        <h3 style="margin-bottom: 15px;">Insert Constant</h3>
+        
+        <div style="margin-bottom:10px;">
+            <label style="font-size:0.8rem; color:#666; display:block; margin-bottom:5px;">Symbol (e.g. g, pi, c)</label>
+            <input type="text" id="constInput" class="meta-value" placeholder="Type symbol..." oninput="lookupConstant()">
+        </div>
+        
+        <div style="margin-bottom:15px;">
+            <label style="font-size:0.8rem; color:#666; display:block; margin-bottom:5px;">Value (Editable)</label>
+            <input type="text" id="constValue" class="meta-value" placeholder="Value will appear here...">
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <button class="tool-btn" onclick="confirmConstant()" style="background: var(--save-color); color: white; justify-content: center; flex:1;">Insert</button>
+            <button class="tool-btn" onclick="closeConstantModal()" style="background: #eee; justify-content: center; flex:1;">Cancel</button>
+        </div>
+    </div>
+
     <div class="text-bubble" id="textBubble">
         <button class="bubble-btn" onclick="formatText('bold')">B</button>
         <button class="bubble-btn" onclick="formatText('italic')">I</button>
@@ -1098,6 +1118,8 @@
         let isDraggingRuler = false, isRotatingRuler = false;
         let rulerDragStartX, rulerDragStartY, rulerStartAngle;
         let isMathMode = false; // Toggles keyboard visibility
+        let savedRange = null; // Stores cursor position
+        let editingMathElement = null; // Stores reference to math element being edited
 
         const canvas = document.getElementById('sketchCanvas');
         const ctx = canvas.getContext('2d');
@@ -1105,6 +1127,27 @@
 
         const paperStyles = ['grid', 'lined', 'dotted', 'plain'];
         const markdownTriggers = { '#': 'h1', '##': 'h2', '###': 'h3', '-': 'unordered-list', '*': 'unordered-list', '1.': 'ordered-list', '>': 'blockquote', '[]': 'checkbox', '---': 'hr' };
+
+        // --- GLOBAL SELECTION HELPER FUNCTIONS ---
+        function saveSelection() {
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                const editor = document.getElementById('editor');
+                // Only save if selection is inside editor
+                if (editor.contains(range.commonAncestorContainer)) {
+                    savedRange = range;
+                }
+            }
+        }
+
+        function restoreSelection() {
+            if (savedRange) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedRange);
+            }
+        }
 
         function handleMarkdownInput(e) {
             if (e.data === ' ') {
@@ -1150,6 +1193,19 @@
                 setupDragAndDrop();
                 updateStorageQuota();
                 
+                // Track cursor position globally for better insertion logic
+                document.addEventListener('selectionchange', () => {
+                    const sel = window.getSelection();
+                    if (sel.rangeCount > 0) {
+                        const range = sel.getRangeAt(0);
+                        const editor = document.getElementById('editor');
+                        if (editor.contains(range.commonAncestorContainer)) {
+                            savedRange = range;
+                        }
+                    }
+                    handleSelectionChange(); // Keep bubble functionality
+                });
+
                 document.getElementById('editor').addEventListener('input', handleMarkdownInput);
                 document.getElementById('editor').addEventListener('click', function(e) {
                     if (e.target.classList.contains('checkbox')) {
@@ -1245,7 +1301,6 @@
                 
                 setupRulerEvents();
                 switchMathTab('basic'); // Init keys
-                document.addEventListener('selectionchange', handleSelectionChange);
                 
             } catch (err) {
                 console.error(err);
@@ -1344,24 +1399,34 @@
             const latex = buffer.value.trim();
             if(!latex) return;
             
+            // Check if we are updating a block (display) or inline
+            const isDisplay = editingMathElement && editingMathElement.classList.contains('math-display');
+            
             let mathHtml = '';
             if(window.katex) {
-                mathHtml = katex.renderToString(latex, { throwOnError: false });
+                mathHtml = katex.renderToString(latex, { throwOnError: false, displayMode: isDisplay });
             } else {
                 mathHtml = `<span style="font-family:monospace; background:#eee;">${latex}</span>`;
             }
             
-            // Insert as a non-editable block (so backspace deletes whole thing)
-            const html = `<span class="math-block" contenteditable="false" data-latex="${latex}" style="padding:0 5px; cursor:pointer;" onclick="editMathBlock(this)">${mathHtml}</span>&nbsp;`;
-            
-            // Insert into editor at cursor
-            const editor = document.getElementById('editor');
-            editor.focus();
-            if(document.execCommand('insertHTML', false, html)) {
-                // success
+            if (editingMathElement) {
+                // UPDATE EXISTING
+                editingMathElement.setAttribute('data-latex', latex);
+                editingMathElement.innerHTML = mathHtml;
+                editingMathElement = null; // Reset
             } else {
-                // Fallback append
-                editor.innerHTML += html;
+                // INSERT NEW (Inline)
+                const html = `<span class="math-block" contenteditable="false" data-latex="${latex}" style="padding:0 5px; cursor:pointer;" onclick="editMathBlock(this)">${mathHtml}</span>&nbsp;`;
+                
+                restoreSelection();
+                const editor = document.getElementById('editor');
+                editor.focus();
+                if(document.execCommand('insertHTML', false, html)) {
+                    // success
+                } else {
+                    // Fallback append
+                    editor.innerHTML += html;
+                }
             }
             
             buffer.value = '';
@@ -1370,12 +1435,11 @@
         }
         
         window.editMathBlock = (el) => {
+            editingMathElement = el; // Store reference to element being edited
             const latex = el.getAttribute('data-latex');
             document.getElementById('mathBuffer').value = latex;
             updateMathPreview();
             toggleMathMode(true); // Open keyboard
-            // Optional: Remove old block so "update" feels natural? 
-            // Or just append new. Let's just open keyboard for now.
         };
 
         window.toggleMathMode = (forceOpen = false) => {
@@ -1397,6 +1461,7 @@
                 keyboard.style.display = 'none';
                 if(btn) btn.classList.remove('active');
                 document.querySelector('.sidebar').style.bottom = '0';
+                editingMathElement = null; // Clear edit reference on close
             }
         };
 
@@ -1406,23 +1471,6 @@
         window.insertComplexity = () => { insertHtml(`<span class="algo-badge" contenteditable="true">Time: O(n)</span>&nbsp;`); }
         
         // TRACE TABLE FIX
-        let savedRange = null;
-
-        function saveSelection() {
-            const sel = window.getSelection();
-            if (sel.rangeCount > 0) {
-                savedRange = sel.getRangeAt(0);
-            }
-        }
-
-        function restoreSelection() {
-            if (savedRange) {
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(savedRange);
-            }
-        }
-
         window.insertTraceTable = () => {
             saveSelection();
             document.getElementById('traceModal').style.display = 'flex';
@@ -1626,9 +1674,70 @@
             });
         }
 
-        window.insertEquation = () => { insertHtml(`<div style="font-family:'Times New Roman', serif; font-style:italic; font-size:1.1rem; text-align:center; background:rgba(0,0,0,0.03); padding:10px; border-radius:4px;">x = (-b ± √(b² - 4ac)) / 2a</div><p><br></p>`); }
+        window.insertEquation = () => { 
+            const latex = "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}";
+            let mathHtml = "";
+            if(window.katex) {
+                mathHtml = katex.renderToString(latex, { throwOnError: false, displayMode: true });
+            } else {
+                mathHtml = latex;
+            }
+            // Insert interactive math block
+            const html = `<div class="math-display" contenteditable="false" data-latex="${latex}" style="text-align:center; padding:10px; cursor:pointer; background:rgba(0,0,0,0.03); border-radius:4px; margin: 10px 0;" onclick="editMathBlock(this)">${mathHtml}</div><p><br></p>`;
+            restoreSelection(); // Ensure insertion point is correct
+            insertHtml(html); 
+        }
         window.insertAssumptions = () => { insertHtml(`<h3 style="color:#7f8c8d; border-bottom:1px solid #eee;">Assumptions</h3><ul><li>Steady state</li><li>Adiabatic</li></ul>`); }
-        window.insertConstants = () => { insertHtml(`<div class="chalk-code">g = 9.81 m/s²<br>π = 3.14159</div>`); }
+        
+        // --- CONSTANTS TOOL LOGIC ---
+        const ENG_CONSTANTS = {
+            'g': '9.81 m/s²',
+            'pi': '3.14159',
+            'π': '3.14159',
+            'e': '2.71828',
+            'c': '3.00 × 10⁸ m/s',
+            'h': '6.626 × 10⁻³⁴ J·s',
+            'G': '6.674 × 10⁻¹¹ N·m²/kg²',
+            'atm': '101,325 Pa',
+            'R': '8.314 J/(mol·K)',
+            'Na': '6.022 × 10²³ mol⁻¹',
+            'k': '1.380 × 10⁻²³ J/K'
+        };
+
+        window.insertConstants = () => { 
+            saveSelection();
+            document.getElementById('constantModal').style.display = 'flex';
+            document.getElementById('constInput').value = '';
+            document.getElementById('constValue').value = '';
+            document.getElementById('constInput').focus();
+        }
+
+        window.closeConstantModal = () => {
+            document.getElementById('constantModal').style.display = 'none';
+        };
+
+        window.lookupConstant = () => {
+            const key = document.getElementById('constInput').value.trim();
+            const valInput = document.getElementById('constValue');
+            
+            // Check for match (case-insensitive fallback)
+            if(ENG_CONSTANTS[key]) {
+                valInput.value = ENG_CONSTANTS[key];
+            } else if (ENG_CONSTANTS[key.toLowerCase()]) {
+                 valInput.value = ENG_CONSTANTS[key.toLowerCase()];
+            }
+        };
+
+        window.confirmConstant = () => {
+            const sym = document.getElementById('constInput').value.trim();
+            const val = document.getElementById('constValue').value.trim();
+            
+            if (sym && val) {
+                restoreSelection();
+                insertHtml(`<div class="chalk-code">${sym} = ${val}</div><p><br></p>`);
+            }
+            closeConstantModal();
+        };
         
         // --- TOOLBAR SWITCHING ---
         function updateToolVisibility(chapter) {
@@ -1995,6 +2104,65 @@
         let startPanX = 0; let startPanY = 0;
         let scrollStartX = 0; let scrollStartY = 0;
 
+        function getCanvasCoordinates(inputEvent) {
+            let clientX = inputEvent.clientX;
+            let clientY = inputEvent.clientY;
+
+            if (isRulerActive && activeSketchTool !== 'hand' && activeSketchTool !== 'eraser') {
+                const rulerWidth = 400;
+                const rulerHeight = 60;
+                
+                // Calculate Ruler Center
+                const cx = rulerX + (rulerWidth / 2);
+                const cy = rulerY + (rulerHeight / 2);
+                
+                const dx = clientX - cx;
+                const dy = clientY - cy;
+                
+                const angleRad = rulerAngle * (Math.PI / 180);
+                
+                // Rotate point to local ruler space
+                const localX = dx * Math.cos(-angleRad) - dy * Math.sin(-angleRad);
+                const localY = dx * Math.sin(-angleRad) + dy * Math.cos(-angleRad);
+                
+                // Snap logic
+                const snapThreshold = 40; // Pixels
+                const halfHeight = rulerHeight / 2;
+                let snappedLocalY = localY;
+                let snapped = false;
+                
+                // Snap to top or bottom edge
+                if (Math.abs(localY - halfHeight) < snapThreshold) {
+                    snappedLocalY = halfHeight;
+                    snapped = true;
+                } else if (Math.abs(localY + halfHeight) < snapThreshold) {
+                    snappedLocalY = -halfHeight;
+                    snapped = true;
+                }
+                
+                if (snapped) {
+                    // Constrain length
+                    const halfWidth = rulerWidth / 2;
+                    let snappedLocalX = localX;
+                    if (snappedLocalX < -halfWidth) snappedLocalX = -halfWidth;
+                    if (snappedLocalX > halfWidth) snappedLocalX = halfWidth;
+                    
+                    // Rotate back
+                    const rotatedX = snappedLocalX * Math.cos(angleRad) - snappedLocalY * Math.sin(angleRad);
+                    const rotatedY = snappedLocalX * Math.sin(angleRad) + snappedLocalY * Math.cos(angleRad);
+                    
+                    clientX = cx + rotatedX;
+                    clientY = cy + rotatedY;
+                }
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
         function startDrawing(e) {
             if (activeSketchTool === 'hand') {
                 isPanning = true;
@@ -2013,11 +2181,10 @@
             
             saveStateToStack();
             drawing = true;
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX || e.touches[0].clientX) - rect.left;
-            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+            
+            const coords = getCanvasCoordinates(e.clientX ? e : e.touches[0]);
             ctx.beginPath();
-            ctx.moveTo(x, y);
+            ctx.moveTo(coords.x, coords.y);
         }
 
         function draw(e) {
@@ -2037,9 +2204,7 @@
             if (!drawing || !isSketchMode || isReadMode) return;
             if(e.type === 'touchmove') e.preventDefault();
 
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX || e.touches[0].clientX) - rect.left;
-            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+            const coords = getCanvasCoordinates(e.clientX ? e : e.touches[0]);
 
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -2049,28 +2214,28 @@
             if (activeSketchTool === 'eraser') {
                 ctx.globalCompositeOperation = 'destination-out';
                 ctx.lineWidth = 30;
-                ctx.lineTo(x, y);
+                ctx.lineTo(coords.x, coords.y);
                 ctx.stroke();
             } else if (activeSketchTool === 'highlighter') {
                 ctx.globalCompositeOperation = 'source-over'; 
                 ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)';
                 ctx.lineWidth = 20;
-                ctx.lineTo(x, y);
+                ctx.lineTo(coords.x, coords.y);
                 ctx.stroke();
             } else if (activeSketchTool === 'custom') {
                  ctx.strokeStyle = customStrokeStyle;
                  ctx.lineWidth = 2;
-                 ctx.lineTo(x, y);
+                 ctx.lineTo(coords.x, coords.y);
                  ctx.stroke();
             } else {
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50';
-                ctx.lineTo(x, y);
+                ctx.lineTo(coords.x, coords.y);
                 ctx.stroke();
             }
             
             ctx.beginPath();
-            ctx.moveTo(x, y);
+            ctx.moveTo(coords.x, coords.y);
         }
 
         function stopDrawing() {
@@ -2317,6 +2482,9 @@
             undoStack = []; redoStack = [];
             const chapter = chapters.find(c => c.id === id);
             if (!chapter) return;
+
+            // FIX: Remove stray pins from paper background (cleanup from old bug)
+            document.querySelectorAll('#paper > .anatomy-pin').forEach(p => p.remove());
 
             setTimeout(() => resizeCanvas(), 0);
 
