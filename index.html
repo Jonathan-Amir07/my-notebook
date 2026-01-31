@@ -286,6 +286,29 @@
         .checkbox.checked + .checklist-text::after { width: 100%; }
 
         .uploaded-img { max-width: 100%; border-radius: 8px; margin: 10px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        /* Resizable Image Container */
+        .uploaded-container {
+            display: inline-block;
+            resize: both;
+            overflow: hidden;
+            vertical-align: middle;
+            margin: 10px;
+            max-width: 100%;
+            border: 1px solid transparent;
+            position: relative;
+            z-index: 10; /* Ensure handle is clickable */
+        }
+        .uploaded-container:hover {
+            border: 1px dashed var(--accent-color); /* Visual cue */
+        }
+        .uploaded-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            border-radius: 8px;
+        }
+
         .save-status { position: absolute; top: 2rem; right: 4rem; font-family: sans-serif; font-size: 0.75rem; color: #999; text-transform: uppercase; letter-spacing: 1px; pointer-events: none; }
         .word-count { font-family: sans-serif; font-size: 0.7rem; color: var(--accent-color); margin-top: 4px; opacity: 0.7; }
         .status-bar { position: absolute; top: 2rem; right: 4rem; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
@@ -1774,7 +1797,7 @@
                         if (file.type.startsWith('image/')) {
                             const reader = new FileReader();
                             reader.onload = (event) => {
-                                const html = `<img src="${event.target.result}" class="uploaded-img" />`;
+                                const html = `<div class="uploaded-container" contenteditable="false"><img src="${event.target.result}" /></div>`;
                                 insertHtml(html);
                             };
                             reader.readAsDataURL(file);
@@ -1790,7 +1813,7 @@
                     const doc = parser.parseFromString(htmlContent, 'text/html');
                     const img = doc.querySelector('img');
                     if (img && img.src) {
-                        const html = `<img src="${img.src}" class="uploaded-img" />`;
+                        const html = `<div class="uploaded-container" contenteditable="false"><img src="${img.src}" /></div>`;
                         insertHtml(html);
                         return;
                     }
@@ -1799,7 +1822,7 @@
                 // 4. Handle Direct Image URLs
                 const uri = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
                 if (uri && /\.(jpg|jpeg|png|gif|webp|svg)/i.test(uri)) {
-                    const html = `<img src="${uri}" class="uploaded-img" />`;
+                    const html = `<div class="uploaded-container" contenteditable="false"><img src="${uri}" /></div>`;
                     insertHtml(html);
                 }
             });
@@ -2175,6 +2198,18 @@
             showToast("Page Deleted");
         };
 
+        window.triggerImageUpload = () => document.getElementById('imageInput').click();
+        window.handleImageUpload = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const html = `<div class="uploaded-container" contenteditable="false"><img src="${event.target.result}" /></div>`;
+                insertHtml(html);
+            };
+            reader.readAsDataURL(file);
+        };
+
         function loadChapter(id) {
             currentId = id;
             undoStack = []; redoStack = [];
@@ -2301,18 +2336,6 @@
                 document.getElementById('voiceBtn').classList.add('active-voice');
                 showToast("Listening...");
             }
-        };
-
-        window.triggerImageUpload = () => document.getElementById('imageInput').click();
-        window.handleImageUpload = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const html = `<img src="${event.target.result}" class="uploaded-img" />`;
-                insertHtml(html);
-            };
-            reader.readAsDataURL(file);
         };
 
         window.insertBlock = (type) => {
