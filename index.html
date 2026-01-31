@@ -1719,19 +1719,84 @@
 
         function setupDragAndDrop() {
             const paper = document.getElementById('paper');
-            paper.addEventListener('dragover', (e) => { e.preventDefault(); paper.classList.add('drag-over'); });
-            paper.addEventListener('dragleave', (e) => { e.preventDefault(); paper.classList.remove('drag-over'); });
+            let dragCounter = 0;
+
+            paper.addEventListener('dragenter', (e) => { 
+                e.preventDefault(); 
+                dragCounter++;
+                paper.classList.add('drag-over'); 
+            });
+
+            paper.addEventListener('dragover', (e) => { 
+                e.preventDefault(); 
+                // Necessary to allow dropping
+            });
+
+            paper.addEventListener('dragleave', (e) => { 
+                e.preventDefault(); 
+                dragCounter--;
+                if (dragCounter <= 0) paper.classList.remove('drag-over'); 
+            });
+
             paper.addEventListener('drop', (e) => {
                 e.preventDefault();
+                dragCounter = 0;
                 paper.classList.remove('drag-over');
+
+                // 1. Position Cursor at Drop Point
+                if (document.caretRangeFromPoint) {
+                    const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                    if (range) {
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                } else if (document.caretPositionFromPoint) { // Firefox fallback
+                    const range = document.createRange();
+                    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+                    if (pos) {
+                        range.setStart(pos.offsetNode, pos.offset);
+                        range.collapse(true);
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                }
+
+                // 2. Handle Local Files
                 const files = e.dataTransfer.files;
-                if (files.length > 0 && files[0].type.startsWith('image/')) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const html = `<img src="${event.target.result}" class="uploaded-img" />`;
+                if (files.length > 0) {
+                    Array.from(files).forEach(file => {
+                        if (file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                                const html = `<img src="${event.target.result}" class="uploaded-img" />`;
+                                insertHtml(html);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                    return;
+                }
+
+                // 3. Handle Dragged Images from Web (HTML)
+                const htmlContent = e.dataTransfer.getData('text/html');
+                if (htmlContent) {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlContent, 'text/html');
+                    const img = doc.querySelector('img');
+                    if (img && img.src) {
+                        const html = `<img src="${img.src}" class="uploaded-img" />`;
                         insertHtml(html);
-                    };
-                    reader.readAsDataURL(files[0]);
+                        return;
+                    }
+                }
+
+                // 4. Handle Direct Image URLs
+                const uri = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+                if (uri && /\.(jpg|jpeg|png|gif|webp|svg)/i.test(uri)) {
+                    const html = `<img src="${uri}" class="uploaded-img" />`;
+                    insertHtml(html);
                 }
             });
         }
@@ -2483,86 +2548,6 @@
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
         };
-
-        // --- MULTI-TOUCH GESTURES (iPad/Tablet) ---
-        let gestureMaxFingers = 0;
-        let gestureStartTime = 0;
-        let gestureIsDrag = false;
-        let lastGestureTapTime = 0;
-        let lastGestureTapFingers = 0;
-        
-        // New variables for triple tap detection
-        let gestureTapCount = 0;
-        let gestureTapTimeout = null;
-
-        window.addEventListener('touchstart', (e) => {
-            // FIX: Removed restriction so gestures work everywhere (text & sketch)
-            
-            // Track maximum fingers touching during this gesture
-            if (e.touches.length > gestureMaxFingers) gestureMaxFingers = e.touches.length;
-            
-            // Reset gesture state on initial touch
-            if (e.touches.length === 1) {
-                gestureStartTime = Date.now();
-                gestureIsDrag = false;
-            }
-        }, { passive: true });
-
-        window.addEventListener('touchmove', (e) => {
-             // If movement occurs, mark as drag to prevent accidental tap detection
-             gestureIsDrag = true;
-        }, { passive: true });
-
-        window.addEventListener('touchend', (e) => {
-            // FIX: Removed restriction so gestures work everywhere (text & sketch)
-            
-            // Execute logic only when ALL fingers have lifted
-            if (e.touches.length === 0) {
-                const duration = Date.now() - gestureStartTime;
-                
-                // Detect Short Tap (ignoring drags)
-                if (duration < 300 && !gestureIsDrag) {
-                    const now = Date.now();
-                    const timeBetweenTaps = now - lastGestureTapTime;
-
-                    // Check for sequential taps (Time between taps < 500ms, same finger count)
-                    if (timeBetweenTaps < 500 && timeBetweenTaps > 50 && lastGestureTapFingers === gestureMaxFingers) {
-                        gestureTapCount++;
-                    } else {
-                        gestureTapCount = 1;
-                    }
-                    
-                    lastGestureTapTime = now;
-                    lastGestureTapFingers = gestureMaxFingers;
-
-                    // 2 FINGERS GESTURES
-                    if (gestureMaxFingers === 2) {
-                        if (gestureTapCount === 2) {
-                            // Double Tap detected - Schedule Undo (wait for potential 3rd tap)
-                            clearTimeout(gestureTapTimeout);
-                            gestureTapTimeout = setTimeout(() => {
-                                if (isSketchMode) undoSketch();
-                                else document.execCommand('undo'); // Native Text Undo
-                                showToast("Undo ↩️");
-                                gestureTapCount = 0; // Reset
-                            }, 400); // 400ms window for triple tap
-                        } 
-                        else if (gestureTapCount === 3) {
-                            // Triple Tap detected - Cancel pending Undo and trigger Redo
-                            clearTimeout(gestureTapTimeout);
-                            if (isSketchMode) redoSketch();
-                            else document.execCommand('redo'); // Native Text Redo
-                            showToast("Redo ↪️");
-                            gestureTapCount = 0; // Reset
-                        }
-                    }
-                }
-                
-                // Reset gesture tracking
-                gestureMaxFingers = 0;
-                gestureIsDrag = false;
-            }
-        });
 
         initApp();
         setTimeout(resizeCanvas, 500);
