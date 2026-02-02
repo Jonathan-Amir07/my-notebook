@@ -496,6 +496,118 @@
             font-size: 0.85rem;
             color: #2c3e50;
         }
+
+        /* Knowledge Base Styles */
+        .knowledge-base-container {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 10px;
+            margin: 0;
+        }
+        .kb-category {
+            margin-bottom: 15px;
+        }
+        .kb-category-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 8px;
+            padding: 5px 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .kb-category-title:hover {
+            background: rgba(255,255,255,0.08);
+        }
+        .kb-content {
+            font-size: 0.75rem;
+            line-height: 1.5;
+            color: var(--sidebar-text);
+            opacity: 0.9;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            border-radius: 4px;
+            margin-top: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .kb-content.collapsed {
+            display: none;
+        }
+        .kb-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .kb-content::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        .kb-content::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+        .kb-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 0.7rem;
+        }
+        .kb-table th {
+            background: rgba(255,255,255,0.1);
+            padding: 4px 6px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-weight: 600;
+        }
+        .kb-table td {
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .kb-table tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .kb-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 5px 0;
+        }
+        .kb-list li {
+            padding: 3px 0;
+            padding-left: 12px;
+            position: relative;
+        }
+        .kb-list li:before {
+            content: "●";
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+            font-size: 0.6rem;
+        }
+        .kb-code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.7rem;
+            display: inline-block;
+            margin: 2px 0;
+        }
+        .kb-section-header {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-top: 10px;
+            margin-bottom: 5px;
+            font-size: 0.75rem;
+        }
+        .kb-arrow {
+            transition: transform 0.3s;
+            font-size: 0.7rem;
+        }
+        .kb-arrow.collapsed {
+            transform: rotate(-90deg);
+        }
         
 
         .continuation-break { 
@@ -1423,6 +1535,21 @@
                             <span>Today</span>
                             <span class="pomodoro-stat-value" id="pomodoroTodayCount">0</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- KNOWLEDGE BASE SECTION -->
+        <div class="sidebar-section" id="knowledgeBaseSectionWrapper">
+            <div class="section-header" onclick="toggleSection('knowledgeBaseContent', 'knowledgeBaseArrow', 'knowledgeBaseSectionWrapper')">
+                <span>📚 Knowledge Base</span>
+                <span class="arrow" id="knowledgeBaseArrow">▼</span>
+            </div>
+            <div class="section-content" id="knowledgeBaseContent">
+                <div class="knowledge-base-container" id="knowledgeBaseContainer">
+                    <div style="font-size: 0.75rem; opacity: 0.7; text-align: center; padding: 10px;">
+                        Select a page to view relevant references
                     </div>
                 </div>
             </div>
@@ -2742,6 +2869,9 @@
             if(disc === 'cs' && csTools) csTools.style.display = 'flex';
             if(disc === 'medical' && medTools) medTools.style.display = 'flex';
             if(disc === 'engineering' && engTools) engTools.style.display = 'flex';
+            
+            // Update Knowledge Base based on discipline
+            updateKnowledgeBase(disc);
         }
 
         window.insertCSCodeBlock = () => {
@@ -4871,6 +5001,361 @@
         window.evaluateCircuit = evaluateCircuit;
         window.clearCircuit = clearCircuit;
         window.initLogicGatesSimulator = initLogicGatesSimulator;
+
+        // ==================== KNOWLEDGE BASE SYSTEM ====================
+        const knowledgeBaseData = {
+            cs: {
+                title: "💻 Computer Science Reference",
+                categories: [
+                    {
+                        name: "Algorithmic Complexity (Big-O)",
+                        content: `
+                            <table class="kb-table">
+                                <tr><th>Complexity</th><th>Typical Meaning</th><th>Common Examples</th></tr>
+                                <tr><td>O(1)</td><td>Constant</td><td>Array access, stack push/pop</td></tr>
+                                <tr><td>O(log n)</td><td>Logarithmic</td><td>Binary search</td></tr>
+                                <tr><td>O(n)</td><td>Linear</td><td>Linear scan, simple loop</td></tr>
+                                <tr><td>O(n log n)</td><td>Linearithmic</td><td>Merge sort, heap sort</td></tr>
+                                <tr><td>O(n²)</td><td>Quadratic</td><td>Nested loops, bubble sort</td></tr>
+                                <tr><td>O(2ⁿ)</td><td>Exponential</td><td>Recursive Fibonacci</td></tr>
+                            </table>
+                        `
+                    },
+                    {
+                        name: "Data Structures at a Glance",
+                        content: `
+                            <table class="kb-table">
+                                <tr><th>Structure</th><th>Access</th><th>Insert</th><th>Delete</th><th>Notes</th></tr>
+                                <tr><td>Array</td><td>O(1)</td><td>O(n)</td><td>O(n)</td><td>Contiguous memory</td></tr>
+                                <tr><td>Linked List</td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>Pointer overhead</td></tr>
+                                <tr><td>Stack</td><td>O(1)</td><td>O(1)</td><td>O(1)</td><td>LIFO</td></tr>
+                                <tr><td>Queue</td><td>O(1)</td><td>O(1)</td><td>O(1)</td><td>FIFO</td></tr>
+                                <tr><td>Hash Table</td><td>O(1)*</td><td>O(1)*</td><td>O(1)*</td><td>*Amortized</td></tr>
+                                <tr><td>Binary Tree</td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td><td>If balanced</td></tr>
+                            </table>
+                        `
+                    },
+                    {
+                        name: "OS & Systems Concepts",
+                        content: `
+                            <div class="kb-section-header">Process States</div>
+                            <div>New → Ready → Running → Waiting → Terminated</div>
+                            
+                            <div class="kb-section-header">Scheduling Algorithms</div>
+                            <div>FCFS, SJF, Priority, Round Robin</div>
+                            
+                            <div class="kb-section-header">Memory</div>
+                            <ul class="kb-list">
+                                <li>Stack vs Heap</li>
+                                <li>Virtual memory</li>
+                                <li>Paging vs Segmentation</li>
+                            </ul>
+                            
+                            <div class="kb-section-header">Concurrency</div>
+                            <ul class="kb-list">
+                                <li><strong>Race condition:</strong> Outcome depends on timing</li>
+                                <li><strong>Deadlock:</strong> Mutual exclusion, Hold & wait, No preemption, Circular wait</li>
+                                <li><strong>Primitives:</strong> Mutex, Semaphore, Atomic operations</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "HTTP Status Codes",
+                        content: `
+                            <ul class="kb-list">
+                                <li><span class="kb-code">200 OK</span> - Success</li>
+                                <li><span class="kb-code">201 Created</span> - Resource created</li>
+                                <li><span class="kb-code">204 No Content</span> - Success, no response body</li>
+                                <li><span class="kb-code">400 Bad Request</span> - Client error</li>
+                                <li><span class="kb-code">401 Unauthorized</span> - Authentication required</li>
+                                <li><span class="kb-code">403 Forbidden</span> - Permissions denied</li>
+                                <li><span class="kb-code">404 Not Found</span> - Resource doesn't exist</li>
+                                <li><span class="kb-code">500 Internal Server Error</span> - Server failure</li>
+                                <li><span class="kb-code">502 Bad Gateway</span> - Invalid upstream response</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "Regex Cheatsheet",
+                        content: `
+                            <table class="kb-table">
+                                <tr><td><span class="kb-code">^</span></td><td>Start of string</td></tr>
+                                <tr><td><span class="kb-code">$</span></td><td>End of string</td></tr>
+                                <tr><td><span class="kb-code">.</span></td><td>Any character (except newline)</td></tr>
+                                <tr><td><span class="kb-code">*</span></td><td>0 or more</td></tr>
+                                <tr><td><span class="kb-code">+</span></td><td>1 or more</td></tr>
+                                <tr><td><span class="kb-code">?</span></td><td>0 or 1 (optional)</td></tr>
+                                <tr><td><span class="kb-code">\\d</span></td><td>Digit [0-9]</td></tr>
+                                <tr><td><span class="kb-code">\\w</span></td><td>Word char [a-zA-Z0-9_]</td></tr>
+                                <tr><td><span class="kb-code">\\s</span></td><td>Whitespace</td></tr>
+                                <tr><td><span class="kb-code">[...]</span></td><td>Character set</td></tr>
+                                <tr><td><span class="kb-code">(...)</span></td><td>Capture group</td></tr>
+                            </table>
+                        `
+                    },
+                    {
+                        name: "ASCII & Encoding",
+                        content: `
+                            <ul class="kb-list">
+                                <li><strong>32:</strong> Space</li>
+                                <li><strong>48-57:</strong> Digits (0-9)</li>
+                                <li><strong>65-90:</strong> Uppercase (A-Z)</li>
+                                <li><strong>97-122:</strong> Lowercase (a-z)</li>
+                                <li><strong>10:</strong> Line Feed (LF)</li>
+                                <li><strong>13:</strong> Carriage Return (CR)</li>
+                                <li><strong>UTF-8:</strong> Variable-length encoding (1-4 bytes)</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "SQL Basics (CRUD)",
+                        content: `
+                            <div class="kb-section-header">SELECT</div>
+                            <div class="kb-code">SELECT * FROM table WHERE col = 'val' ORDER BY col;</div>
+                            
+                            <div class="kb-section-header">INSERT</div>
+                            <div class="kb-code">INSERT INTO table (col1, col2) VALUES ('val1', 'val2');</div>
+                            
+                            <div class="kb-section-header">UPDATE</div>
+                            <div class="kb-code">UPDATE table SET col1 = 'new' WHERE id = 1;</div>
+                            
+                            <div class="kb-section-header">DELETE</div>
+                            <div class="kb-code">DELETE FROM table WHERE id = 1;</div>
+                            
+                            <div class="kb-section-header">JOINS</div>
+                            <ul class="kb-list">
+                                <li><strong>INNER JOIN:</strong> Matches in both</li>
+                                <li><strong>LEFT JOIN:</strong> All from left, matches from right</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "System Design Concepts",
+                        content: `
+                            <ul class="kb-list">
+                                <li><strong>CAP Theorem:</strong> Consistency, Availability, Partition Tolerance (Pick 2)</li>
+                                <li><strong>ACID:</strong> Atomicity, Consistency, Isolation, Durability</li>
+                                <li><strong>Scaling:</strong> Vertical (Bigger machine) vs Horizontal (More machines)</li>
+                                <li><strong>Caching:</strong> Redis/Memcached for read-heavy loads</li>
+                                <li><strong>Abstraction Layers:</strong> Breaking complex systems into levels</li>
+                                <li><strong>State Machines:</strong> Modeling systems as states and transitions</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "Common Ports",
+                        content: `
+                            <table class="kb-table">
+                                <tr><td><span class="kb-code">22</span></td><td>SSH</td></tr>
+                                <tr><td><span class="kb-code">53</span></td><td>DNS</td></tr>
+                                <tr><td><span class="kb-code">80</span></td><td>HTTP</td></tr>
+                                <tr><td><span class="kb-code">443</span></td><td>HTTPS</td></tr>
+                                <tr><td><span class="kb-code">3306</span></td><td>MySQL</td></tr>
+                                <tr><td><span class="kb-code">5432</span></td><td>PostgreSQL</td></tr>
+                                <tr><td><span class="kb-code">27017</span></td><td>MongoDB</td></tr>
+                            </table>
+                        `
+                    }
+                ]
+            },
+            medical: {
+                title: "⚕️ Medical & Dental Reference",
+                categories: [
+                    {
+                        name: "Normal Lab Values (Adult)",
+                        content: `
+                            <div class="kb-section-header">CBC (Complete Blood Count)</div>
+                            <ul class="kb-list">
+                                <li>WBC: 4,500 - 11,000 /µL</li>
+                                <li>RBC: 4.5 - 5.5 M/µL (M), 4.0 - 5.0 M/µL (F)</li>
+                                <li>Hemoglobin: 13.5-17.5 g/dL (M), 12.0-15.5 g/dL (F)</li>
+                                <li>Hematocrit: 41-50% (M), 36-44% (F)</li>
+                                <li>Platelets: 150,000 - 450,000 /µL</li>
+                            </ul>
+                            
+                            <div class="kb-section-header">Basic Metabolic Panel (BMP)</div>
+                            <ul class="kb-list">
+                                <li>Sodium (Na+): 135 - 145 mEq/L</li>
+                                <li>Potassium (K+): 3.5 - 5.0 mEq/L</li>
+                                <li>Chloride (Cl-): 98 - 106 mEq/L</li>
+                                <li>Bicarbonate (HCO3-): 22 - 29 mEq/L</li>
+                                <li>BUN: 7 - 20 mg/dL</li>
+                                <li>Creatinine: 0.6 - 1.2 mg/dL</li>
+                                <li>Glucose: 70 - 100 mg/dL (Fasting)</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "Vital Signs (Resting Adult)",
+                        content: `
+                            <ul class="kb-list">
+                                <li><strong>Heart Rate:</strong> 60 - 100 bpm</li>
+                                <li><strong>Blood Pressure:</strong> &lt; 120/80 mmHg</li>
+                                <li><strong>Respiratory Rate:</strong> 12 - 20 breaths/min</li>
+                                <li><strong>Temperature:</strong> 36.5°C - 37.2°C (97.7°F - 99°F)</li>
+                                <li><strong>SpO2:</strong> 95% - 100%</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "Cranial Nerves",
+                        content: `
+                            <table class="kb-table">
+                                <tr><th>#</th><th>Name</th><th>Type</th><th>Function</th></tr>
+                                <tr><td>I</td><td>Olfactory</td><td>S</td><td>Smell</td></tr>
+                                <tr><td>II</td><td>Optic</td><td>S</td><td>Vision</td></tr>
+                                <tr><td>III</td><td>Oculomotor</td><td>M</td><td>Eye movement, pupil</td></tr>
+                                <tr><td>IV</td><td>Trochlear</td><td>M</td><td>Eye movement (Sup. Oblique)</td></tr>
+                                <tr><td>V</td><td>Trigeminal</td><td>B</td><td>Face sensation, Mastication</td></tr>
+                                <tr><td>VI</td><td>Abducens</td><td>M</td><td>Eye movement (Lateral Rectus)</td></tr>
+                                <tr><td>VII</td><td>Facial</td><td>B</td><td>Face expression, Taste (ant 2/3)</td></tr>
+                                <tr><td>VIII</td><td>Vestibulocochlear</td><td>S</td><td>Hearing, Balance</td></tr>
+                                <tr><td>IX</td><td>Glossopharyngeal</td><td>B</td><td>Taste (post 1/3), Swallowing</td></tr>
+                                <tr><td>X</td><td>Vagus</td><td>B</td><td>Viscera control, Vocal cords</td></tr>
+                                <tr><td>XI</td><td>Accessory</td><td>M</td><td>Head/Shoulder movement</td></tr>
+                                <tr><td>XII</td><td>Hypoglossal</td><td>M</td><td>Tongue movement</td></tr>
+                            </table>
+                            <div style="margin-top:5px; font-size:0.65rem; opacity:0.7;">S=Sensory, M=Motor, B=Both</div>
+                        `
+                    }
+                ]
+            },
+            engineering: {
+                title: "⚙️ Engineering Reference",
+                categories: [
+                    {
+                        name: "Material Properties",
+                        content: `
+                            <div class="kb-section-header">Structural Steel</div>
+                            <ul class="kb-list">
+                                <li>Density: 7,850 kg/m³</li>
+                                <li>Young's Modulus (E): 200 GPa</li>
+                                <li>Yield Strength: 250 MPa</li>
+                            </ul>
+                            
+                            <div class="kb-section-header">Aluminum (6061)</div>
+                            <ul class="kb-list">
+                                <li>Density: 2,700 kg/m³</li>
+                                <li>Young's Modulus (E): 69 GPa</li>
+                                <li>Yield Strength: ~240 MPa (T6)</li>
+                            </ul>
+                            
+                            <div class="kb-section-header">Concrete</div>
+                            <ul class="kb-list">
+                                <li>Density: 2,400 kg/m³</li>
+                                <li>Compressive Strength: 20 - 40 MPa</li>
+                            </ul>
+                            
+                            <div class="kb-section-header">Water</div>
+                            <ul class="kb-list">
+                                <li>Density: 1,000 kg/m³</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "Fundamental Constants",
+                        content: `
+                            <ul class="kb-list">
+                                <li><strong>g</strong> (Gravity): 9.81 m/s²</li>
+                                <li><strong>c</strong> (Speed of Light): 3.00 × 10⁸ m/s</li>
+                                <li><strong>G</strong> (Gravitational): 6.674 × 10⁻¹¹ N·m²/kg²</li>
+                                <li><strong>R</strong> (Gas Constant): 8.314 J/(mol·K)</li>
+                                <li><strong>h</strong> (Planck): 6.626 × 10⁻³⁴ J·s</li>
+                                <li><strong>k</strong> (Boltzmann): 1.380 × 10⁻²³ J/K</li>
+                                <li><strong>Na</strong> (Avogadro): 6.022 × 10²³ mol⁻¹</li>
+                                <li><strong>Atm. Pressure:</strong> 101,325 Pa</li>
+                            </ul>
+                        `
+                    },
+                    {
+                        name: "Common Unit Conversions",
+                        content: `
+                            <table class="kb-table">
+                                <tr><th>Category</th><th>Conversion</th></tr>
+                                <tr><td>Length</td><td>1 in = 2.54 cm | 1 ft = 0.3048 m</td></tr>
+                                <tr><td>Force</td><td>1 lbf ≈ 4.448 N</td></tr>
+                                <tr><td>Mass</td><td>1 lb ≈ 0.4536 kg</td></tr>
+                                <tr><td>Pressure</td><td>1 psi ≈ 6,895 Pa | 1 bar = 100 kPa</td></tr>
+                                <tr><td>Energy</td><td>1 BTU ≈ 1,055 J | 1 cal = 4.184 J</td></tr>
+                                <tr><td>Power</td><td>1 hp ≈ 746 W</td></tr>
+                            </table>
+                        `
+                    },
+                    {
+                        name: "Periodic Table (Key Elements)",
+                        content: `
+                            <table class="kb-table">
+                                <tr><th>Symbol</th><th>Element</th><th>Atomic #</th><th>Mass</th></tr>
+                                <tr><td>H</td><td>Hydrogen</td><td>1</td><td>1.008</td></tr>
+                                <tr><td>C</td><td>Carbon</td><td>6</td><td>12.011</td></tr>
+                                <tr><td>N</td><td>Nitrogen</td><td>7</td><td>14.007</td></tr>
+                                <tr><td>O</td><td>Oxygen</td><td>8</td><td>15.999</td></tr>
+                                <tr><td>Al</td><td>Aluminium</td><td>13</td><td>26.982</td></tr>
+                                <tr><td>Si</td><td>Silicon</td><td>14</td><td>28.085</td></tr>
+                                <tr><td>Fe</td><td>Iron</td><td>26</td><td>55.845</td></tr>
+                                <tr><td>Cu</td><td>Copper</td><td>29</td><td>63.546</td></tr>
+                                <tr><td>Au</td><td>Gold</td><td>79</td><td>196.97</td></tr>
+                                <tr><td>Pb</td><td>Lead</td><td>82</td><td>207.2</td></tr>
+                            </table>
+                        `
+                    }
+                ]
+            }
+        };
+
+        function updateKnowledgeBase(discipline) {
+            const container = document.getElementById('knowledgeBaseContainer');
+            if (!container) return;
+            
+            // Determine which knowledge base to show
+            let kbData = null;
+            if (discipline === 'cs') {
+                kbData = knowledgeBaseData.cs;
+            } else if (discipline === 'medical') {
+                kbData = knowledgeBaseData.medical;
+            } else if (discipline === 'engineering') {
+                kbData = knowledgeBaseData.engineering;
+            }
+            
+            if (!kbData) {
+                container.innerHTML = `<div style="font-size: 0.75rem; opacity: 0.7; text-align: center; padding: 10px;">Select a CS, Medical, or Engineering page to view references</div>`;
+                return;
+            }
+            
+            // Build the knowledge base UI
+            let html = `<div style="font-size: 0.85rem; font-weight: bold; margin-bottom: 10px; color: var(--accent-color);">${kbData.title}</div>`;
+            
+            kbData.categories.forEach((category, index) => {
+                const categoryId = `kb-cat-${discipline}-${index}`;
+                html += `
+                    <div class="kb-category">
+                        <div class="kb-category-title" onclick="toggleKbCategory('${categoryId}')">
+                            <span>${category.name}</span>
+                            <span class="kb-arrow" id="${categoryId}-arrow">▼</span>
+                        </div>
+                        <div class="kb-content" id="${categoryId}">
+                            ${category.content}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function toggleKbCategory(categoryId) {
+            const content = document.getElementById(categoryId);
+            const arrow = document.getElementById(categoryId + '-arrow');
+            
+            if (content && arrow) {
+                content.classList.toggle('collapsed');
+                arrow.classList.toggle('collapsed');
+            }
+        }
+
+        // Make function globally accessible
+        window.toggleKbCategory = toggleKbCategory;
+        window.updateKnowledgeBase = updateKnowledgeBase;
 
         initApp();
         setTimeout(resizeCanvas, 500);
