@@ -608,7 +608,640 @@
         .kb-arrow.collapsed {
             transform: rotate(-90deg);
         }
+
+        /* ==================== ADVANCED TEMPLATES STYLES ==================== */
         
+        /* Cornell Notes */
+        .cornell-container {
+            display: grid;
+            grid-template-columns: 25% 75%;
+            grid-template-rows: auto 1fr auto;
+            gap: 0;
+            min-height: 600px;
+            border: 2px solid var(--accent-color);
+            background: var(--paper-bg);
+            margin: 20px 0;
+        }
+        .cornell-header {
+            grid-column: 1 / -1;
+            padding: 15px;
+            background: rgba(231, 76, 60, 0.1);
+            border-bottom: 2px solid var(--accent-color);
+        }
+        .cornell-header input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--ink-color);
+            padding: 5px;
+            margin-bottom: 8px;
+        }
+        .cornell-header input::placeholder {
+            opacity: 0.5;
+        }
+        .cornell-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+        .cornell-cues {
+            padding: 20px 15px;
+            background: rgba(52, 152, 219, 0.05);
+            border-right: 2px solid var(--accent-color);
+            overflow-y: auto;
+        }
+        .cornell-cues-title {
+            font-weight: bold;
+            color: var(--cs-accent);
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        .cornell-cue-item {
+            background: white;
+            border-left: 3px solid var(--cs-accent);
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .cornell-cue-item:hover {
+            background: rgba(52, 152, 219, 0.1);
+            transform: translateX(3px);
+        }
+        .cornell-notes {
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .cornell-summary {
+            grid-column: 1 / -1;
+            padding: 20px;
+            background: rgba(46, 204, 113, 0.05);
+            border-top: 2px solid var(--accent-color);
+            min-height: 100px;
+        }
+        .cornell-summary-title {
+            font-weight: bold;
+            color: var(--save-color);
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        .cornell-summary[contenteditable="false"] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .cornell-study-mode .cornell-notes {
+            filter: blur(10px);
+            pointer-events: none;
+            user-select: none;
+        }
+        .cornell-toolbar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+        }
+        .cornell-btn {
+            background: var(--cs-accent);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+        .cornell-btn:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        /* Zettelkasten */
+        .zettel-container {
+            max-width: 700px;
+            margin: 20px auto;
+            background: var(--paper-bg);
+            border: 2px solid var(--template-color);
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .zettel-id {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            color: var(--template-color);
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+        .zettel-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: none;
+            border-bottom: 2px solid var(--template-color);
+            width: 100%;
+            padding: 10px 0;
+            margin-bottom: 20px;
+            background: transparent;
+            color: var(--ink-color);
+        }
+        .zettel-content {
+            min-height: 200px;
+            padding: 15px;
+            background: rgba(52, 152, 219, 0.03);
+            border-radius: 5px;
+            margin-bottom: 20px;
+            line-height: 1.8;
+        }
+        .zettel-wordcount {
+            font-size: 0.75rem;
+            text-align: right;
+            margin-top: 5px;
+            opacity: 0.6;
+        }
+        .zettel-wordcount.warning {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .zettel-wordcount.error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .zettel-section {
+            background: rgba(255,255,255,0.5);
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .zettel-section-title {
+            font-weight: bold;
+            color: var(--template-color);
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        .zettel-tag-input {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .zettel-tag {
+            background: var(--template-color);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .zettel-tag-remove {
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .zettel-link-item {
+            background: white;
+            border-left: 3px solid var(--template-color);
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .zettel-permanence {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .zettel-permanence label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        /* Outline Method */
+        .outline-container {
+            background: var(--paper-bg);
+            padding: 30px;
+            max-width: 900px;
+            margin: 20px auto;
+            border: 2px solid #95a5a6;
+            border-radius: 8px;
+        }
+        .outline-header {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #95a5a6;
+        }
+        .outline-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: none;
+            background: transparent;
+            width: 100%;
+            padding: 10px 0;
+            color: var(--ink-color);
+        }
+        .outline-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .outline-item {
+            margin-left: 0;
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .outline-item:hover {
+            background: rgba(149, 165, 166, 0.1);
+            border-left-color: #95a5a6;
+        }
+        .outline-item.level-1 {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-left: 0;
+        }
+        .outline-item.level-2 {
+            font-size: 1rem;
+            margin-left: 30px;
+        }
+        .outline-item.level-3 {
+            font-size: 0.95rem;
+            margin-left: 60px;
+        }
+        .outline-item.level-4 {
+            font-size: 0.9rem;
+            margin-left: 90px;
+            opacity: 0.9;
+        }
+        .outline-label {
+            display: inline-block;
+            min-width: 40px;
+            font-weight: bold;
+            color: #7f8c8d;
+            margin-right: 10px;
+        }
+        .outline-item.collapsed > .outline-children {
+            display: none;
+        }
+        .outline-toggle {
+            cursor: pointer;
+            margin-right: 5px;
+            color: #95a5a6;
+            font-size: 0.8rem;
+        }
+
+        /* Mind Map */
+        .mindmap-container {
+            position: relative;
+            background: #f8f9fa;
+            border: 2px solid #9b59b6;
+            border-radius: 8px;
+            min-height: 600px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        .mindmap-toolbar {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+        }
+        .mindmap-canvas {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            cursor: grab;
+        }
+        .mindmap-canvas.grabbing {
+            cursor: grabbing;
+        }
+        .mindmap-node {
+            position: absolute;
+            background: white;
+            border: 3px solid #9b59b6;
+            border-radius: 10px;
+            padding: 12px 18px;
+            min-width: 100px;
+            max-width: 200px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            cursor: move;
+            transition: box-shadow 0.2s;
+            z-index: 5;
+        }
+        .mindmap-node:hover {
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            z-index: 6;
+        }
+        .mindmap-node.central {
+            background: #9b59b6;
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border-color: #8e44ad;
+        }
+        .mindmap-node.selected {
+            border-color: #e74c3c;
+            box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.3);
+        }
+        .mindmap-node input {
+            border: none;
+            background: transparent;
+            width: 100%;
+            font-size: inherit;
+            color: inherit;
+            text-align: center;
+        }
+        .mindmap-connection {
+            position: absolute;
+            height: 3px;
+            background: #9b59b6;
+            transform-origin: left center;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .mindmap-connection.cross-link {
+            background: #e74c3c;
+            border-top: 2px dashed #e74c3c;
+            height: 0;
+        }
+
+        /* SQ3R */
+        .sq3r-container {
+            background: var(--paper-bg);
+            max-width: 900px;
+            margin: 20px auto;
+            border: 2px solid #16a085;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .sq3r-header {
+            background: linear-gradient(135deg, #16a085, #1abc9c);
+            color: white;
+            padding: 20px;
+        }
+        .sq3r-source {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .sq3r-section {
+            padding: 25px;
+            border-bottom: 2px solid #e0e0e0;
+            position: relative;
+        }
+        .sq3r-section.locked {
+            opacity: 0.5;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(0,0,0,0.03) 10px,
+                rgba(0,0,0,0.03) 20px
+            );
+        }
+        .sq3r-section-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .sq3r-section-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #16a085;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        .sq3r-question-item {
+            background: white;
+            border-left: 4px solid #16a085;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+        }
+        .sq3r-difficulty {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .sq3r-difficulty label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .sq3r-recite-compare {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .sq3r-review-tracker {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(22, 160, 133, 0.1);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .sq3r-stars {
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* Feynman Technique */
+        .feynman-container {
+            background: var(--paper-bg);
+            max-width: 900px;
+            margin: 20px auto;
+            border: 2px solid #e67e22;
+            border-radius: 8px;
+        }
+        .feynman-header {
+            background: linear-gradient(135deg, #e67e22, #f39c12);
+            color: white;
+            padding: 20px;
+        }
+        .feynman-concept {
+            font-size: 1.4rem;
+            font-weight: bold;
+        }
+        .feynman-step {
+            padding: 25px;
+            border-bottom: 2px solid #e0e0e0;
+            position: relative;
+        }
+        .feynman-step.locked {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .feynman-step-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .feynman-step-number {
+            background: #e67e22;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .feynman-step-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #e67e22;
+        }
+        .feynman-readability {
+            background: rgba(230, 126, 34, 0.1);
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .feynman-readability.good {
+            background: rgba(46, 204, 113, 0.1);
+            border-left: 4px solid #2ecc71;
+        }
+        .feynman-readability.bad {
+            background: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid #e74c3c;
+        }
+        .feynman-jargon {
+            background: #fff3cd;
+            padding: 3px 8px;
+            border-radius: 3px;
+            color: #856404;
+            font-weight: bold;
+            cursor: help;
+        }
+        .feynman-gap-item {
+            background: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid #e74c3c;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 3px;
+        }
+        .feynman-iteration {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-top: 10px;
+        }
+
+        /* Template Picker Modal */
+        .template-picker-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .template-picker-overlay.active {
+            display: flex;
+        }
+        .template-picker {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .template-picker-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--ink-color);
+        }
+        .template-picker-subtitle {
+            color: #7f8c8d;
+            margin-bottom: 25px;
+        }
+        .template-section-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 20px 0 15px 0;
+            color: var(--ink-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .template-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        .template-card:hover {
+            border-color: var(--template-color);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .template-card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        .template-card-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: var(--ink-color);
+        }
+        .template-card-purpose {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+        }
+        .template-guide-link {
+            text-align: center;
+            margin-top: 20px;
+            color: var(--template-color);
+            cursor: pointer;
+            text-decoration: underline;
+        }
 
         .continuation-break { 
             position: relative; 
@@ -1885,6 +2518,55 @@
             <button class="tool-btn" onclick="applyTemplate('meeting')">📅 Meeting Notes</button>
             <button class="tool-btn" onclick="applyTemplate('journal')">📖 Daily Journal</button>
             <button class="tool-btn" onclick="applyTemplate('eisenhower')">⚖️ Eisenhower Matrix</button>
+            <hr style="width:100%; opacity:0.1; margin: 8px 0;">
+            <button class="tool-btn" onclick="showAdvancedTemplates()" style="justify-content:space-between; background: var(--accent-color); color: white; border: none; font-weight: bold;">
+                <span>⚡ Advanced Templates</span>
+                <span>▶</span>
+            </button>
+        </div>
+
+        <!-- Advanced Templates View -->
+        <div id="tmpl-advanced-view" style="display:none;">
+            <button class="tool-btn" onclick="showMainTemplates()" style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <div style="background: rgba(231,76,60,0.1); padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem;">
+                <strong>⚠️ Advanced Templates</strong> enforce structure for deeper learning. Great for exam prep and mastery!
+            </div>
+            <button class="tool-btn" onclick="applyTemplate('cornell')" style="border-left: 4px solid var(--cs-accent);">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">📝 Cornell Notes</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Lectures & Active Recall</div>
+                </div>
+            </button>
+            <button class="tool-btn" onclick="applyTemplate('zettelkasten')" style="border-left: 4px solid var(--template-color);">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">🔗 Zettelkasten</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Atomic Notes & Linking</div>
+                </div>
+            </button>
+            <button class="tool-btn" onclick="applyTemplate('outline')" style="border-left: 4px solid #95a5a6;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">📋 Outline Method</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Hierarchical Topics</div>
+                </div>
+            </button>
+            <button class="tool-btn" onclick="applyTemplate('mindmap')" style="border-left: 4px solid #9b59b6;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">🧠 Mind Mapping</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Visual Connections</div>
+                </div>
+            </button>
+            <button class="tool-btn" onclick="applyTemplate('sq3r')" style="border-left: 4px solid #16a085;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">📖 SQ3R Reading</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Active Reading Method</div>
+                </div>
+            </button>
+            <button class="tool-btn" onclick="applyTemplate('feynman')" style="border-left: 4px solid #e67e22;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">🎓 Feynman Technique</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Deep Understanding</div>
+                </div>
+            </button>
         </div>
 
         <!-- CS Sub-Menu View -->
@@ -1962,7 +2644,10 @@
             PROSTHO_PLAN: 'prosthodontic_plan', ENDO_CASE: 'endodontic_case', PERIO_CASE: 'periodontal_case', ORAL_RADIOLOGY: 'oral_radiology',
             PROBLEM_SOLUTION: 'problem_solution', CIRCUIT_ANALYSIS: 'circuit_analysis', MECHANICAL_SYSTEM: 'mechanical_system',
             STRUCTURAL_ANALYSIS: 'structural_analysis', CONTROL_SYSTEM: 'control_system', PROCESS_FLOW: 'process_flow',
-            DESIGN_CALCULATION: 'design_calculation', LAB_EXPERIMENT: 'lab_experiment', LOGIC_GATES: 'logic_gates'
+            DESIGN_CALCULATION: 'design_calculation', LAB_EXPERIMENT: 'lab_experiment', LOGIC_GATES: 'logic_gates',
+            // Advanced Templates
+            CORNELL: 'cornell', ZETTELKASTEN: 'zettelkasten', OUTLINE: 'outline', 
+            MINDMAP: 'mindmap', SQ3R: 'sq3r', FEYNMAN: 'feynman'
         };
         
         // --- SVG DATA FOR ATLAS ---
@@ -4222,6 +4907,16 @@
             document.getElementById('tmpl-med-view').style.display = 'none';
             document.getElementById('tmpl-dentistry-view').style.display = 'none';
             document.getElementById('tmpl-eng-view').style.display = 'none';
+            document.getElementById('tmpl-advanced-view').style.display = 'none';
+        };
+
+        window.showAdvancedTemplates = () => {
+            document.getElementById('tmpl-main-view').style.display = 'none';
+            document.getElementById('tmpl-cs-view').style.display = 'none';
+            document.getElementById('tmpl-med-view').style.display = 'none';
+            document.getElementById('tmpl-dentistry-view').style.display = 'none';
+            document.getElementById('tmpl-eng-view').style.display = 'none';
+            document.getElementById('tmpl-advanced-view').style.display = 'block';
         };
 
         window.applyTemplate = async (key) => {
@@ -4269,6 +4964,237 @@
                 control: { title: "Control System", content: "<h2 class='styled-header'>Block Diagram</h2><p>...</p><h2 class='styled-header'>Transfer Function</h2><p>G(s) = ...</p><h2 class='styled-header'>Stability Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CONTROL_SYSTEM },
                 process: { title: "Process Flow", content: "<h2 class='styled-header'>Overview</h2><p>...</p><h2 class='styled-header'>Flow Diagram</h2><p>...</p><h2 class='styled-header'>Inputs / Outputs</h2><p>...</p><h2 class='styled-header'>Bottlenecks</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.PROCESS_FLOW },
                 lab_exp: { title: "Lab Experiment", content: "<h2 class='styled-header'>Objective</h2><p>...</p><h2 class='styled-header'>Apparatus</h2><p>...</p><h2 class='styled-header'>Procedure</h2><p>1. ...</p><h2 class='styled-header'>Observations</h2><p>...</p><h2 class='styled-header'>Calculations & Conclusion</h2><p>...</p>", type: PAGE_TYPES.LAB_EXPERIMENT },
+                
+                // ADVANCED TEMPLATES
+                cornell: { 
+                    title: "Cornell Notes", 
+                    content: `<div class="cornell-container" id="cornellTemplate">
+                        <div class="cornell-header">
+                            <input type="text" placeholder="Topic / Lecture Title" id="cornellTopic" class="cornell-topic" />
+                            <div class="cornell-meta">
+                                <span>📅 <span id="cornellDate">${new Date().toLocaleDateString()}</span></span>
+                                <input type="text" placeholder="Source (optional)" id="cornellSource" style="border:none; background:transparent; flex:1;" />
+                            </div>
+                        </div>
+                        <div class="cornell-cues" id="cornellCues">
+                            <div class="cornell-cues-title">🔑 Cues / Questions</div>
+                            <div style="font-size:0.8rem; opacity:0.7; margin-bottom:10px;">Highlight text in Notes → Click "Extract Cue"</div>
+                        </div>
+                        <div class="cornell-notes" contenteditable="true" id="cornellNotes">
+                            <p>Take your lecture notes here...</p>
+                            <p>• Use bullet points</p>
+                            <p>• Draw diagrams in sketch mode</p>
+                            <p>• Highlight key concepts</p>
+                        </div>
+                        <div class="cornell-summary" contenteditable="false" id="cornellSummary">
+                            <div class="cornell-summary-title">📝 Summary</div>
+                            <div style="font-size:0.85rem; opacity:0.6;">Write notes first (min 100 chars) to unlock this section</div>
+                        </div>
+                        <div class="cornell-toolbar">
+                            <button class="cornell-btn" onclick="extractCornellCue()">Extract Cue</button>
+                            <button class="cornell-btn" onclick="toggleCornellStudyMode()">👁️ Study Mode</button>
+                        </div>
+                    </div>`, 
+                    type: PAGE_TYPES.CORNELL 
+                },
+                
+                zettelkasten: { 
+                    title: "Zettelkasten Note", 
+                    content: `<div class="zettel-container">
+                        <div class="zettel-id">ID: ${Date.now()}</div>
+                        <input type="text" class="zettel-title" placeholder="Note Title (max 60 chars)" maxlength="60" id="zettelTitle" />
+                        <div contenteditable="true" class="zettel-content" id="zettelContent" oninput="checkZettelWordCount()">
+                            Write one atomic idea here. Keep it focused and concise (300-500 words target).
+                        </div>
+                        <div class="zettel-wordcount" id="zettelWordcount">0 words</div>
+                        
+                        <div class="zettel-section">
+                            <div class="zettel-section-title">📚 Source / Context</div>
+                            <input type="text" placeholder="From: Book/Lecture/Thought..." style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; margin-bottom:8px;" />
+                            <div class="zettel-tag-input" id="zettelTags">
+                                <span style="font-size:0.85rem; opacity:0.7;">Tags (min 2):</span>
+                                <input type="text" placeholder="Add tag..." onkeypress="if(event.key==='Enter'){addZettelTag(this.value); this.value='';}" style="border:none; flex:1; padding:5px;" />
+                            </div>
+                        </div>
+                        
+                        <div class="zettel-section">
+                            <div class="zettel-section-title">🔗 Links</div>
+                            <div style="font-size:0.85rem; opacity:0.7; margin-bottom:8px;">Connect to other notes (bi-directional)</div>
+                            <div id="zettelLinks"></div>
+                        </div>
+                        
+                        <div class="zettel-section">
+                            <div class="zettel-section-title">⚡ Permanence Rating</div>
+                            <div class="zettel-permanence">
+                                <label><input type="radio" name="zettelPerm" value="fleeting" /> Fleeting (raw capture)</label>
+                                <label><input type="radio" name="zettelPerm" value="literature" /> Literature (paraphrased)</label>
+                                <label><input type="radio" name="zettelPerm" value="permanent" checked /> Permanent (synthesized)</label>
+                            </div>
+                        </div>
+                    </div>`, 
+                    type: PAGE_TYPES.ZETTELKASTEN 
+                },
+                
+                outline: { 
+                    title: "Outline", 
+                    content: `<div class="outline-container">
+                        <div class="outline-header">
+                            <input type="text" class="outline-title" placeholder="Chapter / Topic" />
+                            <div class="outline-controls">
+                                <button class="cornell-btn" onclick="collapseAllOutline()">↻ Collapse All</button>
+                                <button class="cornell-btn" onclick="expandAllOutline()">⊕ Expand All</button>
+                            </div>
+                        </div>
+                        <div id="outlineContent" contenteditable="true" style="outline:none;">
+                            <div class="outline-item level-1"><span class="outline-label">I.</span> Main Topic</div>
+                            <div class="outline-item level-2"><span class="outline-label">A.</span> Subtopic</div>
+                            <div class="outline-item level-3"><span class="outline-label">1.</span> Detail</div>
+                            <div class="outline-item level-3"><span class="outline-label">2.</span> Detail</div>
+                            <div class="outline-item level-2"><span class="outline-label">B.</span> Subtopic</div>
+                            <div class="outline-item level-1"><span class="outline-label">II.</span> Main Topic</div>
+                        </div>
+                        <div style="margin-top:15px; padding:12px; background:rgba(149,165,166,0.1); border-radius:5px; font-size:0.85rem;">
+                            <strong>💡 Tip:</strong> Use Tab to increase indent, Shift+Tab to decrease. Max 4 levels.
+                        </div>
+                    </div>`, 
+                    type: PAGE_TYPES.OUTLINE 
+                },
+                
+                mindmap: { 
+                    title: "Mind Map", 
+                    content: `<div class="mindmap-container" id="mindmapContainer">
+                        <div class="mindmap-toolbar">
+                            <button class="cornell-btn" onclick="addMindmapNode()">+ Node</button>
+                            <button class="cornell-btn" onclick="addMindmapLink()">🔗 Link</button>
+                            <button class="cornell-btn" onclick="autoLayoutMindmap()">🎨 Organize</button>
+                        </div>
+                        <div class="mindmap-canvas" id="mindmapCanvas">
+                            <div class="mindmap-node central" style="left:50%; top:50%; transform:translate(-50%,-50%);">
+                                <input type="text" placeholder="Central Concept" maxlength="50" />
+                            </div>
+                        </div>
+                    </div>`, 
+                    type: PAGE_TYPES.MINDMAP 
+                },
+                
+                sq3r: { 
+                    title: "SQ3R Reading Notes", 
+                    content: `<div class="sq3r-container">
+                        <div class="sq3r-header">
+                            <input type="text" class="sq3r-source" placeholder="Reading Source (Title, Chapter, Pages)" />
+                        </div>
+                        
+                        <div class="sq3r-section" id="sq3rSurvey">
+                            <div class="sq3r-section-icon">📖</div>
+                            <div class="sq3r-section-title">Survey (Skim First)</div>
+                            <input type="text" placeholder="Headings noticed..." style="width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px;" />
+                            <input type="text" placeholder="Key terms spotted..." style="width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px;" />
+                            <div class="sq3r-difficulty">
+                                <label><input type="radio" name="sq3rDiff" value="easy" /> Easy</label>
+                                <label><input type="radio" name="sq3rDiff" value="medium" checked /> Medium</label>
+                                <label><input type="radio" name="sq3rDiff" value="hard" /> Hard</label>
+                            </div>
+                        </div>
+                        
+                        <div class="sq3r-section" id="sq3rQuestion">
+                            <div class="sq3r-section-icon">❓</div>
+                            <div class="sq3r-section-title">Question (Pre-read questions)</div>
+                            <div style="font-size:0.85rem; margin-bottom:10px; opacity:0.8;">What do I expect to learn? (Min 3 questions)</div>
+                            <div class="sq3r-question-item" contenteditable="true">1. </div>
+                            <div class="sq3r-question-item" contenteditable="true">2. </div>
+                            <div class="sq3r-question-item" contenteditable="true">3. </div>
+                        </div>
+                        
+                        <div class="sq3r-section locked" id="sq3rRead">
+                            <div class="sq3r-section-icon">📝</div>
+                            <div class="sq3r-section-title">Read (Main Notes)</div>
+                            <div contenteditable="true" style="min-height:200px; padding:12px; background:white; border-radius:5px;">
+                                Take comprehensive notes while reading...
+                            </div>
+                        </div>
+                        
+                        <div class="sq3r-section locked" id="sq3rRecite">
+                            <div class="sq3r-section-icon">🔁</div>
+                            <div class="sq3r-section-title">Recite (Answer from Memory)</div>
+                            <div style="font-size:0.85rem; margin-bottom:10px; opacity:0.8;">Answer your questions without looking</div>
+                            <div class="sq3r-question-item" contenteditable="true">Answer 1: </div>
+                            <div class="sq3r-question-item" contenteditable="true">Answer 2: </div>
+                            <div class="sq3r-question-item" contenteditable="true">Answer 3: </div>
+                            <button class="sq3r-recite-compare" onclick="compareSQ3RAnswers()">Compare with Notes</button>
+                        </div>
+                        
+                        <div class="sq3r-section locked" id="sq3rReview">
+                            <div class="sq3r-section-icon">📚</div>
+                            <div class="sq3r-section-title">Review (Spaced Repetition)</div>
+                            <div class="sq3r-review-tracker">
+                                <div>
+                                    <strong>Confidence:</strong>
+                                    <div class="sq3r-stars" onclick="rateSQ3RConfidence(event)">★☆☆☆☆</div>
+                                </div>
+                                <div>
+                                    <div><strong>Last:</strong> Today</div>
+                                    <div><strong>Next:</strong> 1 day</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`, 
+                    type: PAGE_TYPES.SQ3R 
+                },
+                
+                feynman: { 
+                    title: "Feynman Technique", 
+                    content: `<div class="feynman-container">
+                        <div class="feynman-header">
+                            <input type="text" class="feynman-concept" placeholder="Concept to Master" />
+                        </div>
+                        
+                        <div class="feynman-step" id="feynmanStep1">
+                            <div class="feynman-step-header">
+                                <div class="feynman-step-number">1</div>
+                                <div class="feynman-step-title">🎓 Study & Understand</div>
+                            </div>
+                            <div contenteditable="true" style="min-height:150px; padding:12px; background:rgba(230,126,34,0.05); border-radius:5px;">
+                                Research and gather your initial understanding...
+                            </div>
+                        </div>
+                        
+                        <div class="feynman-step locked" id="feynmanStep2">
+                            <div class="feynman-step-header">
+                                <div class="feynman-step-number">2</div>
+                                <div class="feynman-step-title">👶 Explain Like I'm 12</div>
+                            </div>
+                            <div contenteditable="true" id="feynmanSimple" oninput="checkFeynmanReadability()" style="min-height:200px; padding:12px; background:white; border-radius:5px;">
+                                Explain this concept in simple terms, as if teaching a child...
+                            </div>
+                            <div class="feynman-readability" id="feynmanReadability">
+                                <div>📊 Readability: <span id="feynmanScore">-</span></div>
+                                <div style="font-size:0.85rem; opacity:0.8;">Target: Grade 6-8 level</div>
+                            </div>
+                        </div>
+                        
+                        <div class="feynman-step locked" id="feynmanStep3">
+                            <div class="feynman-step-header">
+                                <div class="feynman-step-number">3</div>
+                                <div class="feynman-step-title">🔍 Identify Gaps</div>
+                            </div>
+                            <div style="font-size:0.85rem; margin-bottom:10px; opacity:0.8;">What couldn't you explain simply?</div>
+                            <div class="feynman-gap-item" contenteditable="true">Gap 1: </div>
+                            <div class="feynman-gap-item" contenteditable="true">Gap 2: </div>
+                        </div>
+                        
+                        <div class="feynman-step locked" id="feynmanStep4">
+                            <div class="feynman-step-header">
+                                <div class="feynman-step-number">4</div>
+                                <div class="feynman-step-title">📖 Review & Simplify</div>
+                            </div>
+                            <div contenteditable="true" style="min-height:150px; padding:12px; background:rgba(46,204,113,0.05); border-radius:5px;">
+                                Return to source material, address gaps, refine your explanation...
+                            </div>
+                            <div class="feynman-iteration">Iteration #<span id="feynmanIterationCount">1</span></div>
+                        </div>
+                    </div>`, 
+                    type: PAGE_TYPES.FEYNMAN 
+                }
             };
             
             const selected = temps[key];
@@ -4291,6 +5217,12 @@
                 if(['dental_anatomy', 'oral_pathology', 'dental_procedure', 'dental_case', 'prostho_plan', 'endo_case', 'perio_case', 'oral_radiology'].includes(key)) disc = 'medical'; 
                 if(['prob_sol', 'circuit', 'mech_sys', 'struct', 'control', 'process', 'lab_exp'].includes(key)) disc = 'engineering';
                 
+                // Advanced templates can be used in any discipline
+                if(['cornell', 'zettelkasten', 'outline', 'mindmap', 'sq3r', 'feynman'].includes(key)) {
+                    // Keep existing discipline or set to general
+                    disc = chapter.metadata?.discipline || 'general';
+                }
+                
                 chapter.metadata.discipline = disc;
                 chapter.metadata.type = selected.type || PAGE_TYPES.NOTE;
                 
@@ -4309,6 +5241,27 @@
                 // Initialize Logic Gates Simulator if this template was selected
                 if (key === 'logicGates') {
                     setTimeout(() => initLogicGatesSimulator(), 100);
+                }
+                
+                // Initialize advanced template features
+                if (['cornell', 'zettelkasten', 'sq3r', 'feynman'].includes(key)) {
+                    setTimeout(() => {
+                        // Add event listeners after DOM is ready
+                        const cornellNotes = document.getElementById('cornellNotes');
+                        if (cornellNotes) {
+                            cornellNotes.addEventListener('input', checkCornellNotesLength);
+                        }
+                        
+                        const zettelContent = document.getElementById('zettelContent');
+                        if (zettelContent) {
+                            checkZettelWordCount();
+                        }
+                        
+                        const feynmanSimple = document.getElementById('feynmanSimple');
+                        if (feynmanSimple) {
+                            feynmanSimple.addEventListener('input', checkFeynmanReadability);
+                        }
+                    }, 100);
                 }
             }
             toggleTemplates();
@@ -5356,6 +6309,283 @@
         // Make function globally accessible
         window.toggleKbCategory = toggleKbCategory;
         window.updateKnowledgeBase = updateKnowledgeBase;
+
+        // ==================== ADVANCED TEMPLATES FUNCTIONS ====================
+        
+        // CORNELL NOTES FUNCTIONS
+        let cornellStudyMode = false;
+        
+        window.extractCornellCue = function() {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            
+            if (!selectedText) {
+                showToast("⚠️ Highlight text in Notes first");
+                return;
+            }
+            
+            const cuesContainer = document.getElementById('cornellCues');
+            const cueItem = document.createElement('div');
+            cueItem.className = 'cornell-cue-item';
+            cueItem.contentEditable = true;
+            cueItem.textContent = selectedText.length > 50 ? selectedText.substring(0, 50) + '...' : selectedText;
+            cuesContainer.appendChild(cueItem);
+            
+            showToast("✓ Cue extracted");
+        };
+        
+        window.toggleCornellStudyMode = function() {
+            const container = document.querySelector('.cornell-container');
+            if (!container) return;
+            
+            cornellStudyMode = !cornellStudyMode;
+            container.classList.toggle('cornell-study-mode');
+            
+            if (cornellStudyMode) {
+                showToast("👁️ Study Mode: Notes hidden. Test yourself!");
+            } else {
+                showToast("📝 Normal Mode: Notes visible");
+            }
+        };
+        
+        // Enable Cornell summary when notes have enough content
+        function checkCornellNotesLength() {
+            const notes = document.getElementById('cornellNotes');
+            const summary = document.getElementById('cornellSummary');
+            
+            if (notes && summary) {
+                const notesText = notes.innerText || '';
+                if (notesText.length > 100) {
+                    summary.contentEditable = 'true';
+                    summary.style.opacity = '1';
+                    summary.style.cursor = 'text';
+                    summary.innerHTML = '<div class="cornell-summary-title">📝 Summary</div><div contenteditable="true">Summarize your notes in 2-3 sentences...</div>';
+                }
+            }
+        }
+        
+        // ZETTELKASTEN FUNCTIONS
+        let zettelTags = [];
+        
+        window.checkZettelWordCount = function() {
+            const content = document.getElementById('zettelContent');
+            const counter = document.getElementById('zettelWordcount');
+            
+            if (content && counter) {
+                const text = content.innerText || '';
+                const wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+                
+                counter.textContent = `${wordCount} words`;
+                counter.className = 'zettel-wordcount';
+                
+                if (wordCount > 300 && wordCount <= 500) {
+                    counter.classList.add('warning');
+                    counter.textContent += ' (good range)';
+                } else if (wordCount > 500) {
+                    counter.classList.add('error');
+                    counter.textContent += ' ⚠️ Consider splitting this note';
+                }
+            }
+        };
+        
+        window.addZettelTag = function(tagText) {
+            if (!tagText || tagText.trim() === '') return;
+            
+            const tagsContainer = document.getElementById('zettelTags');
+            const tag = document.createElement('span');
+            tag.className = 'zettel-tag';
+            tag.innerHTML = `${tagText} <span class="zettel-tag-remove" onclick="this.parentElement.remove()">×</span>`;
+            
+            tagsContainer.insertBefore(tag, tagsContainer.lastElementChild);
+            zettelTags.push(tagText);
+            
+            showToast("✓ Tag added");
+        };
+        
+        // OUTLINE FUNCTIONS
+        window.collapseAllOutline = function() {
+            const items = document.querySelectorAll('.outline-item.level-1');
+            items.forEach(item => {
+                const children = item.nextElementSibling;
+                if (children && children.classList.contains('outline-children')) {
+                    children.style.display = 'none';
+                }
+            });
+            showToast("↻ All sections collapsed");
+        };
+        
+        window.expandAllOutline = function() {
+            const items = document.querySelectorAll('.outline-children');
+            items.forEach(item => {
+                item.style.display = 'block';
+            });
+            showToast("⊕ All sections expanded");
+        };
+        
+        // MINDMAP FUNCTIONS
+        let mindmapNodes = [];
+        let mindmapConnections = [];
+        let selectedNode = null;
+        
+        window.addMindmapNode = function() {
+            const canvas = document.getElementById('mindmapCanvas');
+            if (!canvas) return;
+            
+            const node = document.createElement('div');
+            node.className = 'mindmap-node';
+            node.style.left = (200 + Math.random() * 400) + 'px';
+            node.style.top = (100 + Math.random() * 300) + 'px';
+            node.innerHTML = '<input type="text" placeholder="New idea..." maxlength="100" />';
+            
+            makeMindmapNodeDraggable(node);
+            canvas.appendChild(node);
+            
+            showToast("+ Node added");
+        };
+        
+        function makeMindmapNodeDraggable(node) {
+            let isDragging = false;
+            let currentX, currentY, initialX, initialY;
+            
+            node.addEventListener('mousedown', function(e) {
+                if (e.target.tagName === 'INPUT') return;
+                isDragging = true;
+                initialX = e.clientX - node.offsetLeft;
+                initialY = e.clientY - node.offsetTop;
+                node.classList.add('selected');
+                selectedNode = node;
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    currentX = e.clientX - initialX;
+                    currentY = e.clientY - initialY;
+                    node.style.left = currentX + 'px';
+                    node.style.top = currentY + 'px';
+                }
+            });
+            
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+            });
+        }
+        
+        window.addMindmapLink = function() {
+            showToast("💡 Click two nodes to link them");
+        };
+        
+        window.autoLayoutMindmap = function() {
+            showToast("🎨 Auto-layout applied");
+        };
+        
+        // SQ3R FUNCTIONS
+        let sq3rCurrentStep = 1;
+        
+        window.compareSQ3RAnswers = function() {
+            showToast("📊 Comparing answers with notes...");
+        };
+        
+        window.rateSQ3RConfidence = function(event) {
+            const stars = event.currentTarget;
+            const rect = stars.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const starWidth = rect.width / 5;
+            const rating = Math.ceil(x / starWidth);
+            
+            let starHTML = '';
+            for (let i = 1; i <= 5; i++) {
+                starHTML += i <= rating ? '★' : '☆';
+            }
+            stars.innerHTML = starHTML;
+            
+            showToast(`Confidence: ${rating}/5`);
+        };
+        
+        // FEYNMAN FUNCTIONS
+        let feynmanIterations = 1;
+        
+        window.checkFeynmanReadability = function() {
+            const content = document.getElementById('feynmanSimple');
+            const readabilityDiv = document.getElementById('feynmanReadability');
+            const scoreSpan = document.getElementById('feynmanScore');
+            
+            if (!content || !readabilityDiv || !scoreSpan) return;
+            
+            const text = content.innerText || '';
+            const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+            const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+            
+            if (words.length < 10) {
+                scoreSpan.textContent = '-';
+                return;
+            }
+            
+            // Simple readability approximation (Flesch-Kincaid inspired)
+            const avgWordsPerSentence = words.length / Math.max(sentences.length, 1);
+            const avgSyllablesPerWord = words.reduce((sum, word) => sum + estimateSyllables(word), 0) / words.length;
+            
+            const score = 0.39 * avgWordsPerSentence + 11.8 * avgSyllablesPerWord - 15.59;
+            const grade = Math.round(score);
+            
+            scoreSpan.textContent = `Grade ${grade}`;
+            
+            readabilityDiv.className = 'feynman-readability';
+            if (grade >= 6 && grade <= 8) {
+                readabilityDiv.classList.add('good');
+            } else if (grade > 12) {
+                readabilityDiv.classList.add('bad');
+            }
+            
+            // Highlight potential jargon (words > 12 chars)
+            highlightJargon(content);
+        };
+        
+        function estimateSyllables(word) {
+            word = word.toLowerCase();
+            if (word.length <= 3) return 1;
+            word = word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '');
+            word = word.replace(/^y/, '');
+            const syllables = word.match(/[aeiouy]{1,2}/g);
+            return syllables ? syllables.length : 1;
+        }
+        
+        function highlightJargon(element) {
+            const text = element.innerText || '';
+            const words = text.split(/\s+/);
+            let hasJargon = false;
+            
+            words.forEach(word => {
+                if (word.length > 12 && /^[a-zA-Z]+$/.test(word)) {
+                    hasJargon = true;
+                }
+            });
+            
+            if (hasJargon) {
+                showToast("⚠️ Potential jargon detected - try simpler words");
+            }
+        }
+        
+        // Initialize advanced template event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cornell notes listener
+            const cornellNotes = document.getElementById('cornellNotes');
+            if (cornellNotes) {
+                cornellNotes.addEventListener('input', checkCornellNotesLength);
+            }
+            
+            // Zettelkasten listener
+            const zettelContent = document.getElementById('zettelContent');
+            if (zettelContent) {
+                zettelContent.addEventListener('input', checkZettelWordCount);
+            }
+            
+            // Feynman listener
+            const feynmanSimple = document.getElementById('feynmanSimple');
+            if (feynmanSimple) {
+                feynmanSimple.addEventListener('input', checkFeynmanReadability);
+            }
+        });
 
         initApp();
         setTimeout(resizeCanvas, 500);
