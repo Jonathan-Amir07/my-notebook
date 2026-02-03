@@ -496,6 +496,186 @@
             font-size: 0.85rem;
             color: #2c3e50;
         }
+        
+        /* Enhanced Logic Gates - Wiring */
+        .logic-connection-point {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #3498db;
+            border: 2px solid #2980b9;
+            border-radius: 50%;
+            cursor: crosshair;
+            z-index: 20;
+            transition: all 0.2s;
+        }
+        .logic-connection-point:hover {
+            background: #2ecc71;
+            border-color: #27ae60;
+            transform: scale(1.3);
+        }
+        .logic-connection-point.input {
+            left: -6px;
+        }
+        .logic-connection-point.output {
+            right: -6px;
+        }
+        .logic-wire-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        .logic-wire-path {
+            fill: none;
+            stroke: var(--cs-accent);
+            stroke-width: 3;
+            transition: stroke 0.3s;
+        }
+        .logic-wire-path.active {
+            stroke: #2ecc71;
+            stroke-width: 4;
+            filter: drop-shadow(0 0 4px #2ecc71);
+        }
+        .logic-wire-path.drawing {
+            stroke: #e67e22;
+            stroke-dasharray: 5, 5;
+            animation: dash 0.5s linear infinite;
+        }
+        @keyframes dash {
+            to { stroke-dashoffset: -10; }
+        }
+        .logic-gate-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: #7f8c8d;
+            white-space: nowrap;
+        }
+        
+        /* Circuit Symbols Tray */
+        .circuit-symbols-tray {
+            position: fixed;
+            left: 80px;
+            top: 120px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            padding: 15px;
+            max-width: 140px;
+            z-index: 1000;
+            display: none;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .circuit-symbols-tray.active {
+            display: block;
+        }
+        .circuit-symbols-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .circuit-symbols-title {
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: var(--ink-color);
+        }
+        .circuit-symbols-close {
+            background: none;
+            border: none;
+            font-size: 1.3rem;
+            cursor: pointer;
+            color: #7f8c8d;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+        .circuit-symbols-close:hover {
+            background: rgba(0,0,0,0.05);
+            color: var(--accent-color);
+        }
+            margin-bottom: 10px;
+            color: var(--ink-color);
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+        .circuit-symbol-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+        .circuit-symbol-item:hover {
+            border-color: var(--cs-accent);
+            background: rgba(52,152,219,0.1);
+            transform: scale(1.05);
+        }
+        .circuit-symbol-item:active {
+            cursor: grabbing;
+        }
+        .circuit-symbol-icon {
+            font-size: 1.8rem;
+            margin-bottom: 4px;
+        }
+        .circuit-symbol-svg {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 4px;
+        }
+        .circuit-symbol-name {
+            font-size: 0.7rem;
+            color: #555;
+            text-align: center;
+            font-weight: 600;
+        }
+        .circuit-component {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+        }
+        .circuit-component svg {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+        .circuit-component:hover svg {
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+        .circuit-component.selected svg {
+            filter: drop-shadow(0 0 8px rgba(52,152,219,0.8));
+        }
+        .circuit-wire {
+            stroke: #2c3e50;
+            stroke-width: 2;
+            fill: none;
+        }
+        .circuit-wire.selected {
+            stroke: var(--accent-color);
+            stroke-width: 3;
+        }
+        .circuit-connection-dot {
+            fill: #e74c3c;
+            r: 4;
+        }
 
         /* Knowledge Base Styles */
         .knowledge-base-container {
@@ -2524,17 +2704,16 @@
                 <span>⚙️ Engineering</span>
                 <span>▶</span>
             </button>
+            <button class="tool-btn" onclick="showAdvancedTemplates()" style="justify-content:space-between; background: var(--accent-color); color: white; border: none; font-weight: bold;">
+                <span>⚡ Advanced Templates</span>
+                <span>▶</span>
+            </button>
             <hr style="width:100%; opacity:0.1; margin: 8px 0;">
             <button class="tool-btn" onclick="applyTemplate('default')">📄 Default Page</button>
             <button class="tool-btn" onclick="applyTemplate('whiteboard')">♾️ Infinite Whiteboard</button>
             <button class="tool-btn" onclick="applyTemplate('meeting')">📅 Meeting Notes</button>
             <button class="tool-btn" onclick="applyTemplate('journal')">📖 Daily Journal</button>
             <button class="tool-btn" onclick="applyTemplate('eisenhower')">⚖️ Eisenhower Matrix</button>
-            <hr style="width:100%; opacity:0.1; margin: 8px 0;">
-            <button class="tool-btn" onclick="showAdvancedTemplates()" style="justify-content:space-between; background: var(--accent-color); color: white; border: none; font-weight: bold;">
-                <span>⚡ Advanced Templates</span>
-                <span>▶</span>
-            </button>
         </div>
 
         <!-- Advanced Templates View -->
@@ -4979,7 +5158,7 @@
                 perio_case: { title: "Perio Charting", content: "<h2 class='styled-header'>Periodontal Status</h2><p>Pockets > 4mm: ...</p><h2 class='styled-header'>Diagnosis</h2><p>Stage: ... Grade: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scaling & Root Planing</div></div>", type: PAGE_TYPES.PERIO_CASE },
                 oral_radiology: { title: "Radiographic Report", content: "<h2 class='styled-header'>Image Type</h2><p>IOPA / OPG / CBCT</p><h2 class='styled-header'>Findings</h2><p>Radio-opacity/lucency: ...</p><h2 class='styled-header'>Interpretation</h2><p>...</p>", type: PAGE_TYPES.ORAL_RADIOLOGY },
                 prob_sol: { title: "Problem Solution", content: "<h2 class='styled-header'>Problem Statement</h2><p>...</p><h2 class='styled-header'>Given & Assumptions</h2><p>...</p><h2 class='styled-header'>Diagram</h2><p>(Use Sketch Mode)</p><h2 class='styled-header'>Governing Equations</h2><p>...</p><h2 class='styled-header'>Solution</h2><p>...</p><h2 class='styled-header'>Final Answer</h2><div class='sticky-note'>Result: ...</div>", type: PAGE_TYPES.PROBLEM_SOLUTION },
-                circuit: { title: "Circuit Analysis", content: "<h2 class='styled-header'>Circuit Diagram</h2><p>(Draw Schematic)</p><h2 class='styled-header'>Known Values</h2><p>R1 = ...</p><h2 class='styled-header'>Laws Applied</h2><p>KCL / KVL</p><h2 class='styled-header'>Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CIRCUIT_ANALYSIS },
+                circuit: { title: "Circuit Analysis", content: "<h2 class='styled-header'>Circuit Diagram</h2><div style='background:#e8f4f8; border-left:4px solid #3498db; padding:12px; margin:10px 0; border-radius:4px; font-size:0.85rem;'>💡 <strong>Instructions:</strong> Click the ⚡ Components button in the toolbar to open the component library. Drag components onto the canvas, then use sketch mode to draw wires between them. Double-click components to delete.</div><div id='circuitDiagramCanvas' style='position:relative; min-height:400px; background:#f8f9fa; border:2px solid #3498db; border-radius:8px; margin:15px 0;'><svg id='circuitSvg' style='position:absolute; width:100%; height:100%; pointer-events:none;'></svg><div id='circuitComponentsLayer' style='position:absolute; width:100%; height:100%;'></div></div><h2 class='styled-header'>Known Values</h2><p>R1 = ...</p><h2 class='styled-header'>Laws Applied</h2><p>KCL / KVL</p><h2 class='styled-header'>Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CIRCUIT_ANALYSIS },
                 mech_sys: { title: "Mechanical System", content: "<h2 class='styled-header'>System Description</h2><p>...</p><h2 class='styled-header'>Free Body Diagram</h2><p>(Draw FBD)</p><h2 class='styled-header'>Equations of Motion</h2><p>F = ma...</p><h2 class='styled-header'>Solution</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.MECHANICAL_SYSTEM },
                 struct: { title: "Structural Analysis", content: "<h2 class='styled-header'>Structure Description</h2><p>...</p><h2 class='styled-header'>Load Diagram</h2><p>...</p><h2 class='styled-header'>Calculations</h2><p>...</p><h2 class='styled-header'>Design Checks</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Safety Factor OK</div></div>", type: PAGE_TYPES.STRUCTURAL_ANALYSIS },
                 control: { title: "Control System", content: "<h2 class='styled-header'>Block Diagram</h2><p>...</p><h2 class='styled-header'>Transfer Function</h2><p>G(s) = ...</p><h2 class='styled-header'>Stability Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CONTROL_SYSTEM },
@@ -5267,23 +5446,19 @@
                 // Initialize advanced template features
                 if (['cornell', 'zettelkasten', 'sq3r', 'feynman'].includes(key)) {
                     setTimeout(() => {
-                        // Add event listeners after DOM is ready
                         const cornellNotes = document.getElementById('cornellNotes');
-                        if (cornellNotes) {
-                            cornellNotes.addEventListener('input', checkCornellNotesLength);
-                        }
+                        if (cornellNotes) cornellNotes.addEventListener('input', checkCornellNotesLength);
                         
                         const zettelContent = document.getElementById('zettelContent');
-                        if (zettelContent) {
-                            checkZettelWordCount();
-                        }
+                        if (zettelContent) checkZettelWordCount();
                         
                         const feynmanSimple = document.getElementById('feynmanSimple');
-                        if (feynmanSimple) {
-                            feynmanSimple.addEventListener('input', checkFeynmanReadability);
-                        }
+                        if (feynmanSimple) feynmanSimple.addEventListener('input', checkFeynmanReadability);
                     }, 100);
                 }
+                
+                // Circuit symbols tray will be toggled via Components button
+                // No auto-initialization needed
             }
             toggleTemplates();
             resizeCanvas(); 
@@ -6330,6 +6505,464 @@
         // Make function globally accessible
         window.toggleKbCategory = toggleKbCategory;
         window.updateKnowledgeBase = updateKnowledgeBase;
+
+        // ==================== ENHANCED LOGIC GATES WITH WIRING ====================
+        let wiringMode = false;
+        let wiringStart = null;
+        
+        // Enhanced render with connection points
+        function renderLogicCanvas() {
+            if (!logicSimulator.canvas) return;
+            
+            // Clear and add SVG for wires
+            logicSimulator.canvas.innerHTML = '<svg class="logic-wire-svg" id="logicWireSvg"></svg>';
+            
+            // Render wires first (behind components)
+            renderLogicWires();
+            
+            // Render inputs with connection points
+            logicSimulator.inputs.forEach(input => {
+                const el = document.createElement('div');
+                el.className = `logic-input ${input.state ? 'on' : 'off'}`;
+                el.style.left = input.x + 'px';
+                el.style.top = input.y + 'px';
+                el.innerHTML = input.state ? '1' : '0';
+                el.dataset.id = input.id;
+                el.title = `${input.label}: Click to toggle`;
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    input.state = !input.state;
+                    renderLogicCanvas();
+                    evaluateLogicCircuit();
+                };
+                makeDraggable(el, input);
+                
+                // Add output connection point
+                const outPoint = document.createElement('div');
+                outPoint.className = 'logic-connection-point output';
+                outPoint.style.top = '14px';
+                outPoint.dataset.componentId = input.id;
+                outPoint.dataset.pointType = 'output';
+                outPoint.onclick = (e) => {
+                    e.stopPropagation();
+                    handleConnectionClick(input.id, 'output');
+                };
+                el.appendChild(outPoint);
+                
+                logicSimulator.canvas.appendChild(el);
+                
+                const label = document.createElement('div');
+                label.className = 'logic-gate-label';
+                label.style.left = input.x + 'px';
+                label.style.top = (input.y + 45) + 'px';
+                label.style.position = 'absolute';
+                label.textContent = input.label;
+                logicSimulator.canvas.appendChild(label);
+            });
+            
+            // Render gates with input/output connection points
+            logicSimulator.gates.forEach(gate => {
+                const el = document.createElement('div');
+                el.className = 'logic-gate';
+                el.style.left = gate.x + 'px';
+                el.style.top = gate.y + 'px';
+                el.textContent = gate.gateType;
+                el.dataset.id = gate.id;
+                makeDraggable(el, gate);
+                
+                // Add input connection points
+                const numInputs = gate.gateType === 'NOT' ? 1 : 2;
+                for (let i = 0; i < numInputs; i++) {
+                    const inPoint = document.createElement('div');
+                    inPoint.className = 'logic-connection-point input';
+                    inPoint.style.top = (15 + i * 20) + 'px';
+                    inPoint.dataset.componentId = gate.id;
+                    inPoint.dataset.pointType = 'input';
+                    inPoint.dataset.inputIndex = i;
+                    inPoint.onclick = (e) => {
+                        e.stopPropagation();
+                        handleConnectionClick(gate.id, 'input', i);
+                    };
+                    el.appendChild(inPoint);
+                }
+                
+                // Add output connection point
+                const outPoint = document.createElement('div');
+                outPoint.className = 'logic-connection-point output';
+                outPoint.style.top = '24px';
+                outPoint.dataset.componentId = gate.id;
+                outPoint.dataset.pointType = 'output';
+                outPoint.onclick = (e) => {
+                    e.stopPropagation();
+                    handleConnectionClick(gate.id, 'output');
+                };
+                el.appendChild(outPoint);
+                
+                logicSimulator.canvas.appendChild(el);
+            });
+            
+            // Render outputs with connection points
+            logicSimulator.outputs.forEach(output => {
+                const el = document.createElement('div');
+                el.className = `logic-output ${output.state ? 'on' : ''}`;
+                el.style.left = output.x + 'px';
+                el.style.top = output.y + 'px';
+                el.innerHTML = output.state ? '1' : '0';
+                el.dataset.id = output.id;
+                makeDraggable(el, output);
+                
+                // Add input connection point
+                const inPoint = document.createElement('div');
+                inPoint.className = 'logic-connection-point input';
+                inPoint.style.top = '19px';
+                inPoint.dataset.componentId = output.id;
+                inPoint.dataset.pointType = 'input';
+                inPoint.onclick = (e) => {
+                    e.stopPropagation();
+                    handleConnectionClick(output.id, 'input');
+                };
+                el.appendChild(inPoint);
+                
+                logicSimulator.canvas.appendChild(el);
+                
+                const label = document.createElement('div');
+                label.className = 'logic-gate-label';
+                label.style.left = output.x + 'px';
+                label.style.top = (output.y + 55) + 'px';
+                label.style.position = 'absolute';
+                label.textContent = output.label;
+                logicSimulator.canvas.appendChild(label);
+            });
+        }
+        
+        // Handle connection clicks for wiring
+        function handleConnectionClick(componentId, pointType, inputIndex = 0) {
+            if (!wiringMode) {
+                wiringMode = true;
+                wiringStart = { componentId, pointType, inputIndex };
+                showToast('🔌 Click destination to complete wire');
+            } else {
+                // Complete the wire
+                const wireEnd = { componentId, pointType, inputIndex };
+                
+                // Validate connection (output to input)
+                if (wiringStart.pointType === 'output' && wireEnd.pointType === 'input') {
+                    logicSimulator.wires.push({
+                        from: wiringStart.componentId,
+                        to: wireEnd.componentId,
+                        toInputIndex: wireEnd.inputIndex
+                    });
+                    showToast('✓ Wire connected');
+                } else if (wiringStart.pointType === 'input' && wireEnd.pointType === 'output') {
+                    logicSimulator.wires.push({
+                        from: wireEnd.componentId,
+                        to: wiringStart.componentId,
+                        toInputIndex: wiringStart.inputIndex
+                    });
+                    showToast('✓ Wire connected');
+                } else {
+                    showToast('⚠️ Connect output to input');
+                }
+                
+                wiringMode = false;
+                wiringStart = null;
+                renderLogicCanvas();
+                evaluateLogicCircuit();
+            }
+        }
+        
+        // Render wires as SVG paths
+        function renderLogicWires() {
+            const svg = document.getElementById('logicWireSvg');
+            if (!svg) return;
+            
+            svg.innerHTML = '';
+            
+            logicSimulator.wires.forEach((wire, index) => {
+                const fromComp = findComponent(wire.from);
+                const toComp = findComponent(wire.to);
+                
+                if (!fromComp || !toComp) return;
+                
+                // Calculate connection points
+                const x1 = fromComp.x + 80; // Output point
+                const y1 = fromComp.y + 25;
+                const x2 = toComp.x; // Input point
+                const y2 = toComp.y + 25 + (wire.toInputIndex * 20);
+                
+                // Create curved wire path
+                const midX = (x1 + x2) / 2;
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+                path.setAttribute('class', 'logic-wire-path');
+                path.setAttribute('data-wire-index', index);
+                path.onclick = () => {
+                    if (confirm('Delete this wire?')) {
+                        logicSimulator.wires.splice(index, 1);
+                        renderLogicCanvas();
+                        evaluateLogicCircuit();
+                    }
+                };
+                path.style.pointerEvents = 'auto';
+                
+                svg.appendChild(path);
+            });
+        }
+        
+        // Find component by ID
+        function findComponent(id) {
+            return logicSimulator.inputs.find(i => i.id === id) ||
+                   logicSimulator.gates.find(g => g.id === id) ||
+                   logicSimulator.outputs.find(o => o.id === id);
+        }
+        
+        // Enhanced circuit evaluation with wire connections
+        function evaluateLogicCircuit() {
+            // Reset all gate and output states
+            logicSimulator.gates.forEach(gate => gate.output = null);
+            logicSimulator.outputs.forEach(output => output.state = false);
+            
+            // Evaluate gates based on wire connections
+            let changed = true;
+            let iterations = 0;
+            while (changed && iterations < 100) {
+                changed = false;
+                iterations++;
+                
+                logicSimulator.gates.forEach(gate => {
+                    const inputWires = logicSimulator.wires.filter(w => w.to === gate.id);
+                    if (inputWires.length === 0) return;
+                    
+                    const inputValues = inputWires.map(wire => {
+                        const fromComp = findComponent(wire.from);
+                        if (fromComp.type === 'input') return fromComp.state;
+                        if (fromComp.type === 'gate') return fromComp.output;
+                        return false;
+                    });
+                    
+                    let newOutput = null;
+                    switch(gate.gateType) {
+                        case 'AND':
+                            newOutput = inputValues.length >= 2 ? inputValues[0] && inputValues[1] : false;
+                            break;
+                        case 'OR':
+                            newOutput = inputValues.length >= 2 ? inputValues[0] || inputValues[1] : false;
+                            break;
+                        case 'NOT':
+                            newOutput = inputValues.length >= 1 ? !inputValues[0] : false;
+                            break;
+                        case 'NAND':
+                            newOutput = inputValues.length >= 2 ? !(inputValues[0] && inputValues[1]) : true;
+                            break;
+                        case 'NOR':
+                            newOutput = inputValues.length >= 2 ? !(inputValues[0] || inputValues[1]) : true;
+                            break;
+                        case 'XOR':
+                            newOutput = inputValues.length >= 2 ? inputValues[0] !== inputValues[1] : false;
+                            break;
+                    }
+                    
+                    if (gate.output !== newOutput) {
+                        gate.output = newOutput;
+                        changed = true;
+                    }
+                });
+            }
+            
+            // Update outputs
+            logicSimulator.outputs.forEach(output => {
+                const inputWire = logicSimulator.wires.find(w => w.to === output.id);
+                if (inputWire) {
+                    const fromComp = findComponent(inputWire.from);
+                    if (fromComp.type === 'input') {
+                        output.state = fromComp.state;
+                    } else if (fromComp.type === 'gate') {
+                        output.state = fromComp.output || false;
+                    }
+                }
+            });
+            
+            renderLogicCanvas();
+        }
+        
+        window.evaluateCircuit = evaluateLogicCircuit;
+        
+        // ==================== CIRCUIT SYMBOLS TRAY ====================
+        const circuitSymbols = [
+            { name: 'Resistor', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><rect x="15" y="15" width="10" height="10" fill="none" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+            { name: 'Capacitor', svg: '<line x1="5" y1="20" x2="17" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="17" y1="10" x2="17" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="23" y1="10" x2="23" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="23" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+            { name: 'Inductor', svg: '<path d="M 5 20 Q 10 10, 15 20 T 25 20 T 35 20" fill="none" stroke="#2c3e50" stroke-width="2"/>' },
+            { name: 'Battery', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="15" y1="12" x2="15" y2="28" stroke="#2c3e50" stroke-width="3"/><line x1="25" y1="15" x2="25" y2="25" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+            { name: 'Ground', svg: '<line x1="20" y1="5" x2="20" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="10" y1="20" x2="30" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="13" y1="25" x2="27" y2="25" stroke="#2c3e50" stroke-width="2"/><line x1="16" y1="30" x2="24" y2="30" stroke="#2c3e50" stroke-width="2"/>' },
+            { name: 'Diode', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><polygon points="15,10 15,30 25,20" fill="#2c3e50"/><line x1="25" y1="10" x2="25" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+            { name: 'LED', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><polygon points="15,10 15,30 25,20" fill="#e74c3c"/><line x1="25" y1="10" x2="25" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+            { name: 'Switch', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="15" y1="20" x2="30" y2="10" stroke="#2c3e50" stroke-width="2"/><circle cx="15" cy="20" r="2" fill="#2c3e50"/><circle cx="30" cy="20" r="2" fill="#2c3e50"/><line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' }
+        ];
+        
+        let circuitComponents = [];
+        let circuitNextId = 1;
+        
+        function initCircuitSymbolsTray() {
+            const canvas = document.getElementById('circuitDiagramCanvas');
+            if (!canvas) return;
+            
+            // Add symbols tray
+            const tray = document.createElement('div');
+            tray.className = 'circuit-symbols-tray';
+            tray.innerHTML = `
+                <div class="circuit-symbols-title">⚡ Components</div>
+                ${circuitSymbols.map(symbol => `
+                    <div class="circuit-symbol-item" draggable="true" data-symbol="${symbol.name}">
+                        <svg class="circuit-symbol-svg" viewBox="0 0 40 40">
+                            ${symbol.svg}
+                        </svg>
+                        <div class="circuit-symbol-name">${symbol.name}</div>
+                    </div>
+                `).join('')}
+            `;
+            canvas.appendChild(tray);
+            
+            // Setup drag and drop
+            tray.querySelectorAll('.circuit-symbol-item').forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('symbolName', item.dataset.symbol);
+                });
+            });
+            
+            const componentsLayer = document.getElementById('circuitComponentsLayer');
+            componentsLayer.addEventListener('dragover', (e) => e.preventDefault());
+            componentsLayer.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const symbolName = e.dataTransfer.getData('symbolName');
+                const symbol = circuitSymbols.find(s => s.name === symbolName);
+                if (symbol) {
+                    const rect = componentsLayer.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    addCircuitComponent(symbol, x, y);
+                }
+            });
+        }
+        
+        function addCircuitComponent(symbol, x, y) {
+            const component = {
+                id: circuitNextId++,
+                symbol: symbol,
+                x: x,
+                y: y
+            };
+            circuitComponents.push(component);
+            renderCircuitComponent(component);
+        }
+        
+        function renderCircuitComponent(component) {
+            const layer = document.getElementById('circuitComponentsLayer');
+            if (!layer) return;
+            
+            const div = document.createElement('div');
+            div.className = 'circuit-component';
+            div.style.left = component.x + 'px';
+            div.style.top = component.y + 'px';
+            div.dataset.componentId = component.id;
+            div.innerHTML = `
+                <svg viewBox="0 0 40 40" width="60" height="60">
+                    ${component.symbol.svg}
+                </svg>
+                <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; white-space: nowrap; color: #2c3e50; font-weight: 600;">${component.symbol.name}</div>
+            `;
+            
+            // Double-click to delete
+            div.ondblclick = (e) => {
+                e.stopPropagation();
+                if (confirm(`Delete ${component.symbol.name}?`)) {
+                    const index = circuitComponents.findIndex(c => c.id === component.id);
+                    if (index > -1) {
+                        circuitComponents.splice(index, 1);
+                        div.remove();
+                        showToast('✓ Component removed');
+                    }
+                }
+            };
+            
+            // Click to select
+            div.onclick = (e) => {
+                e.stopPropagation();
+                // Deselect all others
+                document.querySelectorAll('.circuit-component.selected').forEach(el => {
+                    if (el !== div) el.classList.remove('selected');
+                });
+                div.classList.toggle('selected');
+            };
+            
+            makeComponentDraggable(div, component);
+            layer.appendChild(div);
+        }
+        
+        function makeComponentDraggable(element, component) {
+            let isDragging = false;
+            let startX, startY;
+            
+            element.addEventListener('mousedown', (e) => {
+                if (e.target.closest('svg')) { // Only drag by the SVG
+                    isDragging = true;
+                    startX = e.clientX - component.x;
+                    startY = e.clientY - component.y;
+                    element.style.cursor = 'grabbing';
+                    element.classList.add('selected');
+                }
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                component.x = e.clientX - startX;
+                component.y = e.clientY - startY;
+                element.style.left = component.x + 'px';
+                element.style.top = component.y + 'px';
+            });
+            
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    element.style.cursor = 'move';
+                }
+            });
+        }
+        
+        window.initCircuitSymbolsTray = initCircuitSymbolsTray;
+        
+        // Keyboard shortcuts for circuit components
+        document.addEventListener('keydown', (e) => {
+            // Delete selected components with Delete or Backspace
+            if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input, textarea, [contenteditable="true"]')) {
+                const selected = document.querySelectorAll('.circuit-component.selected');
+                if (selected.length > 0) {
+                    e.preventDefault();
+                    selected.forEach(el => {
+                        const componentId = parseInt(el.dataset.componentId);
+                        const index = circuitComponents.findIndex(c => c.id === componentId);
+                        if (index > -1) {
+                            circuitComponents.splice(index, 1);
+                            el.remove();
+                        }
+                    });
+                    showToast(`✓ ${selected.length} component(s) deleted`);
+                }
+            }
+            
+            // Clear all components with Ctrl/Cmd + Shift + C
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
+                const layer = document.getElementById('circuitComponentsLayer');
+                if (layer && circuitComponents.length > 0) {
+                    e.preventDefault();
+                    if (confirm('Clear all circuit components?')) {
+                        circuitComponents = [];
+                        layer.innerHTML = '';
+                        showToast('✓ All components cleared');
+                    }
+                }
+            }
+        });
 
         // ==================== ADVANCED TEMPLATES FUNCTIONS ====================
         
