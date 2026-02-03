@@ -1243,6 +1243,7 @@
             text-decoration: underline;
         }
 
+        /* MY REFERENCES */ .my-refs-container{background:rgba(255,255,255,0.03);border-radius:8px;padding:10px;margin:0}.my-refs-empty{background:linear-gradient(135deg,rgba(52,152,219,0.1),rgba(155,89,182,0.1));border:2px dashed rgba(255,255,255,0.2);border-radius:8px;padding:20px;text-align:center}.my-refs-empty-icon{font-size:2.5rem;margin-bottom:10px}.my-refs-create-btn{background:var(--accent-color);color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold}.ref-item{background:rgba(255,255,255,0.05);border-left:3px solid var(--accent-color);border-radius:4px;padding:10px;margin-bottom:8px;cursor:pointer;transition:all 0.2s}.ref-item:hover{background:rgba(255,255,255,0.1)}.ref-item.pinned{background:rgba(241,196,15,0.15);border-left-color:#f1c40f}.ref-item-header{display:flex;align-items:center;justify-content:space-between}.ref-item-title{font-weight:bold;font-size:0.85rem;color:var(--sidebar-text);flex:1}.ref-item-pin{cursor:pointer;opacity:0.6}.ref-item-pin.active{opacity:1;color:#f1c40f}.ref-item-preview{font-size:0.75rem;opacity:0.7}.ref-tag{background:rgba(52,152,219,0.3);padding:2px 6px;border-radius:10px}.ref-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:2000;display:none}.ref-modal-overlay.active{display:flex;align-items:center;justify-content:center}.ref-modal{background:white;border-radius:12px;max-width:700px;width:100%;max-height:90vh;overflow-y:auto}.ref-modal-header{padding:20px 25px;border-bottom:2px solid #e0e0e0;display:flex;justify-content:space-between}.ref-modal-title{font-size:1.5rem;font-weight:bold}.ref-modal-body{padding:25px}.ref-form-label{display:block;font-weight:bold;margin-bottom:8px}.ref-form-input,.ref-form-textarea,.ref-form-select{width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:6px}.ref-btn{padding:10px 20px;border:none;border-radius:6px;font-weight:bold;cursor:pointer}.ref-btn-primary{background:var(--accent-color);color:white}.ref-btn-secondary{background:#95a5a6;color:white}.my-refs-section-title{font-weight:bold;font-size:0.85rem;color:var(--accent-color);margin:15px 0 10px 0}
         .continuation-break { 
             position: relative; 
             height: 40px; 
@@ -2188,6 +2189,17 @@
             </div>
         </div>
         
+        <!-- MY REFERENCES SECTION -->
+        <div class="sidebar-section" id="myReferencesSectionWrapper">
+            <div class="section-header" onclick="toggleSection('myReferencesContent', 'myReferencesArrow', 'myReferencesSectionWrapper')">
+                <span>⭐ My References</span>
+                <span class="arrow" id="myReferencesArrow">▼</span>
+            </div>
+            <div class="section-content" id="myReferencesContent">
+                <div class="my-refs-container" id="myReferencesContainer"></div>
+            </div>
+        </div>
+        
         <div class="sidebar-section tools-section">
             <div class="section-header" onclick="toggleSection('toolsContent', 'toolsArrow')">
                 <span>🛠️ Tools</span>
@@ -2693,10 +2705,16 @@
 
         async function initDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, 3); // Bumped version
+                const request = indexedDB.open(DB_NAME, 4); // Bumped version for myReferences
                 request.onupgradeneeded = (e) => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains('myReferences')) {
+                        const refStore = db.createObjectStore('myReferences', { keyPath: 'id' });
+                        refStore.createIndex('discipline', 'discipline', { unique: false });
+                        refStore.createIndex('pinned', 'pinned', { unique: false });
+                        refStore.createIndex('tags', 'tags', { unique: false, multiEntry: true });
+                    }
                 };
                 request.onsuccess = (e) => { db = e.target.result; resolve(db); };
                 request.onerror = (e) => reject("DB Error");
@@ -2849,6 +2867,9 @@
                 
                 setupDragAndDrop();
                 updateStorageQuota();
+                
+                // Initialize My References
+                await initMyReferences();
                 
                 document.addEventListener('selectionchange', () => {
                     saveSelection();
@@ -6587,6 +6608,671 @@
             }
         });
 
+        // ==================== MY REFERENCES SYSTEM ====================
+        let myReferences = [];
+        let currentEditingRef = null;
+        const MAX_PINS = 5;
+        
+        // Reference type icons
+        const REF_ICONS = {
+            definition: '📖',
+            formula: '📐',
+            table: '📊',
+            checklist: '✅',
+            code: '💻',
+            fact: '🎯'
+        };
+        
+        // Initialize My References
+        async function initMyReferences() {
+            await loadMyReferences();
+            renderMyReferences();
+        }
+        
+        // Load from IndexedDB
+        async function loadMyReferences() {
+            try {
+                const tx = db.transaction(['myReferences'], 'readonly');
+                const store = tx.objectStore('myReferences');
+                const request = store.getAll();
+                
+                request.onsuccess = () => {
+                    myReferences = request.result || [];
+                    renderMyReferences();
+                };
+            } catch (e) {
+                // First time - create the store
+                myReferences = [];
+                renderMyReferences();
+            }
+        }
+        
+        // Save reference to IndexedDB
+        async function saveMyReference(reference) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(['myReferences'], 'readwrite');
+                const store = tx.objectStore('myReferences');
+                const request = store.put(reference);
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject();
+            });
+        }
+        
+        // Delete reference
+        async function deleteMyReference(id) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(['myReferences'], 'readwrite');
+                const store = tx.objectStore('myReferences');
+                const request = store.delete(id);
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject();
+            });
+        }
+        
+        // Render My References in sidebar
+        function renderMyReferences() {
+            const container = document.getElementById('myReferencesContainer');
+            if (!container) return;
+            
+            if (myReferences.length === 0) {
+                container.innerHTML = `
+                    <div class="my-refs-empty">
+                        <div class="my-refs-empty-icon">💡</div>
+                        <div class="my-refs-empty-title">Build Your Personal Cheat Sheet</div>
+                        <div class="my-refs-empty-text">
+                            Save important facts from notes or create custom references.
+                        </div>
+                        <button class="my-refs-create-btn" onclick="openRefModal('create')">
+                            + Create Your First Reference
+                        </button>
+                        <div style="font-size: 0.75rem; opacity: 0.6; margin-top: 10px;">
+                            Or highlight text in notes and click "Save to My References"
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Separate pinned and unpinned
+            const pinned = myReferences.filter(r => r.pinned);
+            const unpinned = myReferences.filter(r => !r.pinned);
+            
+            // Group by discipline
+            const byDiscipline = {
+                cs: unpinned.filter(r => r.discipline === 'cs'),
+                medical: unpinned.filter(r => r.discipline === 'medical'),
+                engineering: unpinned.filter(r => r.discipline === 'engineering'),
+                custom: unpinned.filter(r => r.discipline === 'custom')
+            };
+            
+            let html = `
+                <button class="my-refs-create-btn" onclick="openRefModal('create')" style="width: 100%; margin-bottom: 15px;">
+                    + New Reference
+                </button>
+            `;
+            
+            // Pinned section
+            if (pinned.length > 0) {
+                html += `
+                    <div class="my-refs-section-title">
+                        📌 Pinned <span class="my-refs-count">(${pinned.length})</span>
+                    </div>
+                `;
+                pinned.forEach(ref => {
+                    html += renderRefItem(ref);
+                });
+            }
+            
+            // By Discipline
+            if (unpinned.length > 0) {
+                html += `<div class="my-refs-section-title" style="margin-top: 20px;">🏷️ By Discipline</div>`;
+                
+                if (byDiscipline.cs.length > 0) {
+                    html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">💻 Computer Science (${byDiscipline.cs.length})</div>`;
+                    byDiscipline.cs.forEach(ref => html += renderRefItem(ref));
+                }
+                
+                if (byDiscipline.medical.length > 0) {
+                    html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">⚕️ Medical (${byDiscipline.medical.length})</div>`;
+                    byDiscipline.medical.forEach(ref => html += renderRefItem(ref));
+                }
+                
+                if (byDiscipline.engineering.length > 0) {
+                    html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">⚙️ Engineering (${byDiscipline.engineering.length})</div>`;
+                    byDiscipline.engineering.forEach(ref => html += renderRefItem(ref));
+                }
+                
+                if (byDiscipline.custom.length > 0) {
+                    html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">📝 Custom (${byDiscipline.custom.length})</div>`;
+                    byDiscipline.custom.forEach(ref => html += renderRefItem(ref));
+                }
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // Render individual reference item
+        function renderRefItem(ref) {
+            const icon = REF_ICONS[ref.type] || '📄';
+            const preview = getRefPreview(ref);
+            const pinnedClass = ref.pinned ? 'pinned' : '';
+            const pinIcon = ref.pinned ? '📌' : '📍';
+            const pinActive = ref.pinned ? 'active' : '';
+            
+            const tagsHtml = ref.tags && ref.tags.length > 0 
+                ? `<div class="ref-item-tags">${ref.tags.map(t => `<span class="ref-tag">#${t}</span>`).join('')}</div>`
+                : '';
+            
+            return `
+                <div class="ref-item ${pinnedClass}" onclick="viewRef('${ref.id}')">
+                    <div class="ref-item-header">
+                        <span class="ref-item-icon">${icon}</span>
+                        <span class="ref-item-title">${ref.title}</span>
+                        <span class="ref-item-pin ${pinActive}" onclick="event.stopPropagation(); togglePin('${ref.id}')">${pinIcon}</span>
+                    </div>
+                    <div class="ref-item-preview">${preview}</div>
+                    ${tagsHtml}
+                </div>
+            `;
+        }
+        
+        // Get preview text from reference
+        function getRefPreview(ref) {
+            switch(ref.type) {
+                case 'definition':
+                    return ref.content.definition?.substring(0, 80) + '...';
+                case 'formula':
+                    return ref.content.latex || ref.content.when_to_use || '';
+                case 'fact':
+                    return ref.content.fact?.substring(0, 80) + '...';
+                case 'code':
+                    return ref.content.language + ': ' + ref.content.code?.substring(0, 50) + '...';
+                case 'table':
+                    return `${ref.content.rows?.length || 0} rows`;
+                case 'checklist':
+                    return `${ref.content.items?.length || 0} items`;
+                default:
+                    return '';
+            }
+        }
+        
+        // Toggle pin
+        async function togglePin(id) {
+            const ref = myReferences.find(r => r.id === id);
+            if (!ref) return;
+            
+            const pinnedCount = myReferences.filter(r => r.pinned).length;
+            
+            if (!ref.pinned && pinnedCount >= MAX_PINS) {
+                showToast(`⚠️ Maximum ${MAX_PINS} pinned items. Unpin others first.`);
+                return;
+            }
+            
+            ref.pinned = !ref.pinned;
+            ref.metadata.lastModified = new Date().toISOString();
+            
+            await saveMyReference(ref);
+            renderMyReferences();
+            showToast(ref.pinned ? '📌 Pinned' : '📍 Unpinned');
+        }
+        
+        // Open modal for create/edit/view
+        window.openRefModal = function(mode, refId = null) {
+            const overlay = document.getElementById('refModalOverlay');
+            const title = document.getElementById('refModalTitle');
+            const body = document.getElementById('refModalBody');
+            const footer = document.getElementById('refModalFooter');
+            
+            currentEditingRef = refId ? myReferences.find(r => r.id === refId) : null;
+            
+            if (mode === 'create' || mode === 'edit') {
+                title.textContent = mode === 'create' ? 'New Reference' : 'Edit Reference';
+                body.innerHTML = renderRefForm(currentEditingRef);
+                footer.innerHTML = `
+                    <button class="ref-btn ref-btn-secondary" onclick="closeRefModal()">Cancel</button>
+                    <button class="ref-btn ref-btn-primary" onclick="saveRef()">Save Reference</button>
+                `;
+            } else if (mode === 'view') {
+                const ref = myReferences.find(r => r.id === refId);
+                if (!ref) return;
+                
+                title.textContent = ref.title;
+                body.innerHTML = renderRefDetail(ref);
+                footer.innerHTML = `
+                    <button class="ref-btn ref-btn-danger" onclick="deleteRef('${ref.id}')">Delete</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="ref-btn ref-btn-secondary" onclick="closeRefModal()">Close</button>
+                        <button class="ref-btn ref-btn-primary" onclick="openRefModal('edit', '${ref.id}')">Edit</button>
+                    </div>
+                `;
+            }
+            
+            overlay.classList.add('active');
+        };
+        
+        window.closeRefModal = function() {
+            document.getElementById('refModalOverlay').classList.remove('active');
+            currentEditingRef = null;
+        };
+        
+        // Render reference form
+        function renderRefForm(ref) {
+            const selectedType = ref?.type || 'definition';
+            
+            return `
+                <div class="ref-form-group">
+                    <label class="ref-form-label">Type</label>
+                    <div class="ref-type-selector">
+                        ${Object.keys(REF_ICONS).map(type => `
+                            <div class="ref-type-option ${type === selectedType ? 'selected' : ''}" onclick="selectRefType('${type}')">
+                                <div class="ref-type-icon">${REF_ICONS[type]}</div>
+                                <div class="ref-type-name">${type.charAt(0).toUpperCase() + type.slice(1)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="ref-form-group">
+                    <label class="ref-form-label">Title *</label>
+                    <input type="text" class="ref-form-input" id="refTitle" value="${ref?.title || ''}" maxlength="100" placeholder="e.g., F = ma (Force equation)" />
+                    <div class="ref-form-hint">Keep it concise for quick scanning (max 100 chars)</div>
+                </div>
+                
+                <div id="refContentFields">
+                    ${renderContentFields(selectedType, ref)}
+                </div>
+                
+                <div class="ref-form-group">
+                    <label class="ref-form-label">Discipline</label>
+                    <select class="ref-form-select" id="refDiscipline">
+                        <option value="cs" ${ref?.discipline === 'cs' ? 'selected' : ''}>💻 Computer Science</option>
+                        <option value="medical" ${ref?.discipline === 'medical' ? 'selected' : ''}>⚕️ Medical</option>
+                        <option value="engineering" ${ref?.discipline === 'engineering' ? 'selected' : ''}>⚙️ Engineering</option>
+                        <option value="custom" ${ref?.discipline === 'custom' ? 'selected' : ''}>📝 Custom</option>
+                    </select>
+                </div>
+                
+                <div class="ref-form-group">
+                    <label class="ref-form-label">Tags</label>
+                    <div class="ref-tag-input-container" id="refTagContainer">
+                        ${ref?.tags?.map(tag => `
+                            <span class="ref-tag-chip">
+                                ${tag}
+                                <span class="ref-tag-remove" onclick="removeTag('${tag}')">×</span>
+                            </span>
+                        `).join('') || ''}
+                        <input type="text" class="ref-tag-input" id="refTagInput" placeholder="Add tag..." onkeypress="if(event.key==='Enter'){event.preventDefault();addTag();}" />
+                    </div>
+                    <div class="ref-form-hint">Use 2-5 tags for best organization</div>
+                </div>
+                
+                <div class="ref-form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="refPinned" ${ref?.pinned ? 'checked' : ''} />
+                        <span>📌 Pin for quick access</span>
+                    </label>
+                </div>
+            `;
+        }
+        
+        // Render content fields based on type
+        function renderContentFields(type, ref) {
+            switch(type) {
+                case 'definition':
+                    return `
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Term *</label>
+                            <input type="text" class="ref-form-input" id="refTerm" value="${ref?.content?.term || ''}" />
+                        </div>
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Definition *</label>
+                            <textarea class="ref-form-textarea" id="refDefinition">${ref?.content?.definition || ''}</textarea>
+                        </div>
+                    `;
+                    
+                case 'formula':
+                    return `
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Formula *</label>
+                            <input type="text" class="ref-form-input" id="refFormula" value="${ref?.content?.latex || ''}" placeholder="e.g., F = ma" />
+                        </div>
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">When to Use</label>
+                            <input type="text" class="ref-form-input" id="refWhenToUse" value="${ref?.content?.when_to_use || ''}" placeholder="e.g., Calculating net force" />
+                        </div>
+                    `;
+                    
+                case 'fact':
+                    return `
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Fact *</label>
+                            <textarea class="ref-form-textarea" id="refFact">${ref?.content?.fact || ''}</textarea>
+                        </div>
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Mnemonic (optional)</label>
+                            <input type="text" class="ref-form-input" id="refMnemonic" value="${ref?.content?.mnemonic || ''}" />
+                        </div>
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Exam Tip (optional)</label>
+                            <input type="text" class="ref-form-input" id="refExamTip" value="${ref?.content?.exam_tip || ''}" />
+                        </div>
+                    `;
+                    
+                case 'code':
+                    return `
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Language *</label>
+                            <select class="ref-form-select" id="refLanguage">
+                                <option value="javascript" ${ref?.content?.language === 'javascript' ? 'selected' : ''}>JavaScript</option>
+                                <option value="python" ${ref?.content?.language === 'python' ? 'selected' : ''}>Python</option>
+                                <option value="java" ${ref?.content?.language === 'java' ? 'selected' : ''}>Java</option>
+                                <option value="cpp" ${ref?.content?.language === 'cpp' ? 'selected' : ''}>C++</option>
+                                <option value="sql" ${ref?.content?.language === 'sql' ? 'selected' : ''}>SQL</option>
+                            </select>
+                        </div>
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Code *</label>
+                            <textarea class="ref-form-textarea" id="refCode" style="font-family: 'Fira Code', monospace; min-height: 150px;">${ref?.content?.code || ''}</textarea>
+                        </div>
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">When to Use</label>
+                            <input type="text" class="ref-form-input" id="refCodeWhen" value="${ref?.content?.when_to_use || ''}" />
+                        </div>
+                    `;
+                    
+                case 'table':
+                    return `
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Table Data</label>
+                            <textarea class="ref-form-textarea" id="refTableData" placeholder="Paste table data (CSV format)" style="min-height: 200px;">${ref?.content ? JSON.stringify(ref.content) : ''}</textarea>
+                            <div class="ref-form-hint">Enter data in CSV format or JSON</div>
+                        </div>
+                    `;
+                    
+                case 'checklist':
+                    return `
+                        <div class="ref-form-group">
+                            <label class="ref-form-label">Checklist Items *</label>
+                            <textarea class="ref-form-textarea" id="refChecklistItems" placeholder="One item per line">${ref?.content?.items?.map(i => i.text).join('\n') || ''}</textarea>
+                            <div class="ref-form-hint">Enter one item per line</div>
+                        </div>
+                    `;
+                    
+                default:
+                    return '';
+            }
+        }
+        
+        // Select reference type
+        window.selectRefType = function(type) {
+            document.querySelectorAll('.ref-type-option').forEach(el => el.classList.remove('selected'));
+            event.target.closest('.ref-type-option').classList.add('selected');
+            
+            const contentFields = document.getElementById('refContentFields');
+            contentFields.innerHTML = renderContentFields(type, null);
+        };
+        
+        // Add tag
+        window.addTag = function() {
+            const input = document.getElementById('refTagInput');
+            const tag = input.value.trim().toLowerCase().replace(/^#/, '');
+            
+            if (!tag) return;
+            
+            const container = document.getElementById('refTagContainer');
+            const existingTags = Array.from(container.querySelectorAll('.ref-tag-chip')).map(el => el.textContent.replace('×', '').trim());
+            
+            if (existingTags.includes(tag)) {
+                showToast('⚠️ Tag already added');
+                return;
+            }
+            
+            if (existingTags.length >= 10) {
+                showToast('⚠️ Maximum 10 tags per reference');
+                return;
+            }
+            
+            const chip = document.createElement('span');
+            chip.className = 'ref-tag-chip';
+            chip.innerHTML = `${tag} <span class="ref-tag-remove" onclick="this.parentElement.remove()">×</span>`;
+            
+            container.insertBefore(chip, input);
+            input.value = '';
+        };
+        
+        // Save reference
+        window.saveRef = async function() {
+            const selectedType = document.querySelector('.ref-type-option.selected')?.querySelector('.ref-type-name')?.textContent.toLowerCase() || 'definition';
+            const title = document.getElementById('refTitle').value.trim();
+            
+            if (!title) {
+                showToast('⚠️ Title is required');
+                return;
+            }
+            
+            // Build content based on type
+            let content = {};
+            switch(selectedType) {
+                case 'definition':
+                    content = {
+                        term: document.getElementById('refTerm')?.value || '',
+                        definition: document.getElementById('refDefinition')?.value || ''
+                    };
+                    break;
+                case 'formula':
+                    content = {
+                        latex: document.getElementById('refFormula')?.value || '',
+                        when_to_use: document.getElementById('refWhenToUse')?.value || ''
+                    };
+                    break;
+                case 'fact':
+                    content = {
+                        fact: document.getElementById('refFact')?.value || '',
+                        mnemonic: document.getElementById('refMnemonic')?.value || '',
+                        exam_tip: document.getElementById('refExamTip')?.value || ''
+                    };
+                    break;
+                case 'code':
+                    content = {
+                        language: document.getElementById('refLanguage')?.value || 'javascript',
+                        code: document.getElementById('refCode')?.value || '',
+                        when_to_use: document.getElementById('refCodeWhen')?.value || ''
+                    };
+                    break;
+                case 'checklist':
+                    const items = document.getElementById('refChecklistItems')?.value.split('\n').filter(i => i.trim());
+                    content = {
+                        items: items.map(text => ({ text: text.trim(), checked: false }))
+                    };
+                    break;
+                case 'table':
+                    try {
+                        content = JSON.parse(document.getElementById('refTableData')?.value || '{}');
+                    } catch(e) {
+                        content = { headers: [], rows: [] };
+                    }
+                    break;
+            }
+            
+            const tags = Array.from(document.querySelectorAll('.ref-tag-chip')).map(el => 
+                el.textContent.replace('×', '').trim()
+            );
+            
+            const reference = {
+                id: currentEditingRef?.id || Date.now().toString(),
+                type: selectedType,
+                title: title,
+                content: content,
+                discipline: document.getElementById('refDiscipline').value,
+                tags: tags,
+                pinned: document.getElementById('refPinned').checked,
+                metadata: {
+                    created: currentEditingRef?.metadata?.created || new Date().toISOString(),
+                    lastModified: new Date().toISOString(),
+                    accessCount: currentEditingRef?.metadata?.accessCount || 0,
+                    lastAccessed: currentEditingRef?.metadata?.lastAccessed || new Date().toISOString()
+                }
+            };
+            
+            // Update or add
+            const index = myReferences.findIndex(r => r.id === reference.id);
+            if (index >= 0) {
+                myReferences[index] = reference;
+            } else {
+                myReferences.push(reference);
+            }
+            
+            await saveMyReference(reference);
+            renderMyReferences();
+            closeRefModal();
+            showToast('✓ Reference saved');
+        };
+        
+        // View reference
+        window.viewRef = function(id) {
+            const ref = myReferences.find(r => r.id === id);
+            if (!ref) return;
+            
+            // Update access count
+            ref.metadata.accessCount++;
+            ref.metadata.lastAccessed = new Date().toISOString();
+            saveMyReference(ref);
+            
+            openRefModal('view', id);
+        };
+        
+        // Render reference detail view
+        function renderRefDetail(ref) {
+            const icon = REF_ICONS[ref.type];
+            
+            let contentHtml = '';
+            switch(ref.type) {
+                case 'definition':
+                    contentHtml = `
+                        <div><strong>${ref.content.term}</strong></div>
+                        <div style="margin-top: 10px;">${ref.content.definition}</div>
+                    `;
+                    break;
+                case 'formula':
+                    contentHtml = `
+                        <div style="font-size: 1.5rem; font-weight: bold; text-align: center; padding: 20px;">
+                            ${ref.content.latex}
+                        </div>
+                        ${ref.content.when_to_use ? `<div><strong>Use:</strong> ${ref.content.when_to_use}</div>` : ''}
+                    `;
+                    break;
+                case 'fact':
+                    contentHtml = `
+                        <div>${ref.content.fact}</div>
+                        ${ref.content.mnemonic ? `<div style="margin-top: 10px;">💡 <strong>Mnemonic:</strong> ${ref.content.mnemonic}</div>` : ''}
+                        ${ref.content.exam_tip ? `<div style="margin-top: 10px;">📝 <strong>Exam Tip:</strong> ${ref.content.exam_tip}</div>` : ''}
+                    `;
+                    break;
+                case 'code':
+                    contentHtml = `
+                        <div><strong>Language:</strong> ${ref.content.language}</div>
+                        <pre style="background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 6px; margin-top: 10px; overflow-x: auto;"><code>${ref.content.code}</code></pre>
+                        ${ref.content.when_to_use ? `<div style="margin-top: 10px;"><strong>Use:</strong> ${ref.content.when_to_use}</div>` : ''}
+                    `;
+                    break;
+                case 'checklist':
+                    contentHtml = `
+                        <ul style="list-style: none; padding: 0;">
+                            ${ref.content.items.map(item => `
+                                <li style="padding: 8px; background: rgba(52,152,219,0.05); margin-bottom: 5px; border-radius: 4px;">
+                                    ${item.checked ? '✓' : '☐'} ${item.text}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                    break;
+                case 'table':
+                    if (ref.content.headers && ref.content.rows) {
+                        contentHtml = `
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    ${ref.content.headers.map(h => `<th style="background: var(--cs-accent); color: white; padding: 10px; text-align: left;">${h}</th>`).join('')}
+                                </tr>
+                                ${ref.content.rows.map(row => `
+                                    <tr>
+                                        ${row.map(cell => `<td style="padding: 10px; border-bottom: 1px solid #e0e0e0;">${cell}</td>`).join('')}
+                                    </tr>
+                                `).join('')}
+                            </table>
+                        `;
+                    }
+                    break;
+            }
+            
+            const tagsHtml = ref.tags && ref.tags.length > 0 
+                ? `<div class="ref-detail-tags">${ref.tags.map(t => `<span class="ref-detail-tag">#${t}</span>`).join('')}</div>`
+                : '';
+            
+            return `
+                <div class="ref-detail">
+                    <div class="ref-detail-header">
+                        <span class="ref-detail-icon">${icon}</span>
+                        <span class="ref-detail-title">${ref.title}</span>
+                    </div>
+                    <div class="ref-detail-meta">
+                        <span>Type: ${ref.type}</span>
+                        <span>Discipline: ${ref.discipline}</span>
+                        <span>Views: ${ref.metadata.accessCount}</span>
+                    </div>
+                    <div class="ref-detail-content">
+                        ${contentHtml}
+                    </div>
+                    ${tagsHtml}
+                </div>
+            `;
+        }
+        
+        // Delete reference
+        window.deleteRef = async function(id) {
+            if (!confirm('Delete this reference? This cannot be undone.')) return;
+            
+            await deleteMyReference(id);
+            myReferences = myReferences.filter(r => r.id !== id);
+            renderMyReferences();
+            closeRefModal();
+            showToast('✓ Reference deleted');
+        };
+        
+        // Save from highlighted text in notes
+        window.saveToMyReferences = function() {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            
+            if (!selectedText) {
+                showToast('⚠️ Select text first');
+                return;
+            }
+            
+            // Auto-detect type and create reference
+            const ref = {
+                id: Date.now().toString(),
+                type: 'fact',
+                title: selectedText.substring(0, 60),
+                content: { fact: selectedText },
+                discipline: chapters.find(c => c.id === currentId)?.metadata?.discipline || 'custom',
+                tags: [],
+                pinned: false,
+                metadata: {
+                    created: new Date().toISOString(),
+                    lastModified: new Date().toISOString(),
+                    accessCount: 0,
+                    lastAccessed: new Date().toISOString()
+                }
+            };
+            
+            myReferences.push(ref);
+            saveMyReference(ref);
+            renderMyReferences();
+            showToast('✓ Saved to My References');
+        };
+
         initApp();
         setTimeout(resizeCanvas, 500);
     </script>
@@ -6597,6 +7283,18 @@
         <div class="dnd-timer" id="dndTimer">25:00</div>
         <div class="dnd-subtitle">Stay focused! All tools are locked.</div>
         <button class="dnd-exit-btn" onclick="exitDnd()">⏸️ Exit Focus</button>
+    </div>
+
+    <!-- MY REFERENCES MODAL -->
+    <div class="ref-modal-overlay" id="refModalOverlay">
+        <div class="ref-modal">
+            <div class="ref-modal-header">
+                <div class="ref-modal-title" id="refModalTitle">New Reference</div>
+                <button class="ref-modal-close" onclick="closeRefModal()">×</button>
+            </div>
+            <div class="ref-modal-body" id="refModalBody"></div>
+            <div class="ref-modal-footer" id="refModalFooter"></div>
+        </div>
     </div>
 
 </body>
