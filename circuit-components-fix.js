@@ -69,6 +69,260 @@ function initCircuitComponentsFix() {
     }
 
     console.log(`Circuit components initialized: ${cards.length} cards, ${contentAreas.length} drop zones`);
+
+    // Initialize Properties Panel
+    initPropertiesPanel();
+}
+
+// Initialize Properties Panel UI
+function initPropertiesPanel() {
+    if (document.getElementById('componentPropertiesPanel')) return;
+
+    // Add Styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .component-properties-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: white;
+            border: 2px solid #2c3e50;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 10000;
+            width: 280px;
+            display: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .component-properties-panel.active {
+            display: block;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        .panel-title { font-weight: bold; color: #2c3e50; font-size: 1.1rem; }
+        .panel-close { 
+            cursor: pointer; color: #95a5a6; font-size: 1.5rem; line-height: 1; 
+            transition: color 0.2s;
+        }
+        .panel-close:hover { color: #e74c3c; }
+        .property-row { margin-bottom: 15px; }
+        .property-label { display: block; font-size: 0.9em; margin-bottom: 5px; color: #7f8c8d; font-weight: 600; }
+        .property-input-group { display: flex; align-items: center; gap: 10px; }
+        .property-input { 
+            width: 80px; padding: 6px; border: 1px solid #bdc3c7; border-radius: 4px;
+            font-size: 1rem; color: #2c3e50;
+        }
+        .property-range { flex: 1; cursor: pointer; accent-color: #3498db; }
+        .property-toggle {
+            background: #bdc3c7; width: 50px; height: 26px; border-radius: 13px;
+            position: relative; cursor: pointer; transition: background 0.3s;
+        }
+        .property-toggle.checked { background: #2ecc71; }
+        .property-toggle-thumb {
+            width: 22px; height: 22px; background: white; border-radius: 50%;
+            position: absolute; top: 2px; left: 2px; transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .property-toggle.checked .property-toggle-thumb { transform: translateX(24px); }
+        .panel-footer { margin-top: 10px; text-align: right; font-size: 0.8rem; color: #95a5a6; }
+    `;
+    document.head.appendChild(style);
+
+    // Add HTML
+    const panel = document.createElement('div');
+    panel.id = 'componentPropertiesPanel';
+    panel.className = 'component-properties-panel';
+    panel.innerHTML = `
+        <div class="panel-header">
+            <span class="panel-title" id="panelTitle">Properties</span>
+            <span class="panel-close" onclick="closePropertiesPanel()">×</span>
+        </div>
+        <div id="panelContent"></div>
+    `;
+    document.body.appendChild(panel);
+
+    // Expose close function
+    window.closePropertiesPanel = function () {
+        panel.classList.remove('active');
+        activeComponentId = null;
+    };
+}
+
+let activeComponentId = null;
+
+function showComponentProperties(componentId) {
+    const comp = window.circuitSimulator?.components.get(componentId);
+    if (!comp) return;
+
+    activeComponentId = componentId;
+    const panel = document.getElementById('componentPropertiesPanel');
+    const content = document.getElementById('panelContent');
+    const title = document.getElementById('panelTitle');
+
+    if (!panel || !content) return;
+
+    // Set Title
+    title.textContent = `${comp.type.charAt(0).toUpperCase() + comp.type.slice(1)} Properties`;
+
+    // Clear Content
+    content.innerHTML = '';
+
+    // Generate Inputs based on type
+    if (comp.type === 'battery') {
+        content.appendChild(createRangeInput('Voltage (V)', comp.voltage, 0, 24, 0.5, (val) => {
+            updateComponentValue(componentId, 'voltage', val);
+        }));
+    } else if (comp.type === 'resistor') {
+        content.appendChild(createNumberInput('Resistance (Ω)', comp.resistance, (val) => {
+            updateComponentValue(componentId, 'resistance', val);
+        }));
+    } else if (comp.type === 'bulb') {
+        content.appendChild(createRangeInput('Resistance (Ω)', comp.resistance, 1, 100, 1, (val) => {
+            updateComponentValue(componentId, 'resistance', val);
+        }));
+        content.appendChild(createNumberInput('Threshold (A)', comp.threshold, (val) => {
+            updateComponentValue(componentId, 'threshold', val);
+        }));
+    } else if (comp.type === 'switch') {
+        content.appendChild(createToggleInput('State', comp.closed ? 'Closed' : 'Open', comp.closed, (val) => {
+            if (val !== comp.closed) {
+                window.circuitSimulator.toggleSwitch(componentId);
+                // Refresh title/state if needed
+                const statusLabel = content.querySelector('.toggle-status-label');
+                if (statusLabel) statusLabel.textContent = val ? 'Closed' : 'Open';
+            }
+        }));
+    }
+
+    panel.classList.add('active');
+}
+
+function updateComponentValue(id, prop, val) {
+    if (window.circuitSimulator) {
+        window.circuitSimulator.changeComponentValue(id, prop, val);
+    }
+}
+
+// Validation helper
+function validateNumber(val) {
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0 ? num : 0;
+}
+
+function createRangeInput(label, value, min, max, step, onChange) {
+    const container = document.createElement('div');
+    container.className = 'property-row';
+
+    const labelElem = document.createElement('label');
+    labelElem.className = 'property-label';
+    labelElem.textContent = `${label}: ${value}`;
+
+    const group = document.createElement('div');
+    group.className = 'property-input-group';
+
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.className = 'property-range';
+    range.min = min;
+    range.max = max;
+    range.step = step;
+    range.value = value;
+
+    const number = document.createElement('input');
+    number.type = 'number';
+    number.className = 'property-input';
+    number.value = value;
+    number.step = step;
+
+    // Sync handlers
+    const update = (newVal) => {
+        newVal = validateNumber(newVal);
+        range.value = newVal;
+        number.value = newVal;
+        labelElem.textContent = `${label}: ${newVal}`;
+        onChange(newVal);
+    };
+
+    range.addEventListener('input', (e) => update(e.target.value));
+    number.addEventListener('change', (e) => update(e.target.value));
+
+    group.appendChild(range);
+    group.appendChild(number);
+    container.appendChild(labelElem);
+    container.appendChild(group);
+
+    return container;
+}
+
+function createNumberInput(label, value, onChange) {
+    const container = document.createElement('div');
+    container.className = 'property-row';
+
+    const labelElem = document.createElement('label');
+    labelElem.className = 'property-label';
+    labelElem.textContent = label;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'property-input';
+    input.style.width = '100%';
+    input.value = value;
+
+    input.addEventListener('change', (e) => {
+        const val = validateNumber(e.target.value);
+        input.value = val;
+        onChange(val);
+    });
+
+    container.appendChild(labelElem);
+    container.appendChild(input);
+    return container;
+}
+
+function createToggleInput(label, statusText, checked, onChange) {
+    const container = document.createElement('div');
+    container.className = 'property-row';
+
+    const labelElem = document.createElement('label');
+    labelElem.className = 'property-label';
+    labelElem.textContent = label;
+
+    const group = document.createElement('div');
+    group.className = 'property-input-group';
+
+    const toggle = document.createElement('div');
+    toggle.className = `property-toggle ${checked ? 'checked' : ''}`;
+    toggle.innerHTML = '<div class="property-toggle-thumb"></div>';
+
+    const status = document.createElement('span');
+    status.className = 'toggle-status-label';
+    status.textContent = statusText;
+    status.style.fontSize = '0.9rem';
+
+    toggle.addEventListener('click', () => {
+        const isChecked = !toggle.classList.contains('checked');
+        toggle.classList.toggle('checked');
+        onChange(isChecked);
+    });
+
+    group.appendChild(toggle);
+    group.appendChild(status);
+    container.appendChild(labelElem);
+    container.appendChild(group);
+
+    return container;
 }
 
 function handleDragStart(e) {
@@ -245,51 +499,28 @@ function addComponentClickHandler(element, componentId, type) {
             e.stopPropagation();
             handleBatteryClick(componentId);
         });
+    } else if (type === 'bulb') {
+        icon.style.cursor = 'pointer';
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showComponentProperties(componentId);
+        });
     }
 }
 
 // Handle resistor click - change resistance value
 function handleResistorClick(componentId) {
-    if (!window.circuitSimulator) return;
-
-    const comp = window.circuitSimulator.components.get(componentId);
-    if (!comp) return;
-
-    const newValue = prompt(`Enter resistance value (Ω):`, comp.resistance);
-    if (newValue !== null && !isNaN(newValue) && parseFloat(newValue) > 0) {
-        window.circuitSimulator.changeComponentValue(componentId, 'resistance', newValue);
-        if (typeof showToast === 'function') {
-            showToast(`Resistor set to ${newValue}Ω`);
-        }
-    }
+    showComponentProperties(componentId);
 }
 
 // Handle switch click - toggle open/closed
 function handleSwitchClick(componentId) {
-    if (!window.circuitSimulator) return;
-
-    window.circuitSimulator.toggleSwitch(componentId);
-
-    const comp = window.circuitSimulator.components.get(componentId);
-    if (comp && typeof showToast === 'function') {
-        showToast(`Switch ${comp.closed ? 'closed' : 'opened'}`);
-    }
+    showComponentProperties(componentId);
 }
 
 // Handle battery click - change voltage
 function handleBatteryClick(componentId) {
-    if (!window.circuitSimulator) return;
-
-    const comp = window.circuitSimulator.components.get(componentId);
-    if (!comp) return;
-
-    const newValue = prompt(`Enter voltage (V):`, comp.voltage);
-    if (newValue !== null && !isNaN(newValue) && parseFloat(newValue) > 0) {
-        window.circuitSimulator.changeComponentValue(componentId, 'voltage', newValue);
-        if (typeof showToast === 'function') {
-            showToast(`Battery set to ${newValue}V`);
-        }
-    }
+    showComponentProperties(componentId);
 }
 
 function makeElementDraggable(element) {

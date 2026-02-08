@@ -12,7 +12,7 @@ class CircuitSimulator {
             resistor: { resistance: 100, unit: 'Ω', minCurrent: 0 },
             battery: { voltage: 9, unit: 'V' },
             led: { threshold: 0.02, unit: 'A', forwardVoltage: 2 },
-            bulb: { threshold: 0.1, unit: 'A', resistance: 10 },
+            bulb: { threshold: 0.05, unit: 'A', resistance: 10 },
             switch: { closed: true },
             ammeter: { resistance: 0 },
             voltmeter: { resistance: Infinity }
@@ -22,16 +22,25 @@ class CircuitSimulator {
     // Register a component with its properties
     registerComponent(id, type, element) {
         const defaults = this.defaults[type] || {};
-        this.components.set(id, {
+        const componentData = {
             id,
             type,
             element,
             ...JSON.parse(JSON.stringify(defaults)), // Deep copy
             connections: { top: null, bottom: null, left: null, right: null },
             current: 0,
-            voltage: 0,
             powered: false
-        });
+        };
+
+        // Only set voltage to 0 if component doesn't have a default voltage (like battery)
+        if (!componentData.voltage && componentData.voltage !== 0) {
+            componentData.voltage = 0;
+        }
+
+        this.components.set(id, componentData);
+
+        const comp = this.components.get(id);
+        console.log(`Registered ${type} with values:`, comp);
 
         // Add default value display
         this.updateComponentDisplay(id);
@@ -85,10 +94,13 @@ class CircuitSimulator {
     analyzeCircuit() {
         console.log('Analyzing circuit...');
 
-        // Reset all states
+        // Reset all states (but preserve battery voltage - it's the source!)
         this.components.forEach(comp => {
             comp.current = 0;
-            comp.voltage = 0;
+            // Don't reset voltage for batteries - they are voltage sources!
+            if (comp.type !== 'battery') {
+                comp.voltage = 0;
+            }
             comp.powered = false;
         });
 
@@ -116,7 +128,7 @@ class CircuitSimulator {
 
     // Analyze circuit for a specific battery
     analyzeBatteryCircuit(battery) {
-        console.log(`Analyzing circuit for battery ${battery.id}`);
+        console.log(`Analyzing circuit for battery ${battery.id}, voltage: ${battery.voltage}V`);
 
         // Find paths from positive (top) to negative (bottom) terminal
         const paths = this.findCircuitPaths(battery.id, 'top', battery.id, 'bottom');
@@ -154,6 +166,10 @@ class CircuitSimulator {
                         totalResistance += comp.resistance;
                     } else if (comp.type === 'led') {
                         totalResistance += 50; // Assume 50Ω for LED
+                    } else if (comp.type === 'ammeter') {
+                        totalResistance += 0.01; // Tiny resistance for Ammeter
+                    } else if (comp.type === 'voltmeter') {
+                        totalResistance += 1000000; // 1MΩ for Voltmeter (High impedance)
                     }
                 }
             });
@@ -179,6 +195,10 @@ class CircuitSimulator {
                         comp.voltage = current * comp.resistance;
                     } else if (comp.type === 'led') {
                         comp.voltage = comp.forwardVoltage;
+                    } else if (comp.type === 'ammeter') {
+                        comp.voltage = current * 0.01;
+                    } else if (comp.type === 'voltmeter') {
+                        comp.voltage = current * 1000000;
                     }
                 }
             });
@@ -284,8 +304,14 @@ class CircuitSimulator {
         if (!circle) return;
 
         if (comp.powered && comp.current >= comp.threshold) {
+            // Calculate brightness based on current (clamped)
+            // Arbitrary max current for full brightness = 2 * threshold or 0.5A
+            const maxCurrent = comp.threshold * 5;
+            const brightness = Math.min(Math.max((comp.current - comp.threshold) / (maxCurrent - comp.threshold), 0.2), 1);
+
             // Bulb is on - make it glow
             circle.setAttribute('fill', '#ffeb3b');
+            circle.setAttribute('fill-opacity', brightness.toFixed(2));
             circle.setAttribute('filter', 'url(#bulb-glow)');
 
             // Add glow filter if it doesn't exist
@@ -305,6 +331,7 @@ class CircuitSimulator {
         } else {
             // Bulb is off
             circle.setAttribute('fill', 'none');
+            circle.removeAttribute('fill-opacity');
             circle.removeAttribute('filter');
         }
     }
@@ -430,9 +457,15 @@ class CircuitSimulator {
     // Handle component value change
     changeComponentValue(id, property, value) {
         const comp = this.components.get(id);
-        if (!comp) return;
+        if (!comp) {
+            console.error(`Component ${id} not found`);
+            return;
+        }
 
+        const oldValue = comp[property];
         comp[property] = parseFloat(value) || 0;
+        console.log(`Changed ${comp.type} ${property}: ${oldValue} → ${comp[property]}`);
+
         this.updateComponentDisplay(id);
         this.analyzeCircuit();
     }
