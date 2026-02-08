@@ -2450,10 +2450,35 @@
         }
 
         .btn-save-sidebar {
-            background: var(--save-color);
+            background: var(--accent-color);
             color: white;
-            margin-top: 5px;
+            font-weight: bold;
         }
+
+        /* UX Enhancement: Interactive Affordances for Buttons */
+        .btn,
+        .tool-btn,
+        .tool-opt,
+        .page-item,
+        .tag-cloud-item {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover,
+        .tool-btn:hover,
+        .tool-opt:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            transform: scale(1.01);
+        }
+
+        body.dark-mode .btn:hover,
+        body.dark-mode .tool-btn:hover,
+        body.dark-mode .tool-opt:hover {
+            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+        }
+
+        /* Note: No draggable elements exist in this app, so draggable affordances are intentionally not implemented */
 
         .btn-sketch {
             background: var(--toolbar-bg);
@@ -2994,11 +3019,171 @@
             border: none;
             border-bottom: 2px solid var(--accent-color);
             width: 100%;
-            background: transparent;
+            background: rgba(0, 0, 0, 0.02);
+            /* Subtle background for light mode */
             font-family: inherit;
             margin-bottom: 2rem;
             color: var(--ink-color);
+            padding: 0.5rem;
+            border-radius: 4px 4px 0 0;
+            transition: background 0.2s ease;
+        }
+
+        /* Dark mode adjustment for title background */
+        body.dark-mode .paper-title {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .paper-title:focus {
+            background: rgba(0, 0, 0, 0.03);
+            outline: none;
+        }
+
+        body.dark-mode .paper-title:focus {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Page Separation in Stream View - Full A4 Pages with Workspace Background */
+        .sequence-editor-block {
+            /* A4 dimensions at 96 DPI: 794px × 1123px */
+            width: 794px;
+            min-height: 1123px;
+            max-width: 100%;
+            margin: 0 auto 3rem auto;
+            /* Center pages with gap between */
             padding: 0;
+            background: var(--paper-bg);
+            border-radius: 0;
+            /* A4 pages don't have rounded corners */
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: visible;
+        }
+
+        /* Each page gets its own paper background pattern */
+        .sequence-editor-block .content-area {
+            background-image:
+                linear-gradient(rgba(52, 152, 219, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(52, 152, 219, 0.08) 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-position: -1px -1px;
+            min-height: 1123px;
+            /* Full A4 height */
+            padding: 3rem 2.5rem;
+            /* Realistic page margins */
+            margin: 0;
+        }
+
+        /* Add page number indicator */
+        .sequence-editor-block::before {
+            content: 'Page';
+            position: absolute;
+            top: -2rem;
+            left: 0;
+            background: var(--accent-color);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            opacity: 0.7;
+            z-index: 10;
+        }
+
+        /* Paper texture effect */
+        .sequence-editor-block::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        body.dark-mode .sequence-editor-block {
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        body.dark-mode .sequence-editor-block .content-area {
+            background-image:
+                linear-gradient(rgba(52, 152, 219, 0.12) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(52, 152, 219, 0.12) 1px, transparent 1px);
+        }
+
+        .sequence-editor-block.active-focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 4px 20px rgba(52, 152, 219, 0.3);
+        }
+
+        /* Ensure content-area in stream has proper z-index */
+        .sequence-editor-block .content-area {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Clear visual break between pages - just the workspace background shows through */
+        .continuation-break {
+            margin: 0;
+            /* No extra margin, just the page gap */
+            text-align: center;
+            position: relative;
+            height: 0;
+            /* No height, pages create their own spacing */
+            display: none;
+            /* Hide the decorative break, pages speak for themselves */
+        }
+
+        .continuation-break::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, var(--accent-color) 20%, var(--accent-color) 80%, transparent);
+            opacity: 0.4;
+        }
+
+        .continuation-break::after {
+            content: '• • •';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--accent-color);
+            font-size: 1.5rem;
+            letter-spacing: 0.5rem;
+            opacity: 0.5;
+        }
+
+        .continuation-label {
+            display: none;
+            /* Hide labels, each page is clearly its own entity */
+        }
+
+        body.dark-mode .continuation-label {
+            box-shadow: 0 2px 10px rgba(52, 152, 219, 0.4);
+        }
+
+        /* Responsive: smaller screens */
+        @media (max-width: 850px) {
+            .sequence-editor-block {
+                width: 95%;
+                min-height: auto;
+            }
+
+            .sequence-editor-block .content-area {
+                min-height: 600px;
+                padding: 2rem 1.5rem;
+            }
         }
 
         .content-area {
@@ -4474,8 +4659,11 @@
                         <button class="btn btn-add" onclick="createNewChapter()">+ New Page</button>
                         <button class="btn btn-secondary" onclick="toggleFocusMode()">👁️ Focus Mode</button>
                         <button class="btn btn-secondary" onclick="startFlashcardMode()">🗂 Flashcards</button>
-                        <button class="btn btn-secondary" onclick="cyclePaperStyle()" id="paperStyleBtn">📄 Paper:
+                        <button class="btn btn-secondary" onclick="cyclePaperStyle()" id="paperStyleBtn">📄 Page:
                             Grid</button>
+                        <small
+                            style="opacity: 0.7; font-size: 0.75em; display: block; margin-top: -8px; margin-left: 4px; color: var(--sidebar-text);">Size
+                            & Texture</small>
                         <button class="btn btn-secondary" onclick="shareNote()" title="Share this note">📤
                             Share</button>
                         <button class="btn btn-save-sidebar" onclick="window.print()">🖨️ Save as PDF</button>
@@ -4638,7 +4826,7 @@
                 <input type="file" id="imageInput" style="display: none;" accept="image/*"
                     onchange="handleImageUpload(event)">
 
-                <input type="text" class="paper-title" id="pageTitle" placeholder="Untitled Page"
+                <input type="text" class="paper-title" id="pageTitle" placeholder="Page title…"
                     oninput="markUnsaved(); saveCurrentToCloud()">
 
                 <!-- NEW: Sequential Stream Container -->
@@ -6324,9 +6512,9 @@
 
             // Apply new style
             paper.classList.add(paperStyles[currentPaperStyle]);
-            btn.textContent = `📄 Paper: ${paperNames[currentPaperStyle]}`;
+            btn.textContent = `📄 Page: ${paperNames[currentPaperStyle]}`;
 
-            showToast(`Paper: ${paperNames[currentPaperStyle]}`);
+            showToast(`Applied ${paperNames[currentPaperStyle]} to entire page`);
         };
 
         window.toggleReadMode = () => {
@@ -7003,13 +7191,57 @@
             }
 
             chapters.unshift(newChapter);
-            await saveChapterToDB(newChapter);
+            await saveToCloud();
+            loadChapter(newChapter.id);
             renderSidebar();
 
-            // Load and scroll to new page
-            loadChapter(id);
+            // UX Enhancement: Show empty page guidance for new pages
+            setTimeout(() => showEmptyPageHints(), 300);
         };
 
+        // UX Enhancement: Empty Page Guidance (shows hints on truly empty pages)
+        window.showEmptyPageHints = () => {
+            const content = document.getElementById('sequentialStream');
+            const titleInput = document.getElementById('pageTitle');
+
+            if (!content) return;
+
+            // Only show if page is empty (no blocks and empty/default title)
+            const isEmpty = content.children.length === 0 ||
+                (content.children.length === 1 && content.textContent.trim() === 'Start typing...');
+            const hasEmptyTitle = !titleInput || titleInput.value.trim() === '' ||
+                titleInput.value === 'Untitled Page' ||
+                titleInput.value.includes('Note -');
+
+            if (isEmpty && hasEmptyTitle) {
+                const hint = document.createElement('div');
+                hint.className = 'empty-page-hint';
+                hint.style.cssText = 'opacity: 0.25; text-align: center; margin-top: 3rem; color: var(--ink-color); pointer-events: none; user-select: none; transition: opacity 0.3s;';
+                hint.innerHTML = `
+                    <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">✍️ Tap to write</p>
+                    <p style="font-size: 0.9rem; opacity: 0.7;">or use the toolbar to add content</p>
+                `;
+
+                content.appendChild(hint);
+
+                // Auto-remove on first interaction
+                const removeHint = () => {
+                    if (hint && hint.parentNode) {
+                        hint.style.opacity = '0';
+                        setTimeout(() => hint.remove(), 300);
+                    }
+                    content.removeEventListener('click', removeHint);
+                    content.removeEventListener('focus', removeHint, true);
+                    if (titleInput) titleInput.removeEventListener('input', removeHint);
+                };
+
+                setTimeout(() => {
+                    content.addEventListener('click', removeHint, { once: true });
+                    content.addEventListener('focus', removeHint, { once: true, capture: true });
+                    if (titleInput) titleInput.addEventListener('input', removeHint, { once: true });
+                }, 100);
+            }
+        };
         window.deleteChapter = async (id, event) => {
             if (event) event.stopPropagation();
             chapters = chapters.filter(c => c.id !== id);
