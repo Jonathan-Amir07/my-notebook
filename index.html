@@ -11503,11 +11503,30 @@
                     const currentNode = range.commonAncestorContainer;
                     const currentElement = currentNode.nodeType === 3 ? currentNode.parentElement : currentNode;
 
-                    // Check if we're in a line that has a checkbox
-                    const currentLine = currentElement.closest('div, p, li');
+                    // Find the current line - check multiple levels
+                    let currentLine = currentElement.closest('div, p, li');
+
+                    // If we're in a span, check its parent
+                    if (!currentLine && currentElement.tagName === 'SPAN') {
+                        currentLine = currentElement.parentElement;
+                    }
+
                     if (!currentLine) return;
 
-                    const hasCheckbox = currentLine.querySelector('input[type="checkbox"]');
+                    // Check if current line or its parent has a checkbox
+                    let hasCheckbox = currentLine.querySelector('input[type="checkbox"]');
+
+                    // Also check if the line itself contains a checkbox as a direct child
+                    if (!hasCheckbox) {
+                        hasCheckbox = Array.from(currentLine.children).find(child =>
+                            child.tagName === 'INPUT' && child.type === 'checkbox'
+                        );
+                    }
+
+                    // Check parent if still not found
+                    if (!hasCheckbox && currentLine.parentElement) {
+                        hasCheckbox = currentLine.parentElement.querySelector('input[type="checkbox"]');
+                    }
 
                     if (hasCheckbox) {
                         e.preventDefault();
