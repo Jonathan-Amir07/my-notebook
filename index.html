@@ -3049,14 +3049,15 @@
             width: 794px;
             min-height: 1123px;
             max-width: 100%;
-            margin: 0 auto 3rem auto;
-            /* Center pages with gap between */
+            margin: 0 auto 4rem auto;
+            /* Center pages with larger gap between for clear separation */
             padding: 0;
             background: var(--paper-bg);
             border-radius: 0;
             /* A4 pages don't have rounded corners */
             border: 1px solid rgba(0, 0, 0, 0.15);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            /* Enhanced shadow for paper edge effect */
             transition: all 0.3s ease;
             position: relative;
             overflow: visible;
@@ -3064,11 +3065,7 @@
 
         /* Each page gets its own paper background pattern */
         .sequence-editor-block .content-area {
-            background-image:
-                linear-gradient(rgba(52, 152, 219, 0.08) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(52, 152, 219, 0.08) 1px, transparent 1px);
-            background-size: 20px 20px;
-            background-position: -1px -1px;
+            background-image: none;
             min-height: 1123px;
             /* Full A4 height */
             padding: 3rem 2.5rem;
@@ -3113,9 +3110,7 @@
         }
 
         body.dark-mode .sequence-editor-block .content-area {
-            background-image:
-                linear-gradient(rgba(52, 152, 219, 0.12) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(52, 152, 219, 0.12) 1px, transparent 1px);
+            background-image: none;
         }
 
         .sequence-editor-block.active-focus {
@@ -4250,6 +4245,93 @@
             color: #2c3e50;
             white-space: nowrap;
             pointer-events: none;
+        }
+
+        /* Sidebar Chapter Items Styling */
+        #chapterList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .chapter-item {
+            background: rgba(192, 57, 43, 0.15);
+            border: 2px solid rgba(192, 57, 43, 0.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .chapter-item:hover {
+            background: rgba(192, 57, 43, 0.25);
+            border-color: rgba(192, 57, 43, 0.5);
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(192, 57, 43, 0.2);
+        }
+
+        .chapter-item.active {
+            background: rgba(192, 57, 43, 0.35);
+            border-color: #c0392b;
+            box-shadow: 0 3px 12px rgba(192, 57, 43, 0.3);
+        }
+
+        .chapter-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .chapter-item-title {
+            font-weight: 500;
+            color: white;
+            margin-bottom: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .chapter-tags {
+            font-size: 0.7rem;
+            opacity: 0.9;
+            margin-top: 4px;
+            color: white;
+        }
+
+        .chapter-delete-btn {
+            background: transparent;
+            border: none;
+            color: #e74c3c;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            opacity: 0;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+        }
+
+        .chapter-item:hover .chapter-delete-btn {
+            opacity: 1;
+        }
+
+        .chapter-delete-btn:hover {
+            background: rgba(231, 76, 60, 0.15);
+            transform: scale(1.1);
+        }
+
+        .chapter-delete-btn:active {
+            transform: scale(0.95);
         }
     </style>
 </head>
@@ -7844,8 +7926,13 @@
             const selected = temps[key];
             if (selected) {
                 document.getElementById('pageTitle').value = selected.title;
-                // Apply to FIRST active editor
-                document.querySelector('.content-area').innerHTML = selected.content;
+
+                // Apply to the ACTIVE chapter's content area
+                const activeBlock = document.getElementById(`page-block-${currentId}`);
+                const contentArea = activeBlock ? activeBlock.querySelector('.content-area') : document.querySelector('.content-area');
+                if (contentArea) {
+                    contentArea.innerHTML = selected.content;
+                }
 
                 if (selected.isWhiteboard) {
                     chapter.isWhiteboard = true;
@@ -10697,6 +10784,935 @@
             element.remove();
             showToast('Component deleted');
         };
+
+        // Create a new chapter/page (OPTIMIZED)
+        window.createNewChapter = async () => {
+            const newChapter = {
+                id: Date.now().toString(),
+                title: 'New Page',
+                content: '<p>Start typing...</p>',
+                tags: [],
+                metadata: {
+                    discipline: 'general',
+                    type: 'note',
+                    createdAt: new Date().toISOString(),
+                    lastEdited: new Date().toISOString()
+                },
+                lastEdited: new Date().toISOString(),
+                isWhiteboard: false,
+                sketchData: null
+            };
+
+            // Add to beginning of chapters array
+            chapters.unshift(newChapter);
+            currentId = newChapter.id;
+
+            // Batch DOM updates for better performance
+            const stream = document.getElementById('sequentialStream');
+            const titleInput = document.getElementById('pageTitle');
+
+            // Use DocumentFragment for efficient DOM manipulation
+            const fragment = document.createDocumentFragment();
+            const block = document.createElement('div');
+            block.className = 'sequence-editor-block active-focus';
+            block.id = `page-block-${newChapter.id}`;
+
+            const contentArea = document.createElement('div');
+            contentArea.className = 'content-area';
+            contentArea.contentEditable = 'true';
+            contentArea.innerHTML = newChapter.content;
+            contentArea.oninput = () => {
+                markUnsaved();
+                saveCurrentToCloud();
+            };
+
+            block.appendChild(contentArea);
+            fragment.appendChild(block);
+
+            // Single DOM update
+            stream.innerHTML = '';
+            stream.appendChild(fragment);
+            titleInput.value = newChapter.title;
+
+            // Focus immediately for better UX
+            contentArea.focus();
+
+            // Defer non-critical operations
+            requestAnimationFrame(() => {
+                renderSidebar();
+                updateToolVisibility(newChapter);
+            });
+
+            // Save to IndexedDB asynchronously (don't block UI)
+            saveChapterToDB(newChapter).catch(err => console.error('Save failed:', err));
+
+            showToast('✓ New page created');
+        };
+
+        // Add a new page to the stream with the same tag (MULTI-PAGE STREAM)
+        window.addPageToStream = async () => {
+            const currentChapter = chapters.find(c => c.id === currentId);
+            if (!currentChapter) return;
+
+            // Create new page with same tag as current page
+            const newChapter = {
+                id: Date.now().toString(),
+                title: 'New Page',
+                content: '<p>Start typing...</p>',
+                tags: currentChapter.tags ? [...currentChapter.tags] : [], // Inherit tags
+                metadata: {
+                    discipline: currentChapter.metadata?.discipline || 'general',
+                    type: currentChapter.metadata?.type || 'note',
+                    createdAt: new Date().toISOString(),
+                    lastEdited: new Date().toISOString()
+                },
+                lastEdited: new Date().toISOString(),
+                isWhiteboard: false,
+                sketchData: null
+            };
+
+            // Add to chapters array
+            chapters.push(newChapter);
+
+            // Save to IndexedDB asynchronously
+            saveChapterToDB(newChapter).catch(err => console.error('Save failed:', err));
+
+            // Reload the stream to show all pages with the same tag
+            loadStreamByTag(currentChapter.tags && currentChapter.tags.length > 0 ? currentChapter.tags[0] : null);
+
+            // Update sidebar
+            requestAnimationFrame(() => renderSidebar());
+
+            showToast('✓ Page added to stream');
+        };
+
+        // Load all pages with the same tag into the stream (MULTI-PAGE VIEW)
+        window.loadStreamByTag = (tag) => {
+            const stream = document.getElementById('sequentialStream');
+            const titleInput = document.getElementById('pageTitle');
+
+            // Find all chapters with this tag
+            const taggedChapters = tag
+                ? chapters.filter(ch => ch.tags && ch.tags.includes(tag))
+                : [chapters.find(c => c.id === currentId)];
+
+            if (taggedChapters.length === 0) return;
+
+            // Use DocumentFragment for efficient rendering
+            const fragment = document.createDocumentFragment();
+
+            taggedChapters.forEach((chapter, index) => {
+                // Create page block
+                const block = document.createElement('div');
+                block.className = 'sequence-editor-block';
+                if (chapter.id === currentId) block.classList.add('active-focus');
+                block.id = `page-block-${chapter.id}`;
+
+                // Add title section for each page
+                const titleSection = document.createElement('div');
+                titleSection.style.cssText = 'padding: 1.5rem 2.5rem 0.5rem 2.5rem; border-bottom: 1px solid rgba(0,0,0,0.1);';
+
+                const titleInput = document.createElement('input');
+                titleInput.type = 'text';
+                titleInput.value = chapter.title || 'Untitled';
+                titleInput.className = 'page-title-input';
+                titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 1.5rem; font-weight: 600; color: var(--ink-color); outline: none; font-family: inherit;';
+                titleInput.oninput = () => {
+                    chapter.title = titleInput.value;
+                    chapter.lastEdited = new Date().toISOString();
+                    markUnsaved();
+                    saveChapterContent(chapter.id);
+                };
+
+                titleSection.appendChild(titleInput);
+                block.appendChild(titleSection);
+
+                // Add content area
+                const contentArea = document.createElement('div');
+                contentArea.className = 'content-area';
+                contentArea.contentEditable = 'true';
+                contentArea.innerHTML = chapter.content || '<p>Start typing...</p>';
+                contentArea.dataset.chapterId = chapter.id;
+                contentArea.style.paddingTop = '1.5rem'; // Adjust padding since title is separate
+                contentArea.oninput = () => {
+                    markUnsaved();
+                    saveChapterContent(chapter.id);
+                };
+
+                // Enable auto-checkbox functionality
+                setupAutoCheckbox(contentArea);
+
+                block.appendChild(contentArea);
+                fragment.appendChild(block);
+            });
+
+            // Update DOM
+            stream.innerHTML = '';
+            stream.appendChild(fragment);
+            titleInput.value = taggedChapters[0].title || 'Untitled';
+
+            // Update current ID to first chapter in stream
+            if (taggedChapters.length > 0) {
+                currentId = taggedChapters[0].id;
+            }
+        };
+
+        // Save specific chapter content
+        function saveChapterContent(chapterId) {
+            const chapter = chapters.find(c => c.id === chapterId);
+            if (!chapter) return;
+
+            const contentArea = document.querySelector(`[data-chapter-id="${chapterId}"]`);
+            if (contentArea) {
+                chapter.content = contentArea.innerHTML;
+                chapter.lastEdited = new Date().toISOString();
+
+                // Debounced save to IndexedDB
+                clearTimeout(window.saveTimeout);
+                window.saveTimeout = setTimeout(() => {
+                    saveChapterToDB(chapter).catch(err => console.error('Save failed:', err));
+                }, 1000);
+            }
+        }
+
+
+        // Render the sidebar chapter list
+        window.renderSidebar = () => {
+            const list = document.getElementById('chapterList');
+            if (!list) return;
+
+            const searchStr = (document.getElementById('sidebarSearch')?.value || '').toLowerCase();
+            const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
+
+            list.innerHTML = '';
+
+            // Filter chapters
+            const filtered = chapters.filter(ch => {
+                const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
+                const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
+                const matchesSearch = titleMatch || tagMatch;
+
+                if (!matchesSearch) return false;
+
+                if (categoryFilter === 'all') return true;
+
+                const disc = ch.metadata?.discipline;
+                const branch = ch.metadata?.branch;
+
+                // Match category filter
+                if (categoryFilter === 'General' && disc === 'general') return true;
+                if (categoryFilter === 'Projects' && ch.metadata?.type === 'project') return true;
+                if (categoryFilter === 'Algorithms' && disc === 'cs') return true;
+                if (categoryFilter === 'Systems' && disc === 'cs') return true;
+                if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter) && disc === 'medical') return true;
+                if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter) && disc === 'medical') return true;
+                if (['Electrical', 'Mechanical', 'Civil', 'Electronics', 'Mechatronics', 'Industrial'].includes(categoryFilter)) {
+                    return disc === 'engineering' && (branch === categoryFilter || categoryFilter.includes(branch));
+                }
+
+                return false;
+            });
+
+            // Group chapters by their first tag (for better organization)
+            const grouped = {};
+            const untagged = [];
+
+            filtered.forEach(ch => {
+                if (ch.tags && ch.tags.length > 0) {
+                    const primaryTag = ch.tags[0];
+                    if (!grouped[primaryTag]) {
+                        grouped[primaryTag] = [];
+                    }
+                    grouped[primaryTag].push(ch);
+                } else {
+                    untagged.push(ch);
+                }
+            });
+
+            // Render grouped chapters (by tag) with visual separation
+            const sortedTags = Object.keys(grouped).sort();
+            sortedTags.forEach((tag, index) => {
+                // Add visual separator between tag groups (except before first group)
+                if (index > 0) {
+                    const separator = document.createElement('li');
+                    separator.style.cssText = 'height: 15px; list-style: none; pointer-events: none;';
+                    list.appendChild(separator);
+                }
+
+                grouped[tag].forEach(ch => {
+                    renderChapterItem(ch, list);
+                });
+            });
+
+            // Add separator before untagged if there are tagged items
+            if (sortedTags.length > 0 && untagged.length > 0) {
+                const separator = document.createElement('li');
+                separator.style.cssText = 'height: 15px; list-style: none; pointer-events: none;';
+                list.appendChild(separator);
+            }
+
+            // Render untagged chapters at the end
+            untagged.forEach(ch => {
+                renderChapterItem(ch, list);
+            });
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<li style="opacity: 0.5; text-align: center; padding: 20px;">No pages found</li>';
+            }
+        };
+
+        // Helper function to render a single chapter item
+        function renderChapterItem(ch, list) {
+            const li = document.createElement('li');
+            li.className = 'chapter-item';
+            if (ch.id === currentId) li.classList.add('active');
+
+            // Create content wrapper
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'chapter-item-content';
+            contentDiv.onclick = () => loadChapter(ch.id);
+
+            // Title
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'chapter-item-title';
+            titleDiv.textContent = ch.title || 'Untitled';
+            contentDiv.appendChild(titleDiv);
+
+            // Add tags if present
+            if (ch.tags && ch.tags.length > 0) {
+                const tagsDiv = document.createElement('div');
+                tagsDiv.className = 'chapter-tags';
+                tagsDiv.textContent = ch.tags.map(t => `#${t}`).join(' ');
+                contentDiv.appendChild(tagsDiv);
+            }
+
+            li.appendChild(contentDiv);
+
+            // Delete button with trash icon
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'chapter-delete-btn';
+            deleteBtn.innerHTML = '🗑️';
+            deleteBtn.title = 'Delete page';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteChapter(ch.id);
+            };
+
+            li.appendChild(deleteBtn);
+            list.appendChild(li);
+        }
+
+        // Delete a chapter (OPTIMIZED)
+        window.deleteChapter = async (id) => {
+            const chapterIndex = chapters.findIndex(c => c.id === id);
+            if (chapterIndex === -1) return;
+
+            const chapter = chapters[chapterIndex];
+
+            // Remove from array (faster than filter for single item)
+            chapters.splice(chapterIndex, 1);
+
+            const wasCurrentChapter = (currentId === id);
+
+            // Delete from IndexedDB asynchronously (don't block UI)
+            deleteChapterFromDB(id).catch(err => console.error('Delete failed:', err));
+
+            // Handle UI updates
+            if (wasCurrentChapter) {
+                if (chapters.length > 0) {
+                    // Load next available chapter without full re-render
+                    loadChapter(chapters[0].id);
+                } else {
+                    // No chapters left, create a new one
+                    createNewChapter();
+                }
+            } else {
+                // Just update sidebar (no need to reload entire page)
+                requestAnimationFrame(() => renderSidebar());
+            }
+
+            showToast('✓ Page deleted');
+        };
+
+        // Delete chapter from IndexedDB
+        async function deleteChapterFromDB(id) {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('NotebookDB', 1);
+                request.onsuccess = (e) => {
+                    const db = e.target.result;
+                    const tx = db.transaction('chapters', 'readwrite');
+                    const store = tx.objectStore('chapters');
+                    const deleteRequest = store.delete(id);
+
+                    deleteRequest.onsuccess = () => resolve();
+                    deleteRequest.onerror = () => reject(deleteRequest.error);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+
+        // Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM)
+        window.loadChapter = (id) => {
+            const chapter = chapters.find(c => c.id === id);
+            if (!chapter) return;
+
+            currentId = id;
+
+            // Get the primary tag of this chapter
+            const primaryTag = chapter.tags && chapter.tags.length > 0 ? chapter.tags[0] : null;
+
+            // Find all chapters with the same primary tag
+            const relatedChapters = primaryTag
+                ? chapters.filter(ch => ch.tags && ch.tags.includes(primaryTag))
+                : [chapter];
+
+            // Sort by creation date
+            relatedChapters.sort((a, b) => new Date(a.metadata?.createdAt || 0) - new Date(b.metadata?.createdAt || 0));
+
+            // Update title
+            document.getElementById('pageTitle').value = chapter.title || 'Untitled';
+
+            // Clear and recreate DOM with all related pages
+            const stream = document.getElementById('sequentialStream');
+            stream.innerHTML = '';
+
+            // Use DocumentFragment for efficient rendering
+            const fragment = document.createDocumentFragment();
+
+            relatedChapters.forEach((ch, index) => {
+                const block = document.createElement('div');
+                block.className = 'sequence-editor-block';
+                if (ch.id === currentId) block.classList.add('active-focus');
+                block.id = `page-block-${ch.id}`;
+
+                // Add title section for each page
+                const titleSection = document.createElement('div');
+                titleSection.style.cssText = 'padding: 1.5rem 2.5rem 0.5rem 2.5rem; border-bottom: 1px solid rgba(0,0,0,0.1);';
+
+                const titleInput = document.createElement('input');
+                titleInput.type = 'text';
+                titleInput.value = ch.title || 'Untitled';
+                titleInput.className = 'page-title-input';
+                titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 1.5rem; font-weight: 600; color: var(--ink-color); outline: none; font-family: inherit;';
+                titleInput.oninput = () => {
+                    ch.title = titleInput.value;
+                    ch.lastEdited = new Date().toISOString();
+                    markUnsaved();
+                    saveChapterContent(ch.id);
+                };
+
+                titleSection.appendChild(titleInput);
+                block.appendChild(titleSection);
+
+                // Add content area
+                const contentArea = document.createElement('div');
+                contentArea.className = 'content-area';
+                contentArea.contentEditable = 'true';
+                contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
+                contentArea.dataset.chapterId = ch.id;
+                contentArea.style.paddingTop = '1.5rem'; // Adjust padding since title is separate
+                contentArea.oninput = () => {
+                    markUnsaved();
+                    saveChapterContent(ch.id);
+                };
+
+                // Enable auto-checkbox functionality
+                setupAutoCheckbox(contentArea);
+
+                block.appendChild(contentArea);
+                fragment.appendChild(block);
+            });
+
+            stream.appendChild(fragment);
+
+            // Update UI
+            updateToolVisibility(chapter);
+            renderSidebar();
+
+            // Handle whiteboard mode
+            if (chapter.isWhiteboard) {
+                document.getElementById('paper').classList.add('infinite');
+            } else {
+                document.getElementById('paper').classList.remove('infinite');
+            }
+
+            // Restore sketch data if exists
+            if (chapter.sketchData) {
+                setTimeout(() => {
+                    const canvas = document.getElementById('sketchCanvas');
+                    const ctx = canvas?.getContext('2d');
+                    if (ctx && chapter.sketchData) {
+                        const img = new Image();
+                        img.onload = () => ctx.drawImage(img, 0, 0);
+                        img.src = chapter.sketchData;
+                    }
+                }, 100);
+            }
+        };
+
+        // Save current chapter to database
+        window.saveCurrentToCloud = async () => {
+            const chapter = chapters.find(c => c.id === currentId);
+            if (!chapter) return;
+
+            // Update title
+            const titleEl = document.getElementById('pageTitle');
+            if (titleEl) chapter.title = titleEl.value;
+
+            // Update content
+            const contentArea = document.querySelector(`#page-block-${currentId} .content-area`);
+            if (contentArea) chapter.content = contentArea.innerHTML;
+
+            // Update timestamp
+            chapter.lastEdited = new Date().toISOString();
+
+            // Save to IndexedDB
+            await saveChapterToDB(chapter);
+
+            // Update status
+            const status = document.getElementById('saveStatus');
+            if (status) {
+                status.textContent = 'All changes saved';
+                status.style.color = 'var(--save-color)';
+            }
+        };
+
+        // Mark content as unsaved
+        window.markUnsaved = () => {
+            const status = document.getElementById('saveStatus');
+            if (status) {
+                status.textContent = 'Saving...';
+                status.style.color = 'var(--ink-color)';
+            }
+        };
+
+        // Show toast notification
+        window.showToast = (message) => {
+            // Create toast element if it doesn't exist
+            let toast = document.getElementById('globalToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'globalToast';
+                toast.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    background: var(--sidebar-bg);
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    z-index: 10000;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                    font-size: 0.9rem;
+                    max-width: 300px;
+                `;
+                document.body.appendChild(toast);
+            }
+
+            toast.textContent = message;
+            toast.style.opacity = '1';
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 3000);
+        };
+
+        // Setup drag and drop for images
+        window.setupDragAndDrop = () => {
+            const workspace = document.getElementById('workspace');
+            if (!workspace) return;
+
+            workspace.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            workspace.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const files = e.dataTransfer?.files;
+                if (!files || files.length === 0) return;
+
+                const file = files[0];
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = document.createElement('img');
+                        img.src = event.target.result;
+                        img.style.maxWidth = '100%';
+                        img.style.height = 'auto';
+                        img.style.margin = '10px 0';
+
+                        const contentArea = document.querySelector(`#page-block-${currentId} .content-area`);
+                        if (contentArea) {
+                            contentArea.appendChild(img);
+                            markUnsaved();
+                            saveCurrentToCloud();
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                    showToast('✓ Image added');
+                }
+            });
+        };
+
+        // Update storage quota display
+        window.updateStorageQuota = async () => {
+            if (!navigator.storage || !navigator.storage.estimate) return;
+
+            try {
+                const estimate = await navigator.storage.estimate();
+                const usage = estimate.usage || 0;
+                const quota = estimate.quota || 0;
+                const percentUsed = quota > 0 ? (usage / quota) * 100 : 0;
+
+                const storageText = document.getElementById('storageText');
+                const storageBar = document.getElementById('storageBar');
+
+                if (storageText) {
+                    const usageMB = (usage / (1024 * 1024)).toFixed(1);
+                    const quotaMB = (quota / (1024 * 1024)).toFixed(0);
+                    storageText.textContent = `${usageMB} MB / ${quotaMB} MB`;
+                }
+
+                if (storageBar) {
+                    storageBar.style.width = `${percentUsed}%`;
+                }
+            } catch (err) {
+                console.error('Storage estimate error:', err);
+            }
+        };
+
+        // Initialize My References system
+        window.initMyReferences = async () => {
+            // Stub - can be implemented later
+            console.log('My References initialized');
+        };
+
+        // Save current text selection
+        window.saveSelection = () => {
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                window.savedRange = selection.getRangeAt(0);
+            }
+        };
+
+        // Handle selection change
+        window.handleSelectionChange = () => {
+            const selection = window.getSelection();
+            const textBubble = document.getElementById('textBubble');
+
+            if (!textBubble) return;
+
+            if (selection.toString().length > 0) {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+
+                textBubble.style.display = 'flex';
+                textBubble.style.left = `${rect.left + window.scrollX}px`;
+                textBubble.style.top = `${rect.top + window.scrollY - 50}px`;
+            } else {
+                textBubble.style.display = 'none';
+            }
+        };
+
+        // Handle markdown input
+        window.handleMarkdownInput = (e) => {
+            // Basic markdown support - can be enhanced later
+            // For now, just trigger save
+            if (e.target.classList.contains('content-area')) {
+                markUnsaved();
+                saveCurrentToCloud();
+            }
+        };
+
+        // Setup ruler events
+        window.setupRulerEvents = () => {
+            const ruler = document.getElementById('engRuler');
+            if (!ruler) return;
+
+            let isDragging = false;
+            let startX, startY;
+
+            ruler.addEventListener('mousedown', (e) => {
+                if (e.target.id === 'rulerRotate') return;
+                isDragging = true;
+                startX = e.clientX - ruler.offsetLeft;
+                startY = e.clientY - ruler.offsetTop;
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                ruler.style.left = `${e.clientX - startX}px`;
+                ruler.style.top = `${e.clientY - startY}px`;
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+        };
+
+        // Switch math keyboard tab
+        window.switchMathTab = (tab) => {
+            const mathKeys = document.getElementById('mathKeys');
+            if (!mathKeys) return;
+
+            // Update active tab button
+            document.querySelectorAll('.math-tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event?.target?.classList.add('active');
+
+            // Define math symbols for each tab
+            const symbols = {
+                basic: ['\\frac{}{}', 'x^2', 'x_n', '\\sqrt{}', '\\sum', '\\int', '\\pm', '\\times', '\\div', '\\neq', '\\leq', '\\geq'],
+                trig: ['\\sin', '\\cos', '\\tan', '\\cot', '\\sec', '\\csc', '\\arcsin', '\\arccos', '\\arctan'],
+                calc: ['\\lim', '\\frac{d}{dx}', '\\int', '\\partial', '\\nabla', '\\infty', '\\Delta'],
+                geom: ['\\angle', '\\triangle', '\\perp', '\\parallel', '\\cong', '\\sim', '\\degree'],
+                struct: ['()', '[]', '\\{\\}', '|', '\\left(\\right)', '\\begin{cases}\\end{cases}']
+            };
+
+            mathKeys.innerHTML = '';
+            (symbols[tab] || symbols.basic).forEach(sym => {
+                const btn = document.createElement('button');
+                btn.className = 'math-key-btn';
+                btn.textContent = sym;
+                btn.onclick = () => {
+                    const buffer = document.getElementById('mathBuffer');
+                    if (buffer) {
+                        buffer.value += sym;
+                        buffer.dispatchEvent(new Event('input'));
+                    }
+                };
+                mathKeys.appendChild(btn);
+            });
+        };
+
+        // Setup auto-checkbox functionality for content areas (for Eisenhower Matrix and task lists)
+        window.setupAutoCheckbox = (contentArea) => {
+            contentArea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    const selection = window.getSelection();
+                    if (!selection.rangeCount) return;
+
+                    const range = selection.getRangeAt(0);
+                    const currentNode = range.commonAncestorContainer;
+                    const currentElement = currentNode.nodeType === 3 ? currentNode.parentElement : currentNode;
+
+                    // Check if we're in a line that has a checkbox
+                    const currentLine = currentElement.closest('div, p, li');
+                    if (!currentLine) return;
+
+                    const hasCheckbox = currentLine.querySelector('input[type="checkbox"]');
+
+                    if (hasCheckbox) {
+                        e.preventDefault();
+
+                        // Create new line with checkbox
+                        const newLine = document.createElement('div');
+                        newLine.style.cssText = 'margin-bottom: 0.5rem; display: flex; align-items: flex-start; gap: 0.5rem;';
+                        newLine.dataset.hasCheckbox = 'true';
+
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.style.cssText = 'margin-top: 0.25rem; cursor: pointer; flex-shrink: 0;';
+                        checkbox.onclick = () => {
+                            markUnsaved();
+                            const chapterId = contentArea.dataset.chapterId;
+                            if (chapterId) saveChapterContent(chapterId);
+                            else saveCurrentToCloud();
+                        };
+
+                        const textSpan = document.createElement('span');
+                        textSpan.contentEditable = 'true';
+                        textSpan.style.cssText = 'flex: 1; outline: none;';
+                        textSpan.innerHTML = '<br>'; // Placeholder for cursor
+
+                        newLine.appendChild(checkbox);
+                        newLine.appendChild(textSpan);
+
+                        // Insert the new line after current line
+                        if (currentLine.nextSibling) {
+                            currentLine.parentNode.insertBefore(newLine, currentLine.nextSibling);
+                        } else {
+                            currentLine.parentNode.appendChild(newLine);
+                        }
+
+                        // Focus on the new text span
+                        setTimeout(() => {
+                            textSpan.focus();
+                            const newRange = document.createRange();
+                            newRange.selectNodeContents(textSpan);
+                            newRange.collapse(true);
+                            const newSelection = window.getSelection();
+                            newSelection.removeAllRanges();
+                            newSelection.addRange(newRange);
+                        }, 0);
+                    }
+                }
+            });
+
+            // Handle input events for touch devices (iPad stylus)
+            // This catches line breaks created by the browser on touch devices
+            let lastContent = contentArea.innerHTML;
+            contentArea.addEventListener('input', () => {
+                const currentContent = contentArea.innerHTML;
+
+                // Check if content changed (new line added)
+                if (currentContent !== lastContent) {
+                    // Find all divs/paragraphs in the content area
+                    const allLines = contentArea.querySelectorAll('div, p');
+
+                    allLines.forEach(line => {
+                        // Check if this line has a checkbox already or is marked as processed
+                        const hasCheckbox = line.querySelector('input[type="checkbox"]');
+                        const isProcessed = line.dataset.hasCheckbox === 'true';
+
+                        // If line doesn't have checkbox but previous sibling does, add one
+                        if (!hasCheckbox && !isProcessed && line.previousElementSibling) {
+                            const prevHasCheckbox = line.previousElementSibling.querySelector('input[type="checkbox"]');
+
+                            if (prevHasCheckbox && line.textContent.trim() !== '') {
+                                // Convert this line to checkbox format
+                                const originalContent = line.innerHTML;
+                                line.innerHTML = '';
+                                line.style.cssText = 'margin-bottom: 0.5rem; display: flex; align-items: flex-start; gap: 0.5rem;';
+                                line.dataset.hasCheckbox = 'true';
+
+                                const checkbox = document.createElement('input');
+                                checkbox.type = 'checkbox';
+                                checkbox.style.cssText = 'margin-top: 0.25rem; cursor: pointer; flex-shrink: 0;';
+                                checkbox.onclick = () => {
+                                    markUnsaved();
+                                    const chapterId = contentArea.dataset.chapterId;
+                                    if (chapterId) saveChapterContent(chapterId);
+                                    else saveCurrentToCloud();
+                                };
+
+                                const textSpan = document.createElement('span');
+                                textSpan.contentEditable = 'true';
+                                textSpan.style.cssText = 'flex: 1; outline: none;';
+                                textSpan.innerHTML = originalContent;
+
+                                line.appendChild(checkbox);
+                                line.appendChild(textSpan);
+                            }
+                        }
+                    });
+                }
+
+                lastContent = currentContent;
+            });
+        };
+
+        // ==================== END MISSING FUNCTIONS ====================
+
+        // Initialize the application
+        async function initApp() {
+            try {
+                // Initialize IndexedDB
+                await initDB();
+
+                // Load all chapters from database
+                chapters = await loadAllChapters();
+
+                // Sort chapters by last edited (most recent first)
+                chapters.sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
+
+                // If no chapters exist, create a default one
+                if (chapters.length === 0) {
+                    createNewChapter();
+                } else {
+                    // Render sidebar with existing chapters
+                    renderSidebar();
+
+                    // Load the most recent chapter
+                    const mostRecent = chapters[0];
+                    currentId = mostRecent.id;
+
+                    // Set page title
+                    document.getElementById('pageTitle').value = mostRecent.title || 'Untitled';
+
+                    // Create content area in sequential stream
+                    const stream = document.getElementById('sequentialStream');
+                    stream.innerHTML = '';
+
+                    const block = document.createElement('div');
+                    block.className = 'sequence-editor-block active-focus';
+                    block.id = `page-block-${mostRecent.id}`;
+
+                    const contentArea = document.createElement('div');
+                    contentArea.className = 'content-area';
+                    contentArea.contentEditable = 'true';
+                    contentArea.innerHTML = mostRecent.content || '<p>Start typing...</p>';
+                    contentArea.oninput = () => {
+                        markUnsaved();
+                        saveCurrentToCloud();
+                    };
+
+                    block.appendChild(contentArea);
+                    stream.appendChild(block);
+
+                    // Update tool visibility based on chapter discipline
+                    updateToolVisibility(mostRecent);
+                }
+
+                // Setup drag and drop for images
+                setupDragAndDrop();
+
+                // Update storage quota display
+                updateStorageQuota();
+
+                // Initialize My References system
+                await initMyReferences();
+
+                // Set default paper texture (Grid)
+                const paper = document.getElementById('paper');
+                if (paper && !paper.className.includes('-texture')) {
+                    paper.classList.add('grid-texture');
+                }
+
+                // Add event listener for selection changes
+                document.addEventListener('selectionchange', () => {
+                    saveSelection();
+                    handleSelectionChange();
+                });
+
+                // Event delegation for checkbox toggles in stream
+                document.getElementById('sequentialStream').addEventListener('click', function (e) {
+                    if (e.target.classList.contains('checkbox')) {
+                        e.preventDefault();
+                        e.target.classList.toggle('checked');
+                        const wrapper = e.target.parentElement;
+                        const textDiv = wrapper.nextElementSibling;
+                        if (textDiv && textDiv.classList.contains('checklist-text')) {
+                            textDiv.classList.toggle('completed');
+                        }
+                        // Trigger save
+                        const block = e.target.closest('.content-area');
+                        if (block && block.oninput) block.oninput();
+                    }
+                });
+
+                // Markdown support on stream container
+                document.getElementById('sequentialStream').addEventListener('input', handleMarkdownInput);
+
+                // Setup ruler events if ruler exists
+                setupRulerEvents();
+
+                // Switch to basic math tab
+                switchMathTab('basic');
+
+            } catch (err) {
+                console.error('Error initializing app:', err);
+                showToast('Error loading application. Please refresh.');
+            }
+        }
+
 
         initApp();
         setTimeout(resizeCanvas, 500);
