@@ -10895,6 +10895,34 @@
                 if (chapter.id === currentId) block.classList.add('active-focus');
                 block.id = `page-block-${chapter.id}`;
 
+                // Add title section for subsequent pages (index > 0)
+                if (index > 0) {
+                    const titleSection = document.createElement('div');
+                    titleSection.className = 'paper-title'; // Re-use main title class
+                    titleSection.style.marginTop = '0';
+                    titleSection.style.marginBottom = '0';
+                    titleSection.style.borderBottom = '2px solid var(--accent-color)';
+                    titleSection.style.borderRadius = '4px 4px 0 0';
+                    titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
+
+                    const titleInput = document.createElement('input');
+                    titleInput.type = 'text';
+                    titleInput.value = chapter.title || 'Untitled';
+                    titleInput.className = 'page-title-input';
+                    titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
+                    titleInput.placeholder = "Page title...";
+
+                    titleInput.oninput = () => {
+                        chapter.title = titleInput.value;
+                        chapter.lastEdited = new Date().toISOString();
+                        markUnsaved();
+                        saveChapterContent(chapter.id);
+                    };
+
+                    titleSection.appendChild(titleInput);
+                    block.appendChild(titleSection);
+                }
+
                 // Add content area
                 const contentArea = document.createElement('div');
                 contentArea.className = 'content-area';
@@ -10902,6 +10930,11 @@
                 contentArea.innerHTML = chapter.content || '<p>Start typing...</p>';
                 contentArea.dataset.chapterId = chapter.id;
                 // Padding uses CSS default (3rem) now that title is gone
+
+                if (index > 0) {
+                    contentArea.style.paddingTop = '1rem';
+                }
+
                 contentArea.oninput = () => {
                     markUnsaved();
                     saveChapterContent(chapter.id);
@@ -11154,6 +11187,34 @@
                 if (ch.id === currentId) block.classList.add('active-focus');
                 block.id = `page-block-${ch.id}`;
 
+                // Add title section for subsequent pages (index > 0)
+                if (index > 0) {
+                    const titleSection = document.createElement('div');
+                    titleSection.className = 'paper-title'; // Re-use main title class for consistency
+                    titleSection.style.marginTop = '0';
+                    titleSection.style.marginBottom = '0';
+                    titleSection.style.borderBottom = '2px solid var(--accent-color)';
+                    titleSection.style.borderRadius = '4px 4px 0 0';
+                    titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
+
+                    const titleInput = document.createElement('input');
+                    titleInput.type = 'text';
+                    titleInput.value = ch.title || 'Untitled';
+                    titleInput.className = 'page-title-input';
+                    titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
+                    titleInput.placeholder = "Page title...";
+
+                    titleInput.oninput = () => {
+                        ch.title = titleInput.value;
+                        ch.lastEdited = new Date().toISOString();
+                        markUnsaved();
+                        saveChapterContent(ch.id);
+                    };
+
+                    titleSection.appendChild(titleInput);
+                    block.appendChild(titleSection);
+                }
+
                 // Add content area
                 const contentArea = document.createElement('div');
                 contentArea.className = 'content-area';
@@ -11161,8 +11222,10 @@
                 contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
                 contentArea.dataset.chapterId = ch.id;
 
-                // Remove manual padding so CSS takes over (or set small padding if needed)
-                // contentArea.style.paddingTop = '1.5rem'; 
+                // Adjust padding for subsequent pages if they have a title
+                if (index > 0) {
+                    contentArea.style.paddingTop = '1rem';
+                }
 
                 contentArea.oninput = () => {
                     markUnsaved();
