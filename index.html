@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Notebook - Engineering Math Pro</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -7486,17 +7486,50 @@
             showToast("Page Added to Stream");
         }
 
+        // IMPROVED SAVE QUEUE to prevent race conditions
         let saveTimers = {};
+        const saveQueue = new Set();
+        let saveInProgress = false;
+
         function debounceSave(chapter) {
+            markUnsaved();
+            updateWordCount();
+
+            // Add to queue
+            saveQueue.add(chapter.id);
+
+            // Clear existing timeout for this chapter
+            if (!saveTimers[chapter.id]) saveTimers[chapter.id] = null;
             clearTimeout(saveTimers[chapter.id]);
+
+            // Set new timeout
             saveTimers[chapter.id] = setTimeout(async () => {
-                await saveChapterToDB(chapter);
-                document.getElementById('saveStatus').innerText = "Saved";
+                if (!saveInProgress && saveQueue.has(chapter.id)) {
+                    saveInProgress = true;
+                    saveQueue.delete(chapter.id);
+                    try {
+                        await saveChapterToDB(chapter);
+                        document.getElementById('saveStatus').innerText = 'All changes saved';
+                        document.getElementById('saveStatus').style.color = 'var(--save-color)';
+                    } catch (error) {
+                        console.error('Save error:', error);
+                        document.getElementById('saveStatus').innerText = '⚠️ Save failed';
+                        document.getElementById('saveStatus').style.color = '#e74c3c';
+
+                        // Handle quota exceeded error
+                        if (error.name === 'QuotaExceededError') {
+                            showToast('⚠️ Storage full! Please delete old notes.');
+                        }
+                    } finally {
+                        saveInProgress = false;
+                    }
+                }
             }, 1000);
         }
 
         let saveTimeout;
         window.markUnsaved = () => { document.getElementById('saveStatus').innerText = "Saving..."; }
+
 
         window.saveCurrentToCloud = () => {
             const chapter = chapters.find(c => c.id === currentId);
@@ -7565,15 +7598,99 @@
             insertHtml(html + "<p><br></p>");
         };
 
-        function insertHtml(html) {
-            let active = document.activeElement;
-            if (!active || !active.closest('.content-area')) {
-                active = document.querySelector('.content-area');
-                active.focus();
+        // GLOBAL CURSOR TRACKING
+        let lastCursorPosition = null;
+        let lastActiveContentArea = null;
+
+        // Track cursor position whenever user clicks or types in a content area
+        document.addEventListener('click', (e) => {
+            const contentArea = e.target.closest('.content-area');
+            if (contentArea) {
+                lastActiveContentArea = contentArea;
+                saveCursorPosition();
             }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const contentArea = e.target.closest('.content-area');
+            if (contentArea) {
+                lastActiveContentArea = contentArea;
+                saveCursorPosition();
+            }
+        });
+
+        function saveCursorPosition() {
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+                lastCursorPosition = sel.getRangeAt(0).cloneRange();
+            }
+        }
+
+        function insertHtml(html) {
+            let targetArea = null;
+            let insertRange = null;
+
+            // Priority 1: Use saved cursor position if we have one
+            if (lastCursorPosition && lastActiveContentArea && document.contains(lastActiveContentArea)) {
+                targetArea = lastActiveContentArea;
+                insertRange = lastCursorPosition;
+            }
+            // Priority 2: Check current active element
+            else {
+                const active = document.activeElement;
+                if (active && active.closest('.content-area')) {
+                    targetArea = active.closest('.content-area');
+                } else {
+                    // Priority 3: Find the active-focus page
+                    const focusedBlock = document.querySelector('.sequence-editor-block.active-focus');
+                    if (focusedBlock) {
+                        targetArea = focusedBlock.querySelector('.content-area');
+                    } else {
+                        // Priority 4: Fallback to first content area
+                        targetArea = document.querySelector('.content-area');
+                    }
+                }
+            }
+
+            if (!targetArea) return;
+
+            // Focus the target area
+            targetArea.focus();
+
+            // If we have a saved range, restore it
+            if (insertRange && document.contains(insertRange.commonAncestorContainer)) {
+                try {
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(insertRange);
+                } catch (e) {
+                    console.warn('Could not restore cursor position:', e);
+                    // Move to end of content
+                    const range = document.createRange();
+                    range.selectNodeContents(targetArea);
+                    range.collapse(false);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            } else {
+                // Move cursor to end
+                const range = document.createRange();
+                range.selectNodeContents(targetArea);
+                range.collapse(false);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+
+            // Insert the HTML
             document.execCommand('insertHTML', false, html);
-            const block = active.closest('.content-area');
-            if (block && block.oninput) block.oninput();
+
+            // Trigger save
+            if (targetArea.oninput) targetArea.oninput();
+
+            // Save new cursor position
+            saveCursorPosition();
         }
 
         window.toggleTemplates = () => {
@@ -7699,9 +7816,9 @@
                             <p>• Draw diagrams in sketch mode</p>
                             <p>• Highlight key concepts</p>
                         </div>
-                        <div class="cornell-summary" contenteditable="false" id="cornellSummary">
+                        <div class="cornell-summary" contenteditable="true" id="cornellSummary">
                             <div class="cornell-summary-title">📝 Summary</div>
-                            <div style="font-size:0.85rem; opacity:0.6;">Write notes first (min 100 chars) to unlock this section</div>
+                            <p>Summarize the key concepts in 2-3 sentences...</p>
                         </div>
                         <div class="cornell-toolbar">
                             <button class="cornell-btn" onclick="extractCornellCue()">Extract Cue</button>
@@ -7972,6 +8089,24 @@
 
                         const feynmanSimple = document.getElementById('feynmanSimple');
                         if (feynmanSimple) feynmanSimple.addEventListener('input', checkFeynmanReadability);
+                    }, 100);
+                }
+
+                // Initialize outline template
+                if (key === 'outline') {
+                    setTimeout(() => {
+                        if (typeof initOutlineTemplate === 'function') {
+                            initOutlineTemplate();
+                        }
+                    }, 100);
+                }
+
+                // Initialize mindmap template
+                if (key === 'mindmap') {
+                    setTimeout(() => {
+                        if (typeof initMindmapTemplate === 'function') {
+                            initMindmapTemplate();
+                        }
                     }, 100);
                 }
 
@@ -10977,6 +11112,39 @@
         }
 
 
+        // Render tags in sidebar
+        function renderTagCloud() {
+            const tagCloud = document.getElementById('tagCloud');
+            if (!tagCloud) return;
+
+            const tagCounts = {};
+            chapters.forEach(chapter => {
+                if (chapter.tags && Array.isArray(chapter.tags)) {
+                    chapter.tags.forEach(tag => {
+                        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                    });
+                }
+            });
+
+            const sortedTags = Object.keys(tagCounts).sort();
+
+            if (sortedTags.length === 0) {
+                tagCloud.innerHTML = '<div style="opacity:0.5; padding:10px; text-align:center;">No tags yet</div>';
+                return;
+            }
+
+            tagCloud.innerHTML = sortedTags.map(tag => {
+                const count = tagCounts[tag];
+                return `
+                    <button class="tag-chip" onclick="loadStreamByTag('${tag.replace(/'/g, "\\'")}')" 
+                            style="margin:3px; cursor:pointer;" 
+                            title="${count} page${count > 1 ? 's' : ''}">
+                        ${tag} <span style="opacity:0.7; font-size:0.85em;">(${count})</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
         // Render the sidebar chapter list
         window.renderSidebar = () => {
             const list = document.getElementById('chapterList');
@@ -11060,6 +11228,9 @@
             if (filtered.length === 0) {
                 list.innerHTML = '<li style="opacity: 0.5; text-align: center; padding: 20px;">No pages found</li>';
             }
+
+            // Update tag cloud
+            renderTagCloud();
         };
 
         // Helper function to render a single chapter item
@@ -11644,6 +11815,437 @@
         };
 
         // ==================== END MISSING FUNCTIONS ====================
+
+        // ==================== MINDMAP TEMPLATE FUNCTIONS ====================
+
+        let mindmapState = {
+            nodes: [],
+            links: [],
+            linkingMode: false,
+            firstNode: null,
+            nextNodeId: 1
+        };
+
+        window.addMindmapNode = function () {
+            const canvas = document.getElementById('mindmapCanvas');
+            if (!canvas) return;
+
+            const nodeId = `mindmap-node-${mindmapState.nextNodeId++}`;
+            const node = document.createElement('div');
+            node.className = 'mindmap-node';
+            node.id = nodeId;
+            node.style.left = `${Math.random() * 60 + 20}%`;
+            node.style.top = `${Math.random() * 60 + 20}%`;
+            node.setAttribute('data-node-id', nodeId);
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = 'New Idea';
+            input.maxLength = 50;
+
+            node.appendChild(input);
+            canvas.appendChild(node);
+
+            // Make draggable
+            makeMindmapNodeDraggable(node);
+
+            // Add click handler for linking
+            node.addEventListener('click', (e) => {
+                if (mindmapState.linkingMode) {
+                    handleMindmapNodeClick(nodeId);
+                }
+            });
+
+            mindmapState.nodes.push({ id: nodeId, element: node });
+            showToast('Node added! Drag to reposition');
+        };
+
+        window.addMindmapLink = function () {
+            mindmapState.linkingMode = true;
+            mindmapState.firstNode = null;
+
+            // Highlight all nodes
+            const nodes = document.querySelectorAll('.mindmap-node');
+            nodes.forEach(n => n.classList.add('linkable'));
+
+            showToast('🔗 Linking mode: Click first node, then second node');
+        };
+
+        function handleMindmapNodeClick(nodeId) {
+            if (!mindmapState.firstNode) {
+                // First node selected
+                mindmapState.firstNode = nodeId;
+                const firstElement = document.getElementById(nodeId);
+                if (firstElement) {
+                    firstElement.classList.add('selected-for-link');
+                    // Setup drag-to-link
+                    setupDragToLink(firstElement, nodeId);
+                }
+                showToast('✓ First node selected. Drag to second node...');
+            } else {
+                // Second node selected - create link
+                const secondNode = nodeId;
+
+                if (mindmapState.firstNode === secondNode) {
+                    showToast('⚠️ Cannot link node to itself');
+                    return;
+                }
+
+                createMindmapLink(mindmapState.firstNode, secondNode);
+
+                // Reset linking mode
+                const nodes = document.querySelectorAll('.mindmap-node');
+                nodes.forEach(n => {
+                    n.classList.remove('linkable');
+                    n.classList.remove('selected-for-link');
+                });
+
+                mindmapState.linkingMode = false;
+                mindmapState.firstNode = null;
+            }
+        }
+
+        function createMindmapLink(fromId, toId) {
+            const canvas = document.getElementById('mindmapCanvas');
+            if (!canvas) return;
+
+            // Create SVG layer if it doesn't exist
+            let svg = canvas.querySelector('svg.mindmap-links');
+            if (!svg) {
+                svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.classList.add('mindmap-links');
+                svg.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1;';
+                canvas.insertBefore(svg, canvas.firstChild);
+            }
+
+            const fromNode = document.getElementById(fromId);
+            const toNode = document.getElementById(toId);
+
+            if (!fromNode || !toNode) return;
+
+            // Create link line
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.classList.add('mindmap-link');
+            line.setAttribute('data-from', fromId);
+            line.setAttribute('data-to', toId);
+            line.setAttribute('stroke', '#3498db');
+            line.setAttribute('stroke-width', '2');
+            line.style.pointerEvents = 'auto';
+            line.style.cursor = 'pointer';
+
+            // Add click to delete
+            line.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (confirm('Delete this link?')) {
+                    line.remove();
+                    mindmapState.links = mindmapState.links.filter(l =>
+                        !(l.from === fromId && l.to === toId)
+                    );
+                }
+            });
+
+            svg.appendChild(line);
+
+            mindmapState.links.push({ from: fromId, to: toId, element: line });
+
+            // Update line position
+            updateMindmapLink(line, fromNode, toNode);
+
+            showToast('✓ Link created!');
+        }
+
+        function updateMindmapLink(line, fromNode, toNode) {
+            const canvas = document.getElementById('mindmapCanvas');
+            if (!canvas) return;
+
+            const canvasRect = canvas.getBoundingClientRect();
+            const fromRect = fromNode.getBoundingClientRect();
+            const toRect = toNode.getBoundingClientRect();
+
+            const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+            const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+            const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+            const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+        }
+
+        function makeMindmapNodeDraggable(node) {
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            node.addEventListener('mousedown', function (e) {
+                // Don't drag if clicking input
+                if (e.target.tagName === 'INPUT') return;
+
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+
+                const style = window.getComputedStyle(node);
+                initialLeft = parseFloat(style.left);
+                initialTop = parseFloat(style.top);
+
+                node.style.zIndex = 100;
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function (e) {
+                if (!isDragging) return;
+
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+
+                node.style.left = `${initialLeft + dx}px`;
+                node.style.top = `${initialTop + dy}px`;
+
+                // Update all connected links
+                updateLinksForNode(node.id);
+            });
+
+            document.addEventListener('mouseup', function () {
+                if (isDragging) {
+                    isDragging = false;
+                    node.style.zIndex = 10;
+                }
+            });
+        }
+
+        function updateLinksForNode(nodeId) {
+            mindmapState.links.forEach(link => {
+                if (link.from === nodeId || link.to === nodeId) {
+                    const fromNode = document.getElementById(link.from);
+                    const toNode = document.getElementById(link.to);
+                    if (fromNode && toNode) {
+                        updateMindmapLink(link.element, fromNode, toNode);
+                    }
+                }
+            });
+        }
+
+        window.autoLayoutMindmap = function () {
+            const canvas = document.getElementById('mindmapCanvas');
+            if (!canvas) return;
+
+            const nodes = Array.from(canvas.querySelectorAll('.mindmap-node'));
+            const centerNode = nodes.find(n => n.classList.contains('central'));
+            const otherNodes = nodes.filter(n => !n.classList.contains('central'));
+
+            if (!centerNode) return;
+
+            // Position center node
+            centerNode.style.left = '50%';
+            centerNode.style.top = '50%';
+            centerNode.style.transform = 'translate(-50%, -50%)';
+
+            // Arrange other nodes in a circle
+            const radius = 200; // pixels
+            const angleStep = (2 * Math.PI) / otherNodes.length;
+
+            otherNodes.forEach((node, index) => {
+                const angle = index * angleStep;
+                const x = 50 + (radius * Math.cos(angle)) / canvas.clientWidth * 100; // Convert to %
+                const y = 50 + (radius * Math.sin(angle)) / canvas.clientHeight * 100;
+
+                node.style.left = `${x}%`;
+                node.style.top = `${y}%`;
+                node.style.transform = 'translate(-50%, -50%)';
+            });
+
+            // Update all links
+            mindmapState.links.forEach(link => {
+                const fromNode = document.getElementById(link.from);
+                const toNode = document.getElementById(link.to);
+                if (fromNode && toNode) {
+                    updateMindmapLink(link.element, fromNode, toNode);
+                }
+            });
+
+            showToast('🎨 Layout organized!');
+        };
+
+        // Initialize mindmap when template is loaded
+        window.initMindmapTemplate = function () {
+            const canvas = document.getElementById('mindmapCanvas');
+            if (!canvas) return;
+
+            // Make all existing nodes (including central node) draggable
+            const existingNodes = canvas.querySelectorAll('.mindmap-node');
+            existingNodes.forEach(node => {
+                if (!node.id) {
+                    node.id = `mindmap-node-${mindmapState.nextNodeId++}`;
+                }
+                makeMindmapNodeDraggable(node);
+
+                // Add click handler for linking
+                node.addEventListener('click', (e) => {
+                    if (mindmapState.linkingMode) {
+                        handleMindmapNodeClick(node.id);
+                    }
+                });
+
+                mindmapState.nodes.push({ id: node.id, element: node });
+            });
+
+            console.log('Mindmap template initialized - all nodes are draggable');
+        };
+
+        // ==================== OUTLINE TEMPLATE FUNCTIONS ====================
+
+        // Outline label generators for each level
+        const outlineLabelGenerators = {
+            1: (index) => ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][index] || `${index + 1}`,
+            2: (index) => String.fromCharCode(65 + index), // A, B, C, ...
+            3: (index) => `${index + 1}`, // 1, 2, 3, ...
+            4: (index) => String.fromCharCode(97 + index) // a, b, c, ...
+        };
+
+        // Initialize outline functionality when template is loaded
+        window.initOutlineTemplate = function () {
+            const outlineContent = document.getElementById('outlineContent');
+            if (!outlineContent) return;
+
+            // Add keyboard event handler
+            outlineContent.addEventListener('keydown', handleOutlineKeydown);
+
+            console.log('Outline template initialized');
+        };
+
+        function handleOutlineKeydown(e) {
+            const outlineContent = e.currentTarget;
+            const selection = window.getSelection();
+            const currentNode = selection.anchorNode;
+
+            // Find the current outline item
+            let currentItem = currentNode;
+            while (currentItem && !currentItem.classList?.contains('outline-item')) {
+                currentItem = currentItem.parentElement;
+            }
+
+            if (!currentItem) return;
+
+            // Handle Enter key - create new item at same level
+            if (e.key === 'Enter') {
+                e.preventDefault();
+
+                const currentLevel = parseInt(currentItem.className.match(/level-(\d)/)?.[1] || '1');
+                const newItem = document.createElement('div');
+                newItem.className = `outline-item level-${currentLevel}`;
+
+                const label = document.createElement('span');
+                label.className = 'outline-label';
+                label.textContent = getNextLabel(currentItem, currentLevel);
+
+                newItem.appendChild(label);
+                newItem.appendChild(document.createTextNode(' '));
+
+                currentItem.parentNode.insertBefore(newItem, currentItem.nextSibling);
+
+                // Move cursor to new item
+                const range = document.createRange();
+                range.selectNodeContents(newItem);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+
+                // Renumber all items
+                renumberOutline(outlineContent);
+            }
+            // Handle Tab - increase indent
+            else if (e.key === 'Tab' && !e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const currentLevel = parseInt(currentItem.className.match(/level-(\d)/)?.[1] || '1');
+                if (currentLevel < 4) {
+                    currentItem.className = `outline-item level-${currentLevel + 1}`;
+                    renumberOutline(outlineContent);
+                }
+                return false;
+            }
+            // Handle Shift+Tab - decrease indent
+            else if (e.key === 'Tab' && e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const currentLevel = parseInt(currentItem.className.match(/level-(\d)/)?.[1] || '1');
+                if (currentLevel > 1) {
+                    currentItem.className = `outline-item level-${currentLevel - 1}`;
+                    renumberOutline(outlineContent);
+                }
+                return false;
+            }
+        }
+
+        function getNextLabel(currentItem, level) {
+            // Get all items at the same level after this one
+            const allItems = Array.from(currentItem.parentElement.querySelectorAll('.outline-item'));
+            const currentIndex = allItems.indexOf(currentItem);
+
+            // Count items at this level up to current
+            let count = 0;
+            for (let i = 0; i <= currentIndex; i++) {
+                const itemLevel = parseInt(allItems[i].className.match(/level-(\d)/)?.[1] || '1');
+                if (itemLevel === level) count++;
+            }
+
+            const generator = outlineLabelGenerators[level];
+            return generator ? generator(count) + '.' : `${count + 1}.`;
+        }
+
+        function renumberOutline(container) {
+            const items = Array.from(container.querySelectorAll('.outline-item'));
+            const counters = { 1: 0, 2: 0, 3: 0, 4: 0 };
+
+            items.forEach(item => {
+                const level = parseInt(item.className.match(/level-(\d)/)?.[1] || '1');
+
+                // Reset deeper level counters
+                for (let l = level + 1; l <= 4; l++) {
+                    counters[l] = 0;
+                }
+
+                // Increment current level counter
+                counters[level]++;
+
+                // Update label
+                const label = item.querySelector('.outline-label');
+                if (label) {
+                    const generator = outlineLabelGenerators[level];
+                    label.textContent = generator ? generator(counters[level] - 1) + '.' : `${counters[level]}.`;
+                }
+            });
+        }
+
+        window.collapseAllOutline = function () {
+            const container = document.getElementById('outlineContent');
+            if (!container) return;
+
+            const items = container.querySelectorAll('.outline-item');
+            items.forEach(item => {
+                const level = parseInt(item.className.match(/level-(\d)/)?.[1] || '1');
+                if (level > 1) {
+                    item.style.display = 'none';
+                }
+            });
+
+            showToast('Collapsed to level 1');
+        };
+
+        window.expandAllOutline = function () {
+            const container = document.getElementById('outlineContent');
+            if (!container) return;
+
+            const items = container.querySelectorAll('.outline-item');
+            items.forEach(item => {
+                item.style.display = 'block';
+            });
+
+            showToast('Expanded all levels');
+        };
 
         // Initialize the application
         async function initApp() {

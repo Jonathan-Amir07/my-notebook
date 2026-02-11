@@ -12,6 +12,7 @@ class CircuitSimulator {
             resistor: { resistance: 100, unit: 'Ω', minCurrent: 0 },
             battery: { voltage: 9, unit: 'V' },
             led: { threshold: 0.02, unit: 'A', forwardVoltage: 2 },
+            diode: { forwardVoltage: 0.7, resistance: 1 }, // Diode: only allows forward direction
             bulb: { threshold: 0.05, unit: 'A', resistance: 10 },
             switch: { closed: true },
             ammeter: { resistance: 0 },
@@ -157,7 +158,9 @@ class CircuitSimulator {
 
             // Calculate total resistance in path
             let totalResistance = 0;
-            path.forEach(p => {
+            let hasReverseBiasedDiode = false; // Track if current fights flow in reverse through diode
+
+            path.forEach((p, idx) => {
                 const comp = this.components.get(p.componentId);
                 if (comp) {
                     if (comp.type === 'resistor') {
@@ -166,6 +169,29 @@ class CircuitSimulator {
                         totalResistance += comp.resistance;
                     } else if (comp.type === 'led') {
                         totalResistance += 50; // Assume 50Ω for LED
+                    } else if (comp.type === 'diode') {
+                        // Check if diode is forward or reverse biased
+                        // Diode symbol points from positive to negative (left to right in circuit)
+                        // Current flows in direction of arrow (positive to negative)
+
+                        // Get entry connection point
+                        const prevComp = idx > 0 ? path[idx - 1].componentId : battery.id;
+                        const wireData = this.wires.get(p.wireId);
+
+                        if (wireData) {
+                            // Determine direction: is current entering from left/top (forward) or right/bottom (reverse)?
+                            const entryPoint = wireData.comp1 === comp.id ? wireData.point1 : wireData.point2;
+
+                            // Forward bias: current enters from left or top (anode side)
+                            const isForwardBiased = (entryPoint === 'left' || entryPoint === 'top');
+
+                            if (isForwardBiased) {
+                                totalResistance += comp.resistance; // Small resistance when forward biased
+                            } else {
+                                // Reverse biased - diode blocks current
+                                hasReverseBiasedDiode = true;
+                            }
+                        }
                     } else if (comp.type === 'ammeter') {
                         totalResistance += 0.01; // Tiny resistance for Ammeter
                     } else if (comp.type === 'voltmeter') {
@@ -173,6 +199,12 @@ class CircuitSimulator {
                     }
                 }
             });
+
+            // If there's a reverse-biased diode, no current flows
+            if (hasReverseBiasedDiode) {
+                console.log('Path has reverse-biased diode - no current');
+                return;
+            }
 
             // Minimum resistance to prevent division by zero
             if (totalResistance < 0.1) totalResistance = 0.1;
