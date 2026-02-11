@@ -3222,7 +3222,7 @@
 
         /* Remove gaps between sequential blocks */
         .sequence-editor-block {
-            margin-bottom: 0 !important;
+            margin-bottom: 4rem !important;
             padding: 0 !important;
             background: transparent !important;
         }
@@ -4906,7 +4906,7 @@
 
             <!-- NEW CONTROLS AT END OF STREAM (OUTSIDE PAPER) -->
             <div id="streamControls">
-                <button class="btn-stream-add" onclick="addSequentialPage()">
+                <button class="btn-stream-add" onclick="addPageToStream()">
                     ➕ Add Page to Stream
                 </button>
             </div>
@@ -11154,32 +11154,16 @@
                 if (ch.id === currentId) block.classList.add('active-focus');
                 block.id = `page-block-${ch.id}`;
 
-                // Add title section for each page
-                const titleSection = document.createElement('div');
-                titleSection.style.cssText = 'padding: 1.5rem 2.5rem 0.5rem 2.5rem; border-bottom: 1px solid rgba(0,0,0,0.1);';
-
-                const titleInput = document.createElement('input');
-                titleInput.type = 'text';
-                titleInput.value = ch.title || 'Untitled';
-                titleInput.className = 'page-title-input';
-                titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 1.5rem; font-weight: 600; color: var(--ink-color); outline: none; font-family: inherit;';
-                titleInput.oninput = () => {
-                    ch.title = titleInput.value;
-                    ch.lastEdited = new Date().toISOString();
-                    markUnsaved();
-                    saveChapterContent(ch.id);
-                };
-
-                titleSection.appendChild(titleInput);
-                block.appendChild(titleSection);
-
                 // Add content area
                 const contentArea = document.createElement('div');
                 contentArea.className = 'content-area';
                 contentArea.contentEditable = 'true';
                 contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
                 contentArea.dataset.chapterId = ch.id;
-                contentArea.style.paddingTop = '1.5rem'; // Adjust padding since title is separate
+
+                // Remove manual padding so CSS takes over (or set small padding if needed)
+                // contentArea.style.paddingTop = '1.5rem'; 
+
                 contentArea.oninput = () => {
                     markUnsaved();
                     saveChapterContent(ch.id);
