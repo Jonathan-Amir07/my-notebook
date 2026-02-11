@@ -35,9 +35,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Notebook">
-    <link rel="icon" id="appIcon" href="">
-    <link rel="apple-touch-icon" id="appleIcon" href="">
-    <link rel="manifest" id="appManifest" href="">
+    <link rel="icon" id="appIcon" href="assets/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" id="appleIcon" href="assets/icon.svg">
+    <link rel="manifest" id="appManifest" href="manifest.json">
 
     <style>
         :root {
@@ -3022,7 +3022,7 @@
             background: rgba(0, 0, 0, 0.02);
             /* Subtle background for light mode */
             font-family: inherit;
-            margin-bottom: 2rem;
+            margin-bottom: 0;
             color: var(--ink-color);
             padding: 0.5rem;
             border-radius: 4px 4px 0 0;
@@ -3068,26 +3068,13 @@
             background-image: none;
             min-height: 1123px;
             /* Full A4 height */
-            padding: 3rem 2.5rem;
+            padding: 1rem 2.5rem 3rem 2.5rem;
             /* Realistic page margins */
             margin: 0;
         }
 
         /* Add page number indicator */
-        .sequence-editor-block::before {
-            content: 'Page';
-            position: absolute;
-            top: -2rem;
-            left: 0;
-            background: var(--accent-color);
-            color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            opacity: 0.7;
-            z-index: 10;
-        }
+
 
         /* Paper texture effect */
         .sequence-editor-block::after {
@@ -10908,32 +10895,13 @@
                 if (chapter.id === currentId) block.classList.add('active-focus');
                 block.id = `page-block-${chapter.id}`;
 
-                // Add title section for each page
-                const titleSection = document.createElement('div');
-                titleSection.style.cssText = 'padding: 1.5rem 2.5rem 0.5rem 2.5rem; border-bottom: 1px solid rgba(0,0,0,0.1);';
-
-                const titleInput = document.createElement('input');
-                titleInput.type = 'text';
-                titleInput.value = chapter.title || 'Untitled';
-                titleInput.className = 'page-title-input';
-                titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 1.5rem; font-weight: 600; color: var(--ink-color); outline: none; font-family: inherit;';
-                titleInput.oninput = () => {
-                    chapter.title = titleInput.value;
-                    chapter.lastEdited = new Date().toISOString();
-                    markUnsaved();
-                    saveChapterContent(chapter.id);
-                };
-
-                titleSection.appendChild(titleInput);
-                block.appendChild(titleSection);
-
                 // Add content area
                 const contentArea = document.createElement('div');
                 contentArea.className = 'content-area';
                 contentArea.contentEditable = 'true';
                 contentArea.innerHTML = chapter.content || '<p>Start typing...</p>';
                 contentArea.dataset.chapterId = chapter.id;
-                contentArea.style.paddingTop = '1.5rem'; // Adjust padding since title is separate
+                // Padding uses CSS default (3rem) now that title is gone
                 contentArea.oninput = () => {
                     markUnsaved();
                     saveChapterContent(chapter.id);
