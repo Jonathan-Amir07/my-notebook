@@ -4801,6 +4801,23 @@
 
             <hr style="opacity: 0.2;">
 
+            <!-- PHASE 1 ADVANCED FEATURES -->
+            <button class="tool-btn" id="lassoBtn" onclick="toggleLassoSelection()"><span>⭕</span> Lasso Select</button>
+            <button class="tool-btn" id="shapeRecBtn" onclick="toggleShapeRecognition()"><span>🟦</span> Shape
+                Fix</button>
+            <small style="opacity: 0.6; font-size: 0.7rem; margin: -5px 0 5px 5px; display: block;">Zoom: Fixed btns
+                bottom-right</small>
+
+            <hr style="opacity: 0.2;">
+
+            <!-- PHASE 2 ADVANCED FEATURES -->
+            <button class="tool-btn" id="audioRecordBtn" onclick="startAudioRecording()"><span>🎙️</span> Record
+                Audio</button>
+            <button class="tool-btn" id="audioTranscribeBtn" onclick="startAudioWithTranscription()"><span>🎤📝</span>
+                Record + Transcribe</button>
+
+            <hr style="opacity: 0.2;">
+
             <!-- Standard Block Tools -->
             <button class="tool-btn" onclick="insertBlock('header')"><span>🏷️</span> Title</button>
             <button class="tool-btn" onclick="insertBlock('note')"><span>📌</span> Note</button>
@@ -11008,32 +11025,140 @@
             showToast('✓ Page added to stream');
         };
 
-        // Load all pages with the same tag into the stream (MULTI-PAGE VIEW)
-        window.loadStreamByTag = (tag) => {
-            const stream = document.getElementById('sequentialStream');
-            const titleInput = document.getElementById('pageTitle');
+        // ===== VIRTUAL SCROLLING MANAGER =====
+        // Manages efficient rendering of large page streams by only rendering visible pages
+        class VirtualScrollManager {
+            constructor(container, chapters, currentId) {
+                this.container = container;
+                this.chapters = chapters;
+                this.currentId = currentId;
+                this.renderedPages = new Map();
+                this.placeholders = new Map();
+                this.observer = null;
+                this.bufferSize = 3; // Number of pages to render before/after viewport
+                this.estimatedPageHeight = 800; // Estimated height per page in pixels
+            }
 
-            // Find all chapters with this tag
-            const taggedChapters = tag
-                ? chapters.filter(ch => ch.tags && ch.tags.includes(tag))
-                : [chapters.find(c => c.id === currentId)];
+            init() {
+                // Clear container
+                this.container.innerHTML = '';
 
-            if (taggedChapters.length === 0) return;
+                // Create placeholders for all pages
+                this.chapters.forEach((chapter, index) => {
+                    const placeholder = this.createPlaceholder(chapter, index);
+                    this.placeholders.set(chapter.id, placeholder);
+                    this.container.appendChild(placeholder);
+                });
 
-            // Use DocumentFragment for efficient rendering
-            const fragment = document.createDocumentFragment();
+                // Set up Intersection Observer
+                this.setupObserver();
 
-            taggedChapters.forEach((chapter, index) => {
-                // Create page block
+                // Render initial visible pages (first 5-7 pages)
+                const initialRenderCount = Math.min(5, this.chapters.length);
+                for (let i = 0; i < initialRenderCount; i++) {
+                    this.renderPage(i);
+                }
+            }
+
+            createPlaceholder(chapter, index) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'page-placeholder';
+                placeholder.dataset.chapterId = chapter.id;
+                placeholder.dataset.index = index;
+                placeholder.style.minHeight = `${this.estimatedPageHeight}px`;
+                placeholder.style.background = 'transparent';
+                return placeholder;
+            }
+
+            setupObserver() {
+                const options = {
+                    root: null, // Use viewport
+                    rootMargin: `${this.estimatedPageHeight * this.bufferSize}px`, // Buffer zone
+                    threshold: 0
+                };
+
+                this.observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        const index = parseInt(entry.target.dataset.index);
+
+                        if (entry.isIntersecting) {
+                            // Page placeholder is entering viewport - render it
+                            this.renderPage(index);
+                        } else {
+                            // Page is far from viewport - can unrender to save memory
+                            // Only unrender if it's far enough (not just slightly out of view)
+                            const rect = entry.target.getBoundingClientRect();
+                            const viewportHeight = window.innerHeight;
+                            const distanceFromViewport = Math.min(
+                                Math.abs(rect.top),
+                                Math.abs(rect.bottom - viewportHeight)
+                            );
+
+                            // Only unrender if more than 3 viewport heights away
+                            if (distanceFromViewport > viewportHeight * 3) {
+                                this.unrenderPage(index);
+                            }
+                        }
+                    });
+                }, options);
+
+                // Observe all placeholders
+                this.placeholders.forEach(placeholder => {
+                    this.observer.observe(placeholder);
+                });
+            }
+
+            renderPage(index) {
+                const chapter = this.chapters[index];
+                if (!chapter || this.renderedPages.has(chapter.id)) return;
+
+                const placeholder = this.placeholders.get(chapter.id);
+                if (!placeholder) return;
+
+                // Create the actual page block
+                const block = this.createPageBlock(chapter, index);
+
+                // Replace placeholder with actual content
+                placeholder.replaceWith(block);
+                this.placeholders.set(chapter.id, block);
+                this.renderedPages.set(chapter.id, block);
+
+                // Continue observing the actual block
+                this.observer.observe(block);
+            }
+
+            unrenderPage(index) {
+                const chapter = this.chapters[index];
+                if (!chapter || !this.renderedPages.has(chapter.id)) return;
+
+                const renderedBlock = this.renderedPages.get(chapter.id);
+
+                // Create placeholder based on actual rendered height
+                const actualHeight = renderedBlock.offsetHeight;
+                const placeholder = this.createPlaceholder(chapter, index);
+                placeholder.style.minHeight = `${actualHeight}px`;
+
+                // Replace rendered content with placeholder
+                renderedBlock.replaceWith(placeholder);
+                this.placeholders.set(chapter.id, placeholder);
+                this.renderedPages.delete(chapter.id);
+
+                // Observe the placeholder again
+                this.observer.observe(placeholder);
+            }
+
+            createPageBlock(chapter, index) {
                 const block = document.createElement('div');
                 block.className = 'sequence-editor-block';
-                if (chapter.id === currentId) block.classList.add('active-focus');
+                if (chapter.id === this.currentId) block.classList.add('active-focus');
                 block.id = `page-block-${chapter.id}`;
+                block.dataset.chapterId = chapter.id;
+                block.dataset.index = index;
 
                 // Add title section for subsequent pages (index > 0)
-                if (index > 0) {
+                if (0 < index) {
                     const titleSection = document.createElement('div');
-                    titleSection.className = 'paper-title'; // Re-use main title class
+                    titleSection.className = 'paper-title';
                     titleSection.style.marginTop = '0';
                     titleSection.style.marginBottom = '0';
                     titleSection.style.borderBottom = '2px solid var(--accent-color)';
@@ -11062,9 +11187,8 @@
                 const contentArea = document.createElement('div');
                 contentArea.className = 'content-area';
                 contentArea.contentEditable = 'true';
-                contentArea.innerHTML = chapter.content || '<p>Start typing...</p>';
+                contentArea.innerHTML = chapter.content || '&lt;p&gt;Start typing...&lt;/p&gt;';
                 contentArea.dataset.chapterId = chapter.id;
-                // Padding uses CSS default (3rem) now that title is gone
 
                 if (index > 0) {
                     contentArea.style.paddingTop = '1rem';
@@ -11079,12 +11203,115 @@
                 setupAutoCheckbox(contentArea);
 
                 block.appendChild(contentArea);
-                fragment.appendChild(block);
-            });
+                return block;
+            }
 
-            // Update DOM
-            stream.innerHTML = '';
-            stream.appendChild(fragment);
+            destroy() {
+                if (this.observer) {
+                    this.observer.disconnect();
+                    this.observer = null;
+                }
+                this.renderedPages.clear();
+                this.placeholders.clear();
+            }
+        }
+
+        // Store current virtual scroll manager instance
+        let currentVirtualScrollManager = null;
+
+
+        // Load all pages with the same tag into the stream (MULTI-PAGE VIEW)
+        window.loadStreamByTag = (tag) => {
+            const stream = document.getElementById('sequentialStream');
+            const titleInput = document.getElementById('pageTitle');
+
+            // Find all chapters with this tag
+            const taggedChapters = tag
+                ? chapters.filter(ch => ch.tags && ch.tags.includes(tag))
+                : [chapters.find(c => c.id === currentId)];
+
+            if (taggedChapters.length === 0) return;
+
+            // Destroy previous virtual scroll manager if it exists
+            if (currentVirtualScrollManager) {
+                currentVirtualScrollManager.destroy();
+            }
+
+            // Use Virtual Scrolling for performance with large page sets
+            if (taggedChapters.length > 10) {
+                // Enable virtual scrolling for streams with more than 10 pages
+                currentVirtualScrollManager = new VirtualScrollManager(stream, taggedChapters, currentId);
+                currentVirtualScrollManager.init();
+            } else {
+                // For small page sets, render normally (no virtual scrolling overhead)
+                currentVirtualScrollManager = null;
+
+                // Use DocumentFragment for efficient rendering
+                const fragment = document.createDocumentFragment();
+
+                taggedChapters.forEach((chapter, index) => {
+                    // Create page block
+                    const block = document.createElement('div');
+                    block.className = 'sequence-editor-block';
+                    if (chapter.id === currentId) block.classList.add('active-focus');
+                    block.id = `page-block-${chapter.id}`;
+
+                    // Add title section for subsequent pages (index > 0)
+                    if (0 < index) {
+                        const titleSection = document.createElement('div');
+                        titleSection.className = 'paper-title'; // Re-use main title class
+                        titleSection.style.marginTop = '0';
+                        titleSection.style.marginBottom = '0';
+                        titleSection.style.borderBottom = '2px solid var(--accent-color)';
+                        titleSection.style.borderRadius = '4px 4px 0 0';
+                        titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
+
+                        const titleInput = document.createElement('input');
+                        titleInput.type = 'text';
+                        titleInput.value = chapter.title || 'Untitled';
+                        titleInput.className = 'page-title-input';
+                        titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
+                        titleInput.placeholder = "Page title...";
+
+                        titleInput.oninput = () => {
+                            chapter.title = titleInput.value;
+                            chapter.lastEdited = new Date().toISOString();
+                            markUnsaved();
+                            saveChapterContent(chapter.id);
+                        };
+
+                        titleSection.appendChild(titleInput);
+                        block.appendChild(titleSection);
+                    }
+
+                    // Add content area
+                    const contentArea = document.createElement('div');
+                    contentArea.className = 'content-area';
+                    contentArea.contentEditable = 'true';
+                    contentArea.innerHTML = chapter.content || '<p>Start typing...</p>';
+                    contentArea.dataset.chapterId = chapter.id;
+                    // Padding uses CSS default (3rem) now that title is gone
+
+                    if (0 < index) {
+                        contentArea.style.paddingTop = '1rem';
+                    }
+
+                    contentArea.oninput = () => {
+                        markUnsaved();
+                        saveChapterContent(chapter.id);
+                    };
+
+                    // Enable auto-checkbox functionality
+                    setupAutoCheckbox(contentArea);
+
+                    block.appendChild(contentArea);
+                    fragment.appendChild(block);
+                });
+
+                // Update DOM
+                stream.innerHTML = '';
+                stream.appendChild(fragment);
+            }
             titleInput.value = taggedChapters[0].title || 'Untitled';
 
             // Update current ID to first chapter in stream
@@ -11347,70 +11574,85 @@
 
             // Clear and recreate DOM with all related pages
             const stream = document.getElementById('sequentialStream');
-            stream.innerHTML = '';
 
-            // Use DocumentFragment for efficient rendering
-            const fragment = document.createDocumentFragment();
+            // Destroy previous virtual scroll manager if it exists
+            if (currentVirtualScrollManager) {
+                currentVirtualScrollManager.destroy();
+            }
 
-            relatedChapters.forEach((ch, index) => {
-                const block = document.createElement('div');
-                block.className = 'sequence-editor-block';
-                if (ch.id === currentId) block.classList.add('active-focus');
-                block.id = `page-block-${ch.id}`;
+            // Use Virtual Scrolling for performance with large page sets
+            if (relatedChapters.length > 10) {
+                // Enable virtual scrolling for streams with more than 10 pages
+                currentVirtualScrollManager = new VirtualScrollManager(stream, relatedChapters, currentId);
+                currentVirtualScrollManager.init();
+            } else {
+                // For small page sets, render normally (no virtual scrolling overhead)
+                currentVirtualScrollManager = null;
+                stream.innerHTML = '';
 
-                // Add title section for subsequent pages (index > 0)
-                if (index > 0) {
-                    const titleSection = document.createElement('div');
-                    titleSection.className = 'paper-title'; // Re-use main title class for consistency
-                    titleSection.style.marginTop = '0';
-                    titleSection.style.marginBottom = '0';
-                    titleSection.style.borderBottom = '2px solid var(--accent-color)';
-                    titleSection.style.borderRadius = '4px 4px 0 0';
-                    titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
+                // Use DocumentFragment for efficient rendering
+                const fragment = document.createDocumentFragment();
 
-                    const titleInput = document.createElement('input');
-                    titleInput.type = 'text';
-                    titleInput.value = ch.title || 'Untitled';
-                    titleInput.className = 'page-title-input';
-                    titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
-                    titleInput.placeholder = "Page title...";
+                relatedChapters.forEach((ch, index) => {
+                    const block = document.createElement('div');
+                    block.className = 'sequence-editor-block';
+                    if (ch.id === currentId) block.classList.add('active-focus');
+                    block.id = `page-block-${ch.id}`;
 
-                    titleInput.oninput = () => {
-                        ch.title = titleInput.value;
-                        ch.lastEdited = new Date().toISOString();
+                    // Add title section for subsequent pages (index > 0)
+                    if (index > 0) {
+                        const titleSection = document.createElement('div');
+                        titleSection.className = 'paper-title'; // Re-use main title class for consistency
+                        titleSection.style.marginTop = '0';
+                        titleSection.style.marginBottom = '0';
+                        titleSection.style.borderBottom = '2px solid var(--accent-color)';
+                        titleSection.style.borderRadius = '4px 4px 0 0';
+                        titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
+
+                        const titleInput = document.createElement('input');
+                        titleInput.type = 'text';
+                        titleInput.value = ch.title || 'Untitled';
+                        titleInput.className = 'page-title-input';
+                        titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
+                        titleInput.placeholder = "Page title...";
+
+                        titleInput.oninput = () => {
+                            ch.title = titleInput.value;
+                            ch.lastEdited = new Date().toISOString();
+                            markUnsaved();
+                            saveChapterContent(ch.id);
+                        };
+
+                        titleSection.appendChild(titleInput);
+                        block.appendChild(titleSection);
+                    }
+
+                    // Add content area
+                    const contentArea = document.createElement('div');
+                    contentArea.className = 'content-area';
+                    contentArea.contentEditable = 'true';
+                    contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
+                    contentArea.dataset.chapterId = ch.id;
+
+                    // Adjust padding for subsequent pages if they have a title
+                    if (index > 0) {
+                        contentArea.style.paddingTop = '1rem';
+                    }
+
+                    contentArea.oninput = () => {
                         markUnsaved();
                         saveChapterContent(ch.id);
                     };
 
-                    titleSection.appendChild(titleInput);
-                    block.appendChild(titleSection);
-                }
+                    // Enable auto-checkbox functionality
+                    setupAutoCheckbox(contentArea);
 
-                // Add content area
-                const contentArea = document.createElement('div');
-                contentArea.className = 'content-area';
-                contentArea.contentEditable = 'true';
-                contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
-                contentArea.dataset.chapterId = ch.id;
+                    block.appendChild(contentArea);
+                    fragment.appendChild(block);
+                });
 
-                // Adjust padding for subsequent pages if they have a title
-                if (index > 0) {
-                    contentArea.style.paddingTop = '1rem';
-                }
-
-                contentArea.oninput = () => {
-                    markUnsaved();
-                    saveChapterContent(ch.id);
-                };
-
-                // Enable auto-checkbox functionality
-                setupAutoCheckbox(contentArea);
-
-                block.appendChild(contentArea);
-                fragment.appendChild(block);
-            });
-
-            stream.appendChild(fragment);
+                stream.appendChild(fragment);
+            }
 
             // Update UI
             updateToolVisibility(chapter);
@@ -12343,11 +12585,249 @@
                 // Switch to basic math tab
                 switchMathTab('basic');
 
+                // PHASE 1: Initialize Advanced Features
+                initializeAdvancedFeatures();
+
             } catch (err) {
                 console.error('Error initializing app:', err);
                 showToast('Error loading application. Please refresh.');
             }
         }
+
+        // ========== PHASE 1: ADVANCED FEATURES ==========
+        let lassoSelector = null;
+        let shapeRecognizer = null;
+        let zoomManager = null;
+
+        function initializeAdvancedFeatures() {
+            try {
+                // Initialize Lasso Selection
+                lassoSelector = new LassoSelector();
+                lassoSelector.initialize();
+
+                // Initialize Shape Recognition
+                shapeRecognizer = new ShapeRecognizer();
+                shapeRecognizer.initialize();
+                shapeRecognizer.setSensitivity('moderate');
+
+                // Initialize Zoom Manager
+                zoomManager = new ZoomManager();
+                zoomManager.initialize();
+
+                // Enable zoom for the main paper area by default
+                const mainPaper = document.getElementById('sequentialStream');
+                if (mainPaper) {
+                    zoomManager.enableZoomForElement(mainPaper);
+                }
+
+                console.log('✅ Advanced Features initialized successfully');
+            } catch (err) {
+                console.error('Error initializing advanced features:', err);
+            }
+        }
+
+        function toggleLassoSelection() {
+            if (!lassoSelector) {
+                showToast('Lasso tool not available');
+                return;
+            }
+
+            const isActive = lassoSelector.toggleLassoMode();
+            const btn = document.getElementById('lassoBtn');
+
+            if (isActive) {
+                btn.style.background = '#3498db';
+                btn.style.color = 'white';
+                showToast('Lasso Selection Active - Draw to select elements');
+            } else {
+                btn.style.background = '';
+                btn.style.color = '';
+                showToast('Lasso Selection Disabled');
+            }
+        }
+
+        function toggleShapeRecognition() {
+            if (!shapeRecognizer) {
+                showToast('Shape recognition not available');
+                return;
+            }
+
+            shapeRecognizer.isEnabled = !shapeRecognizer.isEnabled;
+            const btn = document.getElementById('shapeRecBtn');
+
+            if (shapeRecognizer.isEnabled) {
+                btn.style.background = '#9b59b6';
+                btn.style.color = 'white';
+                showToast('Shape Recognition ON - Draw shapes to auto-correct');
+
+                // Connect shape recognition to drawing system
+                connectShapeRecognition();
+            } else {
+                btn.style.background = '';
+                btn.style.color = '';
+                showToast('Shape Recognition OFF');
+            }
+        }
+
+        function connectShapeRecognition() {
+            // This function will integrate shape recognition with the existing drawing system
+            // When a stroke ends, analyze it for shapes
+
+            // Hook into the existing sketch canvas system
+            shapeRecognizer.onShapeDetected = (shapeResult) => {
+                // When a shape is accepted, draw it on the canvas
+                drawPerfectShape(shapeResult);
+                showToast(`${shapeResult.type} detected and corrected!`);
+            };
+        }
+
+        function drawPerfectShape(shapeResult) {
+            // Get the active canvas context
+            const canvas = document.querySelector('canvas.active, canvas');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const bounds = shapeResult.params.bounds || shapeResult.params;
+
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (shapeResult.type === 'circle') {
+                const { center, radius } = shapeResult.params;
+                ctx.beginPath();
+                ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI);
+                ctx.stroke();
+            } else if (shapeResult.type === 'rectangle' || shapeResult.type === 'square') {
+                const { bounds } = shapeResult.params;
+                ctx.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
+            } else if (shapeResult.type === 'line') {
+                const { start, end } = shapeResult.params;
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+        }
+
+        // ========== END PHASE 1 ADVANCED FEATURES ==========
+
+        // ========== PHASE 2: AUDIO RECORDING ==========
+        let audioRecorder = null;
+
+        // Update initializeAdvancedFeatures to include audio recorder
+        const originalInitAdvanced = initializeAdvancedFeatures;
+        initializeAdvancedFeatures = function () {
+            originalInitAdvanced();
+
+            // Initialize Audio Recorder
+            try {
+                audioRecorder = new AudioRecorder();
+                audioRecorder.initialize();
+                console.log('✅ Audio Recorder initialized');
+            } catch (err) {
+                console.error('Error initializing audio recorder:', err);
+            }
+        };
+
+        async function startAudioRecording() {
+            if (!audioRecorder) {
+                showToast('Audio recorder not available');
+                return;
+            }
+
+            if (audioRecorder.isRecording) {
+                showToast('Already recording!');
+                return;
+            }
+
+            const success = await audioRecorder.startRecording(false);
+
+            if (success) {
+                document.getElementById('audioRecordBtn').style.background = '#e74c3c';
+                document.getElementById('audioRecordBtn').style.color = 'white';
+                showToast('🎙️ Recording started');
+            }
+        }
+
+        async function startAudioWithTranscription() {
+            if (!audioRecorder) {
+                showToast('Audio recorder not available');
+                return;
+            }
+
+            if (audioRecorder.isRecording) {
+                showToast('Already recording!');
+                return;
+            }
+
+            if (!audioRecorder.recognition) {
+                showToast('⚠️ Speech Recognition not supported in your browser. Recording audio only.');
+                await startAudioRecording();
+                return;
+            }
+
+            const success = await audioRecorder.startRecording(true);
+
+            if (success) {
+                document.getElementById('audioTranscribeBtn').style.background = '#9b59b6';
+                document.getElementById('audioTranscribeBtn').style.color = 'white';
+                showToast('🎤📝 Recording with transcription started');
+            }
+        }
+
+        // Reset button colors when recording stops
+        const originalStopRecording = audioRecorder ? audioRecorder.stopRecording.bind(audioRecorder) : null;
+        if (audioRecorder) {
+            audioRecorder.stopRecording = function () {
+                originalStopRecording.call(this);
+
+                // Reset button colors
+                document.getElementById('audioRecordBtn').style.background = '';
+                document.getElementById('audioRecordBtn').style.color = '';
+                document.getElementById('audioTranscribeBtn').style.background = '';
+                document.getElementById('audioTranscribeBtn').style.color = '';
+            };
+        }
+
+        // ========== END PHASE 2 AUDIO RECORDING ==========
+
+        // ========== PHASE 3: GESTURE FEATURES ==========
+        let scribbleEraser = null;
+        let pageDetailsGesture = null;
+
+        // Update initializeAdvancedFeatures to include Phase 3
+        const originalInitAdvanced2 = initializeAdvancedFeatures;
+        initializeAdvancedFeatures = function () {
+            originalInitAdvanced2();
+
+            // Initialize Scribble Eraser
+            try {
+                scribbleEraser = new ScribbleEraser();
+                scribbleEraser.initialize();
+                scribbleEraser.setSensitivity('medium');
+                console.log('✅ Scribble Eraser initialized');
+            } catch (err) {
+                console.error('Error initializing scribble eraser:', err);
+            }
+
+            // Initialize Page Details Gesture
+            try {
+                pageDetailsGesture = new PageDetailsGesture();
+                pageDetailsGesture.initialize();
+                console.log('✅ Page Details Gesture initialized');
+            } catch (err) {
+                console.error('Error initializing page details gesture:', err);
+            }
+        };
+
+        // Note: Scribble eraser integrates with existing drawing/sketch system
+        // It will analyze strokes and automatically trigger erase when scribble detected
+        // No additional UI buttons needed - it works automatically when enabled
+
+        // ========== END PHASE 3 GESTURE FEATURES ==========
+
 
 
         initApp();
@@ -12379,6 +12859,18 @@
 
     <!-- Circuit Components Fix Script -->
     <script src="circuit-components-fix.js"></script>
+
+    <!-- ADVANCED FEATURES - PHASE 1 -->
+    <script src="lasso-selection.js"></script>
+    <script src="shape-recognition.js"></script>
+    <script src="zoom-manager.js"></script>
+
+    <!-- ADVANCED FEATURES - PHASE 2 -->
+    <script src="audio-recorder.js"></script>
+
+    <!-- ADVANCED FEATURES - PHASE 3 -->
+    <script src="scribble-eraser.js"></script>
+    <script src="page-details-gesture.js"></script>
 
 </body>
 
