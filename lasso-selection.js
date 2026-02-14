@@ -15,6 +15,11 @@ class LassoSelector {
         this.isDragging = false;
         this.dragStartPos = { x: 0, y: 0 };
         this.elementStartPositions = [];
+
+        // Store bound function references for proper event listener management
+        this.boundHandleStart = this.handleStart.bind(this);
+        this.boundHandleMove = this.handleMove.bind(this);
+        this.boundHandleEnd = this.handleEnd.bind(this);
     }
 
     initialize() {
@@ -75,12 +80,23 @@ class LassoSelector {
 
     toggleLassoMode() {
         this.isActive = !this.isActive;
+        const btn = document.getElementById('lassoBtn');
 
         if (this.isActive) {
-            this.attachEventListeners();
+            btn?.classList.add('active');
+
+            // Make lasso canvas visible and interactive
             this.lassoCanvas.style.display = 'block';
             this.lassoCanvas.style.pointerEvents = 'auto';
-            document.body.style.cursor = 'crosshair';
+
+            // Apply crosshair cursor only to the canvas/paper area
+            const canvas = document.getElementById('sequentialStream');
+            if (canvas) {
+                canvas.style.cursor = 'crosshair';
+            }
+
+            this.attachEventListeners();
+            console.log('Lasso mode activated');
         } else {
             this.deactivate();
         }
@@ -89,43 +105,66 @@ class LassoSelector {
     }
 
     deactivate() {
+        this.isActive = false;
+        const btn = document.getElementById('lassoBtn');
+        btn?.classList.remove('active');
+
+        // Reset cursor on canvas
+        const canvas = document.getElementById('sequentialStream');
+        if (canvas) {
+            canvas.style.cursor = '';
+        }
+
         this.detachEventListeners();
         this.clearSelection();
+        console.log('Lasso mode deactivated');
         this.lassoCanvas.style.display = 'none';
         this.lassoCanvas.style.pointerEvents = 'none';
         document.body.style.cursor = 'default';
-        this.isActive = false;
     }
 
     attachEventListeners() {
-        this.lassoCanvas.addEventListener('mousedown', this.handleStart.bind(this));
-        this.lassoCanvas.addEventListener('mousemove', this.handleMove.bind(this));
-        this.lassoCanvas.addEventListener('mouseup', this.handleEnd.bind(this));
+        this.lassoCanvas.addEventListener('mousedown', this.boundHandleStart);
+        this.lassoCanvas.addEventListener('mousemove', this.boundHandleMove);
+        this.lassoCanvas.addEventListener('mouseup', this.boundHandleEnd);
 
-        this.lassoCanvas.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
-        this.lassoCanvas.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
-        this.lassoCanvas.addEventListener('touchend', this.handleEnd.bind(this));
+        this.lassoCanvas.addEventListener('touchstart', this.boundHandleStart, { passive: false });
+        this.lassoCanvas.addEventListener('touchmove', this.boundHandleMove, { passive: false });
+        this.lassoCanvas.addEventListener('touchend', this.boundHandleEnd);
     }
 
     detachEventListeners() {
-        this.lassoCanvas.removeEventListener('mousedown', this.handleStart.bind(this));
-        this.lassoCanvas.removeEventListener('mousemove', this.handleMove.bind(this));
-        this.lassoCanvas.removeEventListener('mouseup', this.handleEnd.bind(this));
+        this.lassoCanvas.removeEventListener('mousedown', this.boundHandleStart);
+        this.lassoCanvas.removeEventListener('mousemove', this.boundHandleMove);
+        this.lassoCanvas.removeEventListener('mouseup', this.boundHandleEnd);
 
-        this.lassoCanvas.removeEventListener('touchstart', this.handleStart.bind(this));
-        this.lassoCanvas.removeEventListener('touchmove', this.handleMove.bind(this));
-        this.lassoCanvas.removeEventListener('touchend', this.handleEnd.bind(this));
+        this.lassoCanvas.removeEventListener('touchstart', this.boundHandleStart);
+        this.lassoCanvas.removeEventListener('touchmove', this.boundHandleMove);
+        this.lassoCanvas.removeEventListener('touchend', this.boundHandleEnd);
     }
 
     handleStart(e) {
         e.preventDefault();
+
+        // Ignore if clicking on UI elements
+        if (e.target.closest('.sidebar, .tool-tray, button, input, select, textarea, a')) {
+            console.log('🚫 Ignoring click on UI element');
+            return;
+        }
+
         const point = this.getEventPoint(e);
 
         // Check if clicking on existing selection to drag
         if (this.selectedElements.length > 0 && this.isPointInSelection(point)) {
+            console.log('🎯 Starting drag - point in selection!');
             this.startDragging(point);
             return;
         }
+
+        console.log('✏️ Starting new lasso selection');
+        // Clear previous selection when starting new one
+        this.lassoPoints = [];
+        this.clearLassoCanvas();
 
         // Start new lasso selection
         this.isDrawing = true;
@@ -161,8 +200,9 @@ class LassoSelector {
         this.isDrawing = false;
         this.closeLasso();
         this.detectSelectedElements();
-        this.lassoPoints = [];
-        this.clearLassoCanvas();
+        // Don't clear lasso points or canvas here - keep selection visible for dragging
+        // this.lassoPoints = [];
+        // this.clearLassoCanvas();
     }
 
     getEventPoint(e) {
@@ -221,26 +261,56 @@ class LassoSelector {
 
         // Get all selectable elements on the page
         const currentPaper = document.querySelector('.paper.active, .stream-paper');
-        if (!currentPaper) return;
+        if (!currentPaper) {
+            // Fallback to main content area
+            const mainStream = document.getElementById('sequentialStream');
+            if (!mainStream) return;
 
-        const selectableElements = currentPaper.querySelectorAll(`
-            img,
-            .math-equation,
-            .code-block,
-            .sticky-note,
-            .text-box,
-            .circuit-component,
-            .logic-gate,
-            .mindmap-node,
-            [contenteditable="true"]
-        `);
+            // Select all direct children and common content elements
+            const selectableElements = mainStream.querySelectorAll(`
+                div, p, span, h1, h2, h3, h4, h5, h6,
+                img, svg, canvas,
+                ul, ol, li,
+                table, tr, td, th,
+                .math-equation,
+                .code-block,
+                .sticky-note,
+                .text-box,
+                .circuit-component,
+                .logic-gate,
+                .mindmap-node,
+                [contenteditable="true"]
+            `);
 
-        selectableElements.forEach(element => {
-            if (this.isElementInLasso(element)) {
-                this.selectedElements.push(element);
-                element.classList.add('lasso-selected');
-            }
-        });
+            selectableElements.forEach(element => {
+                if (this.isElementInLasso(element)) {
+                    this.selectedElements.push(element);
+                    element.classList.add('lasso-selected');
+                }
+            });
+        } else {
+            const selectableElements = currentPaper.querySelectorAll(`
+                div, p, span, h1, h2, h3, h4, h5, h6,
+                img, svg, canvas,
+                ul, ol, li,
+                table, tr, td, th,
+                .math-equation,
+                .code-block,
+                .sticky-note,
+                .text-box,
+                .circuit-component,
+                .logic-gate,
+                .mindmap-node,
+                [contenteditable="true"]
+            `);
+
+            selectableElements.forEach(element => {
+                if (this.isElementInLasso(element)) {
+                    this.selectedElements.push(element);
+                    element.classList.add('lasso-selected');
+                }
+            });
+        }
 
         if (this.selectedElements.length > 0) {
             this.updateSelectionOverlay();
@@ -278,18 +348,40 @@ class LassoSelector {
     }
 
     isPointInSelection(point) {
-        if (this.selectedElements.length === 0) return false;
+        if (this.selectedElements.length === 0) {
+            console.log('❌ No selected elements');
+            return false;
+        }
 
-        return this.selectedElements.some(element => {
-            const rect = element.getBoundingClientRect();
-            const canvasRect = this.lassoCanvas.getBoundingClientRect();
+        const canvasRect = this.lassoCanvas.getBoundingClientRect();
 
-            const relX = point.x + canvasRect.left;
-            const relY = point.y + canvasRect.top;
+        // Convert point (relative to canvas) to viewport coordinates
+        const viewportX = point.x + canvasRect.left;
+        const viewportY = point.y + canvasRect.top;
 
-            return relX >= rect.left && relX <= rect.right &&
-                relY >= rect.top && relY <= rect.bottom;
+        console.log('🔍 Checking point:', {
+            canvasPoint: point,
+            viewport: { x: viewportX, y: viewportY },
+            canvasRect,
+            selectedCount: this.selectedElements.length
         });
+
+        const result = this.selectedElements.some((element, index) => {
+            const rect = element.getBoundingClientRect();
+
+            const isInside = viewportX >= rect.left && viewportX <= rect.right &&
+                viewportY >= rect.top && viewportY <= rect.bottom;
+
+            console.log(`  Element ${index}:`, {
+                rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+                isInside
+            });
+
+            return isInside;
+        });
+
+        console.log('🎯 Result:', result ? 'INSIDE selection' : 'OUTSIDE selection');
+        return result;
     }
 
     updateSelectionOverlay() {
@@ -356,7 +448,17 @@ class LassoSelector {
 
     endDragging() {
         this.isDragging = false;
-        document.body.style.cursor = 'crosshair';
+
+        // Reset cursor on canvas
+        const canvas = document.getElementById('sequentialStream');
+        if (canvas) {
+            canvas.style.cursor = 'crosshair';
+        }
+
+        // Clear the lasso visual after dragging is complete
+        this.lassoPoints = [];
+        this.clearLassoCanvas();
+        console.log('✅ Drag complete - lasso cleared');
     }
 
     clearSelection() {

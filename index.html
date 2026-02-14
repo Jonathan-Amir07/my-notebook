@@ -4321,6 +4321,13 @@
             transform: scale(0.95);
         }
     </style>
+
+    <!-- Advanced Features Scripts -->
+    <script src="lasso-selection.js"></script>
+    <script src="shape-recognition.js"></script>
+    <script src="audio-recorder.js"></script>
+    <script src="scribble-eraser.js"></script>
+    <script src="page-details-gesture.js"></script>
 </head>
 
 <body class="cursor-pen">
@@ -4811,10 +4818,8 @@
             <hr style="opacity: 0.2;">
 
             <!-- PHASE 2 ADVANCED FEATURES -->
-            <button class="tool-btn" id="audioRecordBtn" onclick="startAudioRecording()"><span>🎙️</span> Record
-                Audio</button>
-            <button class="tool-btn" id="audioTranscribeBtn" onclick="startAudioWithTranscription()"><span>🎤📝</span>
-                Record + Transcribe</button>
+            <button class="tool-btn" id="audioRecordBtn" onclick="toggleAudioRecording()"><span>🎤</span> Record &
+                Transcribe</button>
 
             <hr style="opacity: 0.2;">
 
@@ -11893,7 +11898,26 @@
             document.querySelectorAll('.math-tab-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event?.target?.classList.add('active');
+
+            // If called from a button click, use event.target
+            // Otherwise, find the button for this category
+            try {
+                if (event?.target) {
+                    event.target.classList.add('active');
+                } else {
+                    // Find and activate the button for this category
+                    const targetBtn = document.querySelector(`.math-tab-btn[onclick*="'${tab}'"]`);
+                    if (targetBtn) {
+                        targetBtn.classList.add('active');
+                    }
+                }
+            } catch (err) {
+                // If event is unreliable, just find the button manually
+                const targetBtn = document.querySelector(`.math-tab-btn[onclick*="'${tab}'"]`);
+                if (targetBtn) {
+                    targetBtn.classList.add('active');
+                }
+            }
 
             // Define math symbols for each tab
             const symbols = {
@@ -12586,43 +12610,62 @@
                 switchMathTab('basic');
 
                 // PHASE 1: Initialize Advanced Features
-                initializeAdvancedFeatures();
+                try {
+                    initializeAdvancedFeatures();
+                } catch (err) {
+                    console.warn('Some advanced features may not be available:', err.message);
+                    showToast(`⚠️ ${err.message} - check console for details`);
+                }
 
             } catch (err) {
-                console.error('Error initializing app:', err);
-                showToast('Error loading application. Please refresh.');
+                console.error('Critical error initializing app:', err);
+                showToast('⚠️ Some features may not work correctly');
             }
         }
 
         // ========== PHASE 1: ADVANCED FEATURES ==========
         let lassoSelector = null;
         let shapeRecognizer = null;
-        let zoomManager = null;
 
         function initializeAdvancedFeatures() {
+            const failures = [];
+
+            // Initialize Lasso Selection
             try {
-                // Initialize Lasso Selection
                 lassoSelector = new LassoSelector();
                 lassoSelector.initialize();
+                console.log('✅ Lasso Selection initialized');
+            } catch (err) {
+                console.error('❌ Lasso Selection failed:', err);
+                failures.push('Lasso Selection');
+            }
 
-                // Initialize Shape Recognition
+            // Initialize Shape Recognition
+            try {
                 shapeRecognizer = new ShapeRecognizer();
                 shapeRecognizer.initialize();
                 shapeRecognizer.setSensitivity('moderate');
-
-                // Initialize Zoom Manager
-                zoomManager = new ZoomManager();
-                zoomManager.initialize();
-
-                // Enable zoom for the main paper area by default
-                const mainPaper = document.getElementById('sequentialStream');
-                if (mainPaper) {
-                    zoomManager.enableZoomForElement(mainPaper);
-                }
-
-                console.log('✅ Advanced Features initialized successfully');
+                console.log('✅ Shape Recognition initialized');
             } catch (err) {
-                console.error('Error initializing advanced features:', err);
+                console.error('❌ Shape Recognition failed:', err);
+                failures.push('Shape Recognition');
+            }
+
+            // Initialize Page Details Gesture
+            try {
+                const pageDetailsGesture = new PageDetailsGesture();
+                pageDetailsGesture.initialize();
+                console.log('✅ Page Details Gesture initialized');
+            } catch (err) {
+                console.error('❌ Page Details Gesture failed:', err);
+                failures.push('Page Details Gesture');
+            }
+
+            if (failures.length > 0) {
+                console.warn(`⚠️ Failed to initialize: ${failures.join(', ')}`);
+                throw new Error(`Failed features: ${failures.join(', ')}`);
+            } else {
+                console.log('✅ All Advanced Features initialized successfully');
             }
         }
 
@@ -12731,65 +12774,36 @@
             }
         };
 
-        async function startAudioRecording() {
+        async function toggleAudioRecording() {
             if (!audioRecorder) {
                 showToast('Audio recorder not available');
                 return;
             }
 
+            // If already recording, stop it
             if (audioRecorder.isRecording) {
-                showToast('Already recording!');
+                await audioRecorder.stopRecording();
+                document.getElementById('audioRecordBtn').style.background = '';
+                document.getElementById('audioRecordBtn').style.color = '';
+                showToast('⏹️ Recording stopped');
                 return;
             }
 
-            const success = await audioRecorder.startRecording(false);
+            // Start recording with transcription if available
+            const enableTranscription = !!audioRecorder.recognition;
+            const success = await audioRecorder.startRecording(enableTranscription);
 
             if (success) {
                 document.getElementById('audioRecordBtn').style.background = '#e74c3c';
                 document.getElementById('audioRecordBtn').style.color = 'white';
-                showToast('🎙️ Recording started');
+                const message = enableTranscription ?
+                    '🎤📝 Recording with transcription' :
+                    '🎙️ Recording audio';
+                showToast(message);
             }
         }
 
-        async function startAudioWithTranscription() {
-            if (!audioRecorder) {
-                showToast('Audio recorder not available');
-                return;
-            }
 
-            if (audioRecorder.isRecording) {
-                showToast('Already recording!');
-                return;
-            }
-
-            if (!audioRecorder.recognition) {
-                showToast('⚠️ Speech Recognition not supported in your browser. Recording audio only.');
-                await startAudioRecording();
-                return;
-            }
-
-            const success = await audioRecorder.startRecording(true);
-
-            if (success) {
-                document.getElementById('audioTranscribeBtn').style.background = '#9b59b6';
-                document.getElementById('audioTranscribeBtn').style.color = 'white';
-                showToast('🎤📝 Recording with transcription started');
-            }
-        }
-
-        // Reset button colors when recording stops
-        const originalStopRecording = audioRecorder ? audioRecorder.stopRecording.bind(audioRecorder) : null;
-        if (audioRecorder) {
-            audioRecorder.stopRecording = function () {
-                originalStopRecording.call(this);
-
-                // Reset button colors
-                document.getElementById('audioRecordBtn').style.background = '';
-                document.getElementById('audioRecordBtn').style.color = '';
-                document.getElementById('audioTranscribeBtn').style.background = '';
-                document.getElementById('audioTranscribeBtn').style.color = '';
-            };
-        }
 
         // ========== END PHASE 2 AUDIO RECORDING ==========
 
@@ -12860,17 +12874,6 @@
     <!-- Circuit Components Fix Script -->
     <script src="circuit-components-fix.js"></script>
 
-    <!-- ADVANCED FEATURES - PHASE 1 -->
-    <script src="lasso-selection.js"></script>
-    <script src="shape-recognition.js"></script>
-    <script src="zoom-manager.js"></script>
-
-    <!-- ADVANCED FEATURES - PHASE 2 -->
-    <script src="audio-recorder.js"></script>
-
-    <!-- ADVANCED FEATURES - PHASE 3 -->
-    <script src="scribble-eraser.js"></script>
-    <script src="page-details-gesture.js"></script>
 
 </body>
 

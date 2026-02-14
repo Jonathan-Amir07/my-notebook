@@ -6,8 +6,9 @@
 class PageDetailsGesture {
     constructor() {
         this.isEnabled = true;
-        this.tapTimes = [];
-        this.maxTapInterval = 500; // ms between taps
+        this.longPressTimer = null;
+        this.touchStartTime = 0;
+        this.touchMoved = false;
         this.detailsModal = null;
     }
 
@@ -94,112 +95,101 @@ class PageDetailsGesture {
     }
 
     attachEventListeners() {
-        document.addEventListener('click', (e) => this.handleTap(e));
-        document.addEventListener('touchstart', (e) => this.handleTap(e));
+        // Detect if this is a touch device
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        if (isTouchDevice) {
+            // On touch devices (like iPad), use long-press (2-second hold)
+            document.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+            document.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+            document.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+            document.addEventListener('touchcancel', (e) => this.handleTouchEnd(e));
+        } else {
+            // On desktop devices, use Ctrl+Click
+            document.addEventListener('click', (e) => this.handleCtrlClick(e));
+        }
+
+        console.log('✅ PageDetailsGesture: Event listeners attached (touch device: ' + isTouchDevice + ')');
     }
 
-    handleTap(event) {
+
+    handleTouchStart(e) {
         if (!this.isEnabled) return;
 
-        // Ignore taps on UI elements
-        if (event.target.closest('button, input, select, textarea, .sidebar, .tool-tray')) {
+        // Ignore touches on UI elements
+        if (e.target.closest('button, input, select, textarea, .sidebar, .tool-tray')) {
             return;
         }
 
-        const now = Date.now();
-        this.tapTimes.push(now);
+        this.touchStartTime = Date.now();
+        this.touchMoved = false;
 
-        // Keep only last 3 taps
-        if (this.tapTimes.length > 3) {
-            this.tapTimes.shift();
-        }
-
-        // Check if we have 3 taps within the interval
-        if (this.tapTimes.length === 3) {
-            const firstTap = this.tapTimes[0];
-            const lastTap = this.tapTimes[2];
-
-            if (lastTap - firstTap < this.maxTapInterval * 2) {
-                // Triple tap detected!
+        // Start long-press timer (2 seconds)
+        this.longPressTimer = setTimeout(() => {
+            if (!this.touchMoved) {
+                // Long press detected!
                 this.showPageDetails();
-                this.tapTimes = []; // Reset
-                event.preventDefault();
+                // Provide haptic feedback if available
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+                e.preventDefault();
             }
+        }, 2000);
+    }
+
+    handleTouchMove(e) {
+        // If user moves their finger, cancel the long press
+        this.touchMoved = true;
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
         }
     }
 
+    handleTouchEnd(e) {
+        // Clear the timer if user lifts finger before 2 seconds
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+    }
+
+    handleCtrlClick(e) {
+        console.log('🔍 Click event received', { ctrl: e.ctrlKey, button: e.button, enabled: this.isEnabled });
+
+        if (!this.isEnabled) return;
+
+        // Check if Ctrl key (or Cmd on Mac) was pressed
+        if (!e.ctrlKey && !e.metaKey) return;
+
+        // Check that it's specifically LEFT mouse button (button 0)
+        if (e.button !== 0) return;
+
+        // Ignore Ctrl+clicks on UI elements
+        if (e.target.closest('button, input, select, textarea, .sidebar, .tool-tray, a')) {
+            return;
+        }
+
+        // Prevent default behavior
+        e.preventDefault();
+
+        // Show page details on Ctrl+Click
+        this.showPageDetails();
+    }
+
+
     showPageDetails() {
-        // Get current page metadata
-        const metadata = this.getCurrentPageMetadata();
+        // Find and click the Page Details button in the sidebar
+        const buttons = Array.from(document.querySelectorAll('.btn, .btn-secondary'));
+        const pageDetailsBtn = buttons.find(btn => btn.textContent && btn.textContent.includes('Page Details'));
 
-        // Populate modal
-        const content = document.getElementById('pageDetailsContent');
-        content.innerHTML = `
-            <div style="display: grid; gap: 12px;">
-                <div style="background: #ecf0f1; padding: 12px; border-radius: 8px;">
-                    <div style="font-weight: bold; color: #7f8c8d; font-size: 0.85rem; margin-bottom: 4px;">Title</div>
-                    <div style="color: #2c3e50; font-size: 1.1rem;">${metadata.title}</div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <div style="background: #ecf0f1; padding: 12px; border-radius: 8px;">
-                        <div style="font-weight: bold; color: #7f8c8d; font-size: 0.85rem; margin-bottom: 4px;">Created</div>
-                        <div style="color: #2c3e50;">${metadata.created}</div>
-                    </div>
-                    <div style="background: #ecf0f1; padding: 12px; border-radius: 8px;">
-                        <div style="font-weight: bold; color: #7f8c8d; font-size: 0.85rem; margin-bottom: 4px;">Modified</div>
-                        <div style="color: #2c3e50;">${metadata.modified}</div>
-                    </div>
-                </div>
-
-                <div style="background: #ecf0f1; padding: 12px; border-radius: 8px;">
-                    <div style="font-weight: bold; color: #7f8c8d; font-size: 0.85rem; margin-bottom: 4px;">Statistics</div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #3498db;">${metadata.wordCount}</div>
-                            <div style="font-size: 0.75rem; color: #7f8c8d;">Words</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #2ecc71;">${metadata.elementCount}</div>
-                            <div style="font-size: 0.75rem; color: #7f8c8d;">Elements</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #e74c3c;">${metadata.imageCount}</div>
-                            <div style="font-size: 0.75rem; color: #7f8c8d;">Images</div>
-                        </div>
-                    </div>
-                </div>
-
-                ${metadata.tags.length > 0 ? `
-                    <div style="background: #ecf0f1; padding: 12px; border-radius: 8px;">
-                        <div style="font-weight: bold; color: #7f8c8d; font-size: 0.85rem; margin-bottom: 8px;">Tags</div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                            ${metadata.tags.map(tag => `
-                                <span style="background: #3498db; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">
-                                    #${tag}
-                                </span>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${metadata.template ? `
-                    <div style="background: #ecf0f1; padding: 12px; border-radius: 8px;">
-                        <div style="font-weight: bold; color: #7f8c8d; font-size: 0.85rem; margin-bottom: 4px;">Template</div>
-                        <div style="color: #2c3e50;">${metadata.template}</div>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-
-        // Show modal with animation
-        this.detailsModal.style.display = 'block';
-        setTimeout(() => {
-            this.detailsModal.style.opacity = '1';
-            this.detailsModal.style.transform = 'translate(-50%, -50%) scale(1)';
-        }, 10);
-
-        console.log('👆 Triple-tap detected - showing page details');
+        if (pageDetailsBtn) {
+            pageDetailsBtn.click();
+            console.log('👆 Gesture triggered - Page Details opened');
+        } else {
+            console.warn('⚠️ Page Details button not found in sidebar');
+        }
     }
 
     getCurrentPageMetadata() {
