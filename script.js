@@ -1954,7 +1954,10 @@ class AudioRecorderWidget {
 // ─── AUTH GUARD ──────────────────────────────────────────────────────────────
 // auth.js is loaded before this script. If no valid session → redirect to login.
 (function () {
-    if (window.AUTH && !window.AUTH.isAuthenticated()) {
+    const p = window.location.pathname.toLowerCase();
+    const isLoginPage = p.endsWith('login.html') || p.endsWith('/login') || p.endsWith('/login/');
+
+    if (window.AUTH && !window.AUTH.isAuthenticated() && !isLoginPage) {
         window.location.replace('login.html');
     }
 })();
