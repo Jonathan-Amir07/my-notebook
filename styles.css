@@ -3303,7 +3303,7 @@ body.dark-mode .continuation-label {
 }
 
 /* UNIFIED PAPER LAYOUT - Remove borders and unify textures */
-.paper,
+body:not(.sketch-mode) .paper,
 #sequentialStream,
 .sequence-editor-block {
     border: none !important;

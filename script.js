@@ -1622,6 +1622,9 @@ class AudioRecorderWidget {
             try { this.recognition.stop(); } catch (e) { /* ignore */ }
         }
 
+        // Preserve any interim text as final if needed
+        this._finalizeTranscript();
+
         // UI
         this._hideRecordingPanel();
         this._stopTimer();
@@ -1642,12 +1645,11 @@ class AudioRecorderWidget {
             return;
         }
 
-        // Web Speech API requires HTTPS (or localhost) — warn immediately if on plain http/file
+        // Web Speech API works best on HTTPS/localhost, but we still attempt to start
         const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         if (!isSecure) {
-            console.warn('Speech Recognition requires HTTPS — transcription disabled');
-            this._updateTranscriptDisplay('⚠️ Transcription requires HTTPS. Open this app over https:// to enable live transcription. Audio is still being recorded.');
-            return;
+            console.warn('Speech Recognition may require HTTPS — attempting anyway');
+            this._updateTranscriptDisplay('⚠️ Transcription usually requires HTTPS/localhost. Attempting anyway…');
         }
 
         this.recognition = new SpeechRecognition();
@@ -1702,7 +1704,7 @@ class AudioRecorderWidget {
 
         try {
             this.recognition.start();
-            this._updateTranscriptDisplay('🎤 Listening…');
+            if (isSecure) this._updateTranscriptDisplay('🎤 Listening…');
         } catch (e) {
             console.warn('Could not start speech recognition:', e);
             this._updateTranscriptDisplay('⚠️ Could not start transcription: ' + e.message);
@@ -1799,7 +1801,7 @@ class AudioRecorderWidget {
         const now = new Date();
         const timestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        const finalTranscript = this.transcript.trim();
+        const finalTranscript = this._getFinalTranscript();
 
         this.widgetCounter++;
         const recording = {
@@ -1817,6 +1819,18 @@ class AudioRecorderWidget {
         if (this.widgetsContainer) this.widgetsContainer.style.display = 'flex';
 
         if (typeof showToast === 'function') showToast(`✓ Recording saved (${duration})`);
+    }
+
+    _finalizeTranscript() {
+        if (!this.transcript && this.interimTranscript) {
+            this.transcript = this.interimTranscript;
+            this.interimTranscript = '';
+        }
+    }
+
+    _getFinalTranscript() {
+        const combined = `${this.transcript} ${this.interimTranscript}`.replace(/\s+/g, ' ').trim();
+        return combined;
     }
 
     // ================================================================
@@ -3373,62 +3387,6 @@ window.toggleReadMode = () => {
     }
 };
 
-// Share note function
-window.shareNote = async () => {
-    const chapter = chapters.find(c => c.id === currentId);
-    if (!chapter) {
-        showToast('⚠️ No note selected');
-        return;
-    }
-
-    const title = chapter.title || 'Untitled Note';
-    const content = chapter.content || '';
-
-    // Create plain text version
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = content;
-    const textContent = tempDiv.innerText || tempDiv.textContent;
-
-    const shareText = `${title}\n\n${textContent.substring(0, 500)}${textContent.length > 500 ? '...' : ''}`;
-
-    // Try native share API (mobile/modern browsers)
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                title: title,
-                text: shareText,
-            });
-            showToast('✓ Shared successfully');
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                copyToClipboardFallback(shareText);
-            }
-        }
-    } else {
-        // Fallback: copy to clipboard
-        copyToClipboardFallback(shareText);
-    }
-};
-
-function copyToClipboardFallback(text) {
-    // Create temporary textarea
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-
-    try {
-        document.execCommand('copy');
-        showToast('✓ Copied to clipboard! Paste to share.');
-    } catch (err) {
-        showToast('⚠️ Could not copy to clipboard');
-    }
-
-    document.body.removeChild(textarea);
-}
-
 function handleSelectionChange() {
     const bubble = document.getElementById('textBubble');
     const selection = window.getSelection();
@@ -3777,16 +3735,6 @@ window.clearSketch = () => {
 };
 
 window.selectSketchTool = (tool) => {
-    if (tool === 'hand') {
-        activeSketchTool = 'hand';
-        document.getElementById('handBtn').classList.add('active');
-        document.getElementById('eraserBtn').classList.remove('active');
-        if (!isSketchMode) toggleSketchMode();
-        return;
-    } else {
-        document.getElementById('handBtn').classList.remove('active');
-    }
-
     if (tool !== 'highlighter') customStrokeStyle = null;
     activeSketchTool = tool === activeSketchTool ? 'brush' : tool;
 
@@ -3802,9 +3750,6 @@ window.selectWritingTool = (tool, save = true) => {
         selectSketchTool('highlighter');
         return;
     }
-    document.getElementById('handBtn').classList.remove('active');
-    if (activeSketchTool === 'hand') activeSketchTool = 'brush';
-
     // Apply class to ALL editors in the stream
     document.querySelectorAll('.content-area').forEach(e => {
         e.className = `content-area writing-tool-${tool}`;
@@ -10892,7 +10837,6 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () { var el = document.querySelector('#_auto_39'); if (el) el.addEventListener('click', function () { toggleFocusMode() }); })();
     (function () { var el = document.querySelector('#_auto_40'); if (el) el.addEventListener('click', function () { startFlashcardMode() }); })();
     (function () { var el = document.querySelector('#paperStyleBtn'); if (el) el.addEventListener('click', function () { cyclePaperStyle() }); })();
-    (function () { var el = document.querySelector('#_auto_41'); if (el) el.addEventListener('click', function () { shareNote() }); })();
     (function () { var el = document.querySelector('#_auto_42'); if (el) el.addEventListener('click', function () { window.print() }); })();
     (function () { var el = document.querySelector('#readModeBtn'); if (el) el.addEventListener('click', function () { toggleReadMode() }); })();
     (function () { var el = document.querySelector('#_auto_43'); if (el) el.addEventListener('click', function () { openMetadataModal() }); })();
@@ -10904,7 +10848,6 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () { var el = document.querySelector('#importFile'); if (el) el.addEventListener('change', function () { importData(this) }); })();
     (function () { var el = document.querySelector('#_auto_48'); if (el) el.addEventListener('click', function () { wipeAllData() }); })();
     (function () { var el = document.querySelector('#voiceBtn'); if (el) el.addEventListener('click', function () { toggleVoiceTranscription() }); })();
-    (function () { var el = document.querySelector('#handBtn'); if (el) el.addEventListener('click', function () { selectSketchTool('hand') }); })();
     (function () { var el = document.querySelector('#eraserBtn'); if (el) el.addEventListener('click', function () { selectSketchTool('eraser') }); })();
     (function () { var el = document.querySelector('#customColorPicker'); if (el) el.addEventListener('change', function () { setCustomColor(this.value) }); })();
     (function () { var el = document.querySelector('#lassoBtn'); if (el) el.addEventListener('click', function () { toggleLassoSelection() }); })();
