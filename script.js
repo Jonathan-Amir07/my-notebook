@@ -1517,6 +1517,7 @@ class AudioRecorderWidget {
         this.widgetsContainer = null;
         this.recordings = [];        // { id, blobUrl, transcript, duration, timestamp }
         this.widgetCounter = 0;
+        this.onStateChange = null;
     }
 
     // ================================================================
@@ -1596,6 +1597,10 @@ class AudioRecorderWidget {
             const btn = document.getElementById('audioRecordBtn');
             if (btn) btn.classList.add('recording-active');
 
+            if (typeof this.onStateChange === 'function') {
+                this.onStateChange(true);
+            }
+
             if (typeof showToast === 'function') showToast('🎤 Recording started...');
 
         } catch (err) {
@@ -1631,6 +1636,10 @@ class AudioRecorderWidget {
 
         const btn = document.getElementById('audioRecordBtn');
         if (btn) btn.classList.remove('recording-active');
+
+        if (typeof this.onStateChange === 'function') {
+            this.onStateChange(false);
+        }
     }
 
     // ================================================================
@@ -1868,6 +1877,13 @@ class AudioRecorderWidget {
         document.body.appendChild(this.widgetsContainer);
     }
 
+    mountRecordingsContainer(targetEl) {
+        if (!this.widgetsContainer || !targetEl) return;
+        this.widgetsContainer.classList.add('embedded');
+        this.widgetsContainer.style.display = 'flex';
+        targetEl.appendChild(this.widgetsContainer);
+    }
+
     _addWidget(recording) {
         const list = this.widgetsContainer.querySelector('.recordings-list');
         if (!list) return;
@@ -1961,6 +1977,560 @@ class AudioRecorderWidget {
             if (MediaRecorder.isTypeSupported(type)) return type;
         }
         return 'audio/webm'; // fallback
+    }
+}
+
+// ================================================================
+//  WIDGET RAIL MANAGER
+// ================================================================
+class WidgetRailManager {
+    constructor() {
+        this.rail = null;
+        this.list = null;
+        this.tab = null;
+        this.collapseBtn = null;
+        this.handle = null;
+        this.audioRecorder = null;
+        this.registry = {};
+        this.state = {
+            side: 'right',
+            collapsed: true,
+            top: 80,
+            order: [],
+            enabled: [],
+            floating: {},
+            minimized: {},
+            widgetState: {}
+        };
+        this.autoExpanded = false;
+        this.hoverExpanded = false;
+    }
+
+    initialize() {
+        this.rail = document.getElementById('widgetRail');
+        this.list = document.getElementById('widgetList');
+        this.tab = document.getElementById('widgetRailTab');
+        this.collapseBtn = document.getElementById('widgetRailCollapse');
+        this.handle = this.rail ? this.rail.querySelector('.widget-rail-handle') : null;
+
+        if (!this.rail || !this.list || !this.tab || !this.collapseBtn) return;
+
+        this._loadState();
+        this._registerWidgets();
+        this._promptSideOnce();
+        this._applyState();
+        this._render();
+        this._wireEvents();
+        this._wireScrollAutoExpand();
+    }
+
+    _registerWidgets() {
+        this.registry = {
+            recording: {
+                id: 'recording',
+                title: 'Recording',
+                icon: '🎤',
+                render: (container) => {
+                    const wrap = document.createElement('div');
+                    const status = document.createElement('div');
+                    status.style.fontSize = '0.8rem';
+                    status.style.marginBottom = '8px';
+                    status.textContent = 'Ready to record';
+
+                    const recordBtn = document.createElement('button');
+                    recordBtn.className = 'tool-btn';
+                    recordBtn.style.width = '100%';
+                    recordBtn.textContent = 'Start Recording';
+
+                    recordBtn.addEventListener('click', () => {
+                        if (this.audioRecorder) this.audioRecorder.toggle();
+                    });
+
+                    const recordingsHost = document.createElement('div');
+                    recordingsHost.className = 'widget-recordings-host';
+
+                    if (this.audioRecorder) {
+                        this.audioRecorder.onStateChange = (isRecording) => {
+                            status.textContent = isRecording ? 'Recording…' : 'Ready to record';
+                            recordBtn.textContent = isRecording ? 'Stop Recording' : 'Start Recording';
+                        };
+                        this.audioRecorder.mountRecordingsContainer(recordingsHost);
+                    } else {
+                        status.textContent = 'Recorder initializing…';
+                    }
+
+                    wrap.appendChild(status);
+                    wrap.appendChild(recordBtn);
+                    wrap.appendChild(recordingsHost);
+                    container.appendChild(wrap);
+                }
+            },
+            calculator: {
+                id: 'calculator',
+                title: 'Calculator',
+                icon: '🧮',
+                render: (container) => {
+                    const saved = this.state.widgetState.calculator || {};
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.placeholder = 'Enter expression (e.g. 12*(3+4))';
+                    input.value = saved.expr || '';
+                    input.style.width = '100%';
+                    input.style.padding = '8px';
+                    input.style.border = '1px solid #ddd';
+                    input.style.borderRadius = '6px';
+
+                    const result = document.createElement('div');
+                    result.style.marginTop = '8px';
+                    result.style.fontFamily = 'monospace';
+                    result.style.fontSize = '0.9rem';
+                    result.textContent = saved.result ? `= ${saved.result}` : '=';
+
+                    const evaluate = () => {
+                        const expr = input.value.trim();
+                        if (!expr) {
+                            result.textContent = '=';
+                            this._updateWidgetState('calculator', { expr, result: '' });
+                            return;
+                        }
+                        if (!/^[0-9+\-*/().\s]+$/.test(expr)) {
+                            result.textContent = 'Invalid input';
+                            this._updateWidgetState('calculator', { expr, result: 'Invalid input' });
+                            return;
+                        }
+                        try {
+                            const value = Function(`"use strict"; return (${expr});`)();
+                            const display = Number.isFinite(value) ? value : 'Error';
+                            result.textContent = `= ${display}`;
+                            this._updateWidgetState('calculator', { expr, result: display });
+                        } catch (e) {
+                            result.textContent = 'Error';
+                            this._updateWidgetState('calculator', { expr, result: 'Error' });
+                        }
+                    };
+
+                    input.addEventListener('input', evaluate);
+                    container.appendChild(input);
+                    container.appendChild(result);
+                }
+            }
+        };
+
+        if (!this.state.enabled || this.state.enabled.length === 0) {
+            this.state.enabled = ['recording'];
+        }
+        if (!localStorage.getItem('widgetRailSeen')) {
+            localStorage.setItem('widgetRailSeen', '1');
+        } else if (!localStorage.getItem('widgetRailPromptedCalc') && !this.state.enabled.includes('calculator')) {
+            const addCalc = confirm('Want to try the Calculator widget?');
+            if (addCalc) {
+                this.state.enabled.push('calculator');
+                if (!this.state.order.includes('calculator')) this.state.order.push('calculator');
+            }
+            localStorage.setItem('widgetRailPromptedCalc', '1');
+        }
+        if (!this.state.order || this.state.order.length === 0) {
+            this.state.order = [...this.state.enabled];
+        } else {
+            this.state.enabled.forEach(id => {
+                if (!this.state.order.includes(id)) this.state.order.push(id);
+            });
+        }
+    }
+
+    _render() {
+        this.list.innerHTML = '';
+        const order = this.state.order.filter(id => this.state.enabled.includes(id));
+        order.forEach(id => {
+            const def = this.registry[id];
+            if (!def) return;
+            const card = this._createWidgetCard(def);
+            if (this.state.floating[id]) {
+                this._detachCard(card, id, this.state.floating[id]);
+            } else {
+                this.list.appendChild(card);
+            }
+        });
+        this._renderTabIcons();
+    }
+
+    _createWidgetCard(def) {
+        const card = document.createElement('div');
+        card.className = 'widget-card';
+        card.setAttribute('data-widget-id', def.id);
+
+        if (this.state.minimized[def.id]) {
+            card.classList.add('minimized');
+        }
+
+        const header = document.createElement('div');
+        header.className = 'widget-card-header';
+        header.draggable = true;
+
+        const title = document.createElement('div');
+        title.className = 'widget-card-title';
+        title.innerHTML = `<span>${def.icon}</span><span>${def.title}</span>`;
+
+        const actions = document.createElement('div');
+        actions.className = 'widget-card-actions';
+
+        const detachBtn = document.createElement('button');
+        detachBtn.title = 'Detach';
+        detachBtn.textContent = '↗';
+        detachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._detachCard(card, def.id);
+        });
+
+        const minimizeBtn = document.createElement('button');
+        minimizeBtn.title = 'Minimize';
+        minimizeBtn.textContent = '—';
+        minimizeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            card.classList.toggle('minimized');
+            this.state.minimized[def.id] = card.classList.contains('minimized');
+            this._saveState();
+        });
+
+        actions.appendChild(detachBtn);
+        actions.appendChild(minimizeBtn);
+        header.appendChild(title);
+        header.appendChild(actions);
+
+        const body = document.createElement('div');
+        body.className = 'widget-card-body';
+        def.render(body);
+
+        card.appendChild(header);
+        card.appendChild(body);
+
+        this._wireReorder(card);
+        return card;
+    }
+
+    _renderTabIcons() {
+        if (!this.tab) return;
+        this.tab.innerHTML = '';
+        const wrap = document.createElement('div');
+        wrap.style.display = 'flex';
+        wrap.style.flexDirection = 'column';
+        wrap.style.gap = '6px';
+        this.state.order.forEach(id => {
+            const def = this.registry[id];
+            if (!def || !this.state.enabled.includes(id)) return;
+            const icon = document.createElement('div');
+            icon.textContent = def.icon;
+            wrap.appendChild(icon);
+        });
+        this.tab.appendChild(wrap);
+    }
+
+    _wireEvents() {
+        this.tab.addEventListener('click', () => this._setCollapsed(false));
+        this.collapseBtn.addEventListener('click', () => this._setCollapsed(true));
+        this.rail.addEventListener('mouseenter', () => {
+            if (this.state.collapsed) {
+                this.hoverExpanded = true;
+                this._setCollapsed(false, true);
+            }
+        });
+        this.rail.addEventListener('mouseleave', () => {
+            if (this.autoExpanded) return;
+            if (this.hoverExpanded) {
+                this.hoverExpanded = false;
+                this._setCollapsed(true, true);
+            }
+        });
+
+        if (this.handle) {
+            let startY = 0;
+            let startTop = 0;
+            const onMove = (e) => {
+                const dy = e.clientY - startY;
+                const newTop = Math.max(40, Math.min(window.innerHeight - 200, startTop + dy));
+                this.state.top = newTop;
+                this.rail.style.top = `${newTop}px`;
+            };
+            const onUp = (e) => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                this._setSide('right');
+                this._saveState();
+            };
+            this.handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                startY = e.clientY;
+                startTop = this.rail.offsetTop;
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+    }
+
+    _wireReorder(card) {
+        card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', card.getAttribute('data-widget-id'));
+            e.dataTransfer.effectAllowed = 'move';
+            card.style.opacity = '0.5';
+        });
+        card.addEventListener('dragend', () => {
+            card.style.opacity = '1';
+        });
+        if (!this.list.dataset.dragBound) {
+            this.list.dataset.dragBound = '1';
+            this.list.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const draggingId = e.dataTransfer.getData('text/plain');
+                const draggingEl = this.list.querySelector(`[data-widget-id="${draggingId}"]`);
+                const afterEl = this._getDragAfterElement(this.list, e.clientY);
+                if (!draggingEl) return;
+                if (afterEl == null) {
+                    this.list.appendChild(draggingEl);
+                } else {
+                    this.list.insertBefore(draggingEl, afterEl);
+                }
+            });
+            this.list.addEventListener('drop', () => {
+                this._syncOrderFromDOM();
+            });
+        }
+    }
+
+    _getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.widget-card:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset, element: child };
+            }
+            return closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    _syncOrderFromDOM() {
+        const ids = [...this.list.querySelectorAll('.widget-card')].map(el => el.getAttribute('data-widget-id'));
+        this.state.order = ids;
+        this._saveState();
+    }
+
+    _detachCard(card, id, savedPos = null) {
+        this.state.floating[id] = savedPos || { left: 120, top: 120 };
+        card.classList.add('widget-floating');
+        card.style.left = `${this.state.floating[id].left}px`;
+        card.style.top = `${this.state.floating[id].top}px`;
+        card.style.position = 'fixed';
+        card.style.width = '320px';
+        const header = card.querySelector('.widget-card-header');
+        if (header) header.draggable = false;
+
+        if (!card.querySelector('.widget-snapback')) {
+            const snapback = document.createElement('button');
+            snapback.className = 'widget-snapback';
+            snapback.title = 'Snap back to rail';
+            snapback.textContent = '↩';
+            snapback.style.marginLeft = '6px';
+            snapback.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._dockCard(card, id);
+            });
+            const actions = card.querySelector('.widget-card-actions');
+            if (actions) actions.appendChild(snapback);
+        }
+
+        document.body.appendChild(card);
+        this._wireFloatingDrag(card, id);
+        this._saveState();
+    }
+
+    _dockCard(card, id) {
+        delete this.state.floating[id];
+        card.classList.remove('widget-floating');
+        card.style.position = '';
+        card.style.left = '';
+        card.style.top = '';
+        const header = card.querySelector('.widget-card-header');
+        if (header) header.draggable = true;
+        const snapback = card.querySelector('.widget-snapback');
+        if (snapback) snapback.remove();
+        this.list.appendChild(card);
+        this._syncOrderFromDOM();
+        this._saveState();
+    }
+
+    _wireFloatingDrag(card, id) {
+        const header = card.querySelector('.widget-card-header');
+        if (!header) return;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        const onMove = (e) => {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            const rect = card.getBoundingClientRect();
+            let left = startLeft + dx;
+            let top = startTop + dy;
+            if (!e.altKey) {
+                const snapped = this._applySnapping(left, top, rect, card);
+                left = snapped.left;
+                top = snapped.top;
+            }
+            card.style.left = `${left}px`;
+            card.style.top = `${top}px`;
+            this.state.floating[id] = { left, top };
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            this._saveState();
+        };
+        header.addEventListener('mousedown', (e) => {
+            if (!card.classList.contains('widget-floating')) return;
+            e.preventDefault();
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = parseInt(card.style.left || '0', 10);
+            startTop = parseInt(card.style.top || '0', 10);
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    _applySnapping(left, top, rect, card) {
+        const snap = 10;
+        const width = rect.width;
+        const height = rect.height;
+
+        const edges = [
+            { x: 0, y: null },
+            { x: window.innerWidth - width, y: null },
+            { x: null, y: 0 },
+            { x: null, y: window.innerHeight - height }
+        ];
+
+        const paper = document.getElementById('paper');
+        if (paper) {
+            const paperRect = paper.getBoundingClientRect();
+            edges.push({ x: paperRect.left - width, y: null });
+            edges.push({ x: paperRect.right, y: null });
+            edges.push({ x: null, y: paperRect.top - height });
+            edges.push({ x: null, y: paperRect.bottom });
+        }
+
+        if (this.rail) {
+            const railRect = this.rail.getBoundingClientRect();
+            edges.push({ x: railRect.left - width, y: null });
+            edges.push({ x: railRect.right, y: null });
+            edges.push({ x: null, y: railRect.top - height });
+            edges.push({ x: null, y: railRect.bottom });
+        }
+
+        document.querySelectorAll('.widget-floating').forEach(el => {
+            if (el === card) return;
+            const r = el.getBoundingClientRect();
+            edges.push({ x: r.left - width, y: null });
+            edges.push({ x: r.right, y: null });
+            edges.push({ x: null, y: r.top - height });
+            edges.push({ x: null, y: r.bottom });
+        });
+
+        edges.forEach(edge => {
+            if (edge.x !== null && Math.abs(left - edge.x) <= snap) left = edge.x;
+            if (edge.y !== null && Math.abs(top - edge.y) <= snap) top = edge.y;
+        });
+        return { left, top };
+    }
+
+    _wireScrollAutoExpand() {
+        const workspace = document.getElementById('workspace');
+        const paper = document.getElementById('paper');
+        if (!workspace || !paper) return;
+
+        const onScroll = () => {
+            const paperRect = paper.getBoundingClientRect();
+            const workspaceRect = workspace.getBoundingClientRect();
+            const beyond =
+                paperRect.top > workspaceRect.top + 20 ||
+                paperRect.bottom < workspaceRect.bottom - 20;
+            if (beyond && this.state.collapsed) {
+                this.autoExpanded = true;
+                this._setCollapsed(false, true);
+            } else if (!beyond && this.autoExpanded) {
+                this.autoExpanded = false;
+                this._setCollapsed(true, true);
+            }
+        };
+        workspace.addEventListener('scroll', onScroll, { passive: true });
+    }
+
+    _setCollapsed(collapsed, fromAuto = false) {
+        this.state.collapsed = collapsed;
+        this.rail.classList.toggle('collapsed', collapsed);
+        if (!fromAuto) this._saveState();
+    }
+
+    _setSide(side) {
+        this.state.side = side;
+        this.rail.dataset.side = side;
+        if (side === 'left') {
+            this.rail.style.left = '0';
+            this.rail.style.right = '';
+        } else {
+            this.rail.style.right = '0';
+            this.rail.style.left = '';
+        }
+    }
+
+    _applyState() {
+        this._setSide(this.state.side);
+        this.rail.style.top = `${this.state.top}px`;
+        this._setCollapsed(this.state.collapsed, true);
+    }
+
+    _updateWidgetState(id, patch) {
+        this.state.widgetState[id] = { ...(this.state.widgetState[id] || {}), ...patch };
+        this._saveState();
+    }
+
+    _promptSideOnce() {
+        // Always keep widget rail on the right side below the night mode button
+        this._setSide('right');
+        localStorage.setItem('widgetRailSideSet', '1');
+        this._saveState();
+    }
+
+    _loadState() {
+        try {
+            const raw = localStorage.getItem('widgetRailState');
+            if (!raw) return;
+            const saved = JSON.parse(raw);
+            this.state = { ...this.state, ...saved };
+            this.state.side = 'right'; // always lock to right side
+        } catch (e) {
+            /* ignore */
+        }
+    }
+
+    _saveState() {
+        try {
+            localStorage.setItem('widgetRailState', JSON.stringify(this.state));
+        } catch (e) {
+            /* ignore */
+        }
+    }
+
+    attachAudioRecorder(recorder) {
+        this.audioRecorder = recorder;
+        this._render();
+    }
+
+    onFocusModeChange(isFocus) {
+        if (isFocus) {
+            this._setCollapsed(true, true);
+        } else {
+            this._setCollapsed(this.state.collapsed, true);
+        }
     }
 }
 
@@ -3347,6 +3917,9 @@ window.toggleMobileSidebar = () => {
 
 window.toggleFocusMode = () => {
     document.body.classList.toggle('focus-mode');
+    if (window.widgetRail) {
+        window.widgetRail.onFocusModeChange(document.body.classList.contains('focus-mode'));
+    }
 };
 
 // Paper texture cycling
@@ -10715,6 +11288,16 @@ function drawPerfectShape(shapeResult) {
 
 // ========== PHASE 2: AUDIO RECORDING ==========
 let audioRecorder = null;
+window.widgetRail = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        window.widgetRail = new WidgetRailManager();
+        window.widgetRail.initialize();
+    } catch (e) {
+        console.error('Error initializing widget rail:', e);
+    }
+});
 
 // Update initializeAdvancedFeatures to include audio recorder
 const originalInitAdvanced = initializeAdvancedFeatures;
@@ -10726,6 +11309,9 @@ initializeAdvancedFeatures = function () {
     try {
         audioRecorder = new AudioRecorderWidget();
         audioRecorder.initialize();
+        if (window.widgetRail) {
+            window.widgetRail.attachAudioRecorder(audioRecorder);
+        }
         console.log('✅ Audio Recorder initialized');
     } catch (err) {
         console.error('Error initializing audio recorder:', err);

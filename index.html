@@ -621,6 +621,22 @@
         </div>
         <button class="tool-tray-toggle" id="trayToggle">◀</button>
     </div>
+    <!-- WIDGET RAIL (collapsed strip + expandable widgets) -->
+    <div class="widget-rail collapsed" data-side="right" id="widgetRail">
+        <div class="widget-rail-handle" title="Drag to reposition">⋮⋮</div>
+        <button class="widget-rail-tab" id="widgetRailTab" title="Widgets">
+            <span class="widget-rail-tab-icon">🧩</span>
+        </button>
+        <div class="widget-rail-content">
+            <div class="widget-rail-header">
+                <span>Widgets</span>
+                <div class="widget-rail-header-actions">
+                    <button class="widget-rail-collapse" id="widgetRailCollapse" title="Collapse">»</button>
+                </div>
+            </div>
+            <div class="widget-list" id="widgetList"></div>
+        </div>
+    </div>
     <!-- MAIN CONTAINER FOR SPLIT LAYOUT -->
     <div class="main-container" id="mainContainer">
         <main class="workspace" id="workspace">

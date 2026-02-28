@@ -4976,3 +4976,210 @@ body.dark-mode .lasso-selected {
 .recording-audio {
     display: none;
 }
+
+/* ==================== WIDGET RAIL ==================== */
+.widget-rail {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    left: auto !important;
+    width: 320px;
+    max-height: calc(100vh - 160px);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    z-index: 9000;
+    transition: transform 0.2s ease, width 0.2s ease, opacity 0.2s ease;
+    pointer-events: auto;
+}
+
+.widget-rail[data-side="left"] {
+    right: 20px;
+    left: auto !important;
+}
+
+.widget-rail.collapsed {
+    width: 40px;
+}
+
+.widget-rail-handle {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+    padding: 4px 6px;
+    cursor: grab;
+    z-index: 2;
+    user-select: none;
+}
+
+.widget-rail-tab {
+    width: 40px;
+    height: 100%;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: rgba(44, 62, 80, 0.9);
+    color: #ecf0f1;
+    cursor: pointer;
+    border-radius: 10px 0 0 10px;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
+}
+
+.widget-rail[data-side="left"] .widget-rail-tab {
+    border-radius: 10px 0 0 10px;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
+}
+
+.widget-rail.collapsed .widget-rail-content {
+    display: none;
+}
+
+.widget-rail-content {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-right: none;
+    border-radius: 12px 0 0 12px;
+    padding: 12px;
+    margin-left: 40px;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+    overflow-y: auto;
+    max-height: calc(100vh - 160px);
+}
+
+.widget-rail[data-side="left"] .widget-rail-content {
+    margin-left: 0;
+    margin-right: 40px;
+    border-right: none;
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px 0 0 12px;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+}
+
+.widget-rail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 0.95rem;
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.widget-rail-collapse {
+    border: none;
+    background: rgba(0, 0, 0, 0.08);
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.widget-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.widget-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.widget-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: rgba(44, 62, 80, 0.08);
+    cursor: grab;
+}
+
+.widget-card-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.widget-card-actions button {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.widget-card-body {
+    padding: 10px;
+}
+
+.widget-card.minimized .widget-card-body {
+    display: none;
+}
+
+/* Floating widgets (detached) */
+.widget-floating {
+    position: fixed;
+    width: 320px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    z-index: 9500;
+}
+
+.widget-floating .widget-card-header {
+    cursor: move;
+    background: rgba(44, 62, 80, 0.12);
+}
+
+.widget-snap-hint {
+    outline: 2px dashed rgba(52, 152, 219, 0.5);
+}
+
+/* Embedded recordings container inside widget */
+.recordings-container.embedded {
+    position: static;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    max-height: 280px;
+    margin-top: 8px;
+    box-shadow: none;
+    border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+    .widget-rail {
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
+        max-height: 45vh;
+    }
+    .widget-rail.collapsed {
+        width: 100%;
+        height: 44px;
+    }
+    .widget-rail-tab {
+        width: 100%;
+        min-height: 44px;
+        border-radius: 10px 10px 0 0;
+    }
+    .widget-rail-content {
+        margin: 0;
+        border-radius: 12px 12px 0 0;
+        border-right: 1px solid rgba(0, 0, 0, 0.1);
+        max-height: 40vh;
+    }
+}
