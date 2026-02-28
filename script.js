@@ -325,7 +325,144 @@ class AuthManager {
                 </text>
             </svg>`;
     }
+
+    // ─────────────────────────────────────────────
+    //  OAUTH — SHARED HELPER
+    // ─────────────────────────────────────────────
+
+    _upsertOAuthUser({ id, email, displayName, provider }) {
+        const users = this._getUsers();
+        let user = users.find(u => u.id === id);
+        if (!user) {
+            user = {
+                id,
+                email,
+                displayName,
+                avatarColor: this._randomAvatarColor(),
+                provider,
+                createdAt: new Date().toISOString(),
+            };
+            users.push(user);
+        } else {
+            user.displayName = displayName;
+            user.email = email;
+        }
+        this._saveUsers(users);
+        return user;
+    }
+
+    // ─────────────────────────────────────────────
+    //  OAUTH — GOOGLE  (fully client-side via GSI)
+    // ─────────────────────────────────────────────
+
+    loginWithGoogle() {
+        return new Promise((resolve) => {
+            const cfg = window.OAUTH_CONFIG || {};
+            if (!cfg.googleClientId) {
+                resolve({ ok: false, error: 'Google Client ID not configured. Add it to window.OAUTH_CONFIG.googleClientId in script.js.' });
+                return;
+            }
+            const run = () => {
+                const client = google.accounts.oauth2.initTokenClient({
+                    client_id: cfg.googleClientId,
+                    scope: 'openid email profile',
+                    callback: async (tokenResponse) => {
+                        if (tokenResponse.error) {
+                            resolve({ ok: false, error: 'Google sign-in failed: ' + tokenResponse.error });
+                            return;
+                        }
+                        try {
+                            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                                headers: { Authorization: 'Bearer ' + tokenResponse.access_token }
+                            });
+                            const profile = await res.json();
+                            if (!profile.sub) throw new Error('Empty profile');
+                            const user = this._upsertOAuthUser({
+                                id: 'google_' + profile.sub,
+                                email: profile.email || 'google@google.com',
+                                displayName: profile.name || profile.email || 'Google User',
+                                provider: 'google',
+                            });
+                            this._setSession(user, false);
+                            resolve({ ok: true, user });
+                        } catch (err) {
+                            resolve({ ok: false, error: 'Could not retrieve your Google profile. Please try again.' });
+                        }
+                    },
+                    error_callback: (err) => {
+                        if (err.type === 'popup_closed') {
+                            resolve({ ok: false, error: 'Sign-in cancelled.' });
+                        } else {
+                            resolve({ ok: false, error: 'Google sign-in error: ' + (err.message || err.type) });
+                        }
+                    },
+                });
+                client.requestAccessToken({ prompt: 'select_account' });
+            };
+
+            if (window.google?.accounts?.oauth2) {
+                run();
+            } else {
+                const existing = document.getElementById('_gsi_script');
+                if (existing) { existing.addEventListener('load', run); return; }
+                const s = document.createElement('script');
+                s.id = '_gsi_script';
+                s.src = 'https://accounts.google.com/gsi/client';
+                s.onload = run;
+                s.onerror = () => resolve({ ok: false, error: 'Failed to load Google Sign-In library. Check your internet connection.' });
+                document.head.appendChild(s);
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────
+    //  FORGOT PASSWORD — local reset
+    //  Since auth is local-only, we verify the email
+    //  exists then allow setting a new password directly.
+    // ─────────────────────────────────────────────
+
+    async resetPassword(email, newPassword) {
+        email = (email || '').trim().toLowerCase();
+        newPassword = (newPassword || '');
+
+        if (!email) return { ok: false, error: 'Please enter your email address.' };
+
+        const users = this._getUsers();
+        const idx = users.findIndex(u => u.email.toLowerCase() === email);
+        if (idx === -1) return { ok: false, error: 'No account found with that email address.' };
+
+        const user = users[idx];
+        if (user.provider) {
+            return { ok: false, error: `This account uses ${user.provider} sign-in. Password reset is not available for it.` };
+        }
+        if (newPassword.length < 6) {
+            return { ok: false, error: 'New password must be at least 6 characters.' };
+        }
+
+        users[idx].passwordHash = await this.hashPassword(newPassword);
+        this._saveUsers(users);
+        return { ok: true };
+    }
+
+    emailExists(email) {
+        email = (email || '').trim().toLowerCase();
+        const user = this._getUsers().find(u => u.email.toLowerCase() === email);
+        if (!user) return { found: false };
+        if (user.provider) return { found: true, oauthProvider: user.provider };
+        return { found: true, oauthProvider: null };
+    }
 }
+
+// ─────────────────────────────────────────────
+//  OAUTH CONFIGURATION — Google only
+//  1. Go to https://console.cloud.google.com/
+//  2. Create an OAuth 2.0 Client ID (Web application)
+//  3. Add your page URL to "Authorised JavaScript origins"
+//  4. Paste the Client ID below.
+// ─────────────────────────────────────────────
+window.OAUTH_CONFIG = {
+    googleClientId: '292090378060-e5vvim1pabuftf837cvbi709ojdqvkd8.apps.googleusercontent.com',
+};
 
 // ─────────────────────────────────────────────
 //  GLOBAL SINGLETON

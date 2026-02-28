@@ -445,6 +445,76 @@
         }
 
         /* ═══════════════════════════════════════
+           GOOGLE SIGN-IN BUTTON
+        ═══════════════════════════════════════ */
+        .btn-google {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 11px;
+            border-radius: 6px;
+            border: 2px solid var(--paper-line);
+            background: transparent;
+            font-family: 'Caveat', cursive;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--ink-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 4px;
+        }
+        .btn-google:hover {
+            background: #fafafa;
+            border-color: #aaa;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .btn-google:active  { transform: scale(0.98); }
+        .btn-google:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-google svg { flex-shrink: 0; width: 18px; height: 18px; }
+
+        /* ═══════════════════════════════════════
+           FORGOT PASSWORD PANEL
+        ═══════════════════════════════════════ */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            font-family: 'Caveat', cursive;
+            font-size: 1rem;
+            color: var(--ink-light);
+            cursor: pointer;
+            padding: 0;
+            margin-bottom: 20px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--ink-dark); }
+
+        .forgot-link {
+            display: block;
+            text-align: right;
+            margin-top: 8px;
+            background: none;
+            border: none;
+            font-family: 'Kalam', cursive;
+            font-size: 0.82rem;
+            color: var(--ink-light);
+            cursor: pointer;
+            padding: 0;
+            transition: color 0.2s;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .forgot-link:hover { color: var(--accent); }
+
+        .reset-step { display: none; }
+        .reset-step.active { display: block; }
+
+        /* ═══════════════════════════════════════
            RESPONSIVE
         ═══════════════════════════════════════ */
         @media (max-width: 480px) {
@@ -531,29 +601,30 @@
             <div class="form-panel active" id="panelSignIn" role="tabpanel">
                 <div class="form-message" id="msgSignIn"></div>
 
+                <button class="btn-google" id="btnGoogleSignIn" onclick="handleGoogleSignIn()" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    Continue with Google
+                </button>
+
+                <div class="divider">or sign in with email</div>
+
                 <div class="field-group">
                     <label class="field-label" for="siEmail">Email</label>
-                    <input class="field-input"
-                           type="email"
-                           id="siEmail"
-                           placeholder="you@example.com"
-                           autocomplete="email"
-                           required/>
+                    <input class="field-input" type="email" id="siEmail"
+                           placeholder="you@example.com" autocomplete="email" required/>
                 </div>
 
                 <div class="field-group">
                     <label class="field-label" for="siPassword">Password</label>
                     <div class="pw-wrapper">
-                        <input class="field-input"
-                               type="password"
-                               id="siPassword"
-                               placeholder="••••••••"
-                               autocomplete="current-password"
-                               required/>
+                        <input class="field-input" type="password" id="siPassword"
+                               placeholder="••••••••" autocomplete="current-password" required/>
                         <button class="pw-toggle" type="button"
-                                onclick="togglePw('siPassword', this)"
-                                aria-label="Show password">👁️</button>
+                                onclick="togglePw('siPassword', this)" aria-label="Show password">👁️</button>
                     </div>
+                    <button class="forgot-link" type="button" onclick="switchTab('forgot')">
+                        Forgot password?
+                    </button>
                 </div>
 
                 <button class="btn-primary" id="btnSignIn" onclick="handleSignIn()">
@@ -572,53 +643,42 @@
             <div class="form-panel" id="panelRegister" role="tabpanel">
                 <div class="form-message" id="msgRegister"></div>
 
+                <button class="btn-google" id="btnGoogleRegister" onclick="handleGoogleSignIn()" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    Sign up with Google
+                </button>
+
+                <div class="divider">or create account with email</div>
+
                 <div class="field-group">
                     <label class="field-label" for="regName">Your Name</label>
-                    <input class="field-input"
-                           type="text"
-                           id="regName"
-                           placeholder="e.g. Alex"
-                           autocomplete="name"
-                           required/>
+                    <input class="field-input" type="text" id="regName"
+                           placeholder="e.g. Alex" autocomplete="name" required/>
                 </div>
 
                 <div class="field-group">
                     <label class="field-label" for="regEmail">Email</label>
-                    <input class="field-input"
-                           type="email"
-                           id="regEmail"
-                           placeholder="you@example.com"
-                           autocomplete="email"
-                           required/>
+                    <input class="field-input" type="email" id="regEmail"
+                           placeholder="you@example.com" autocomplete="email" required/>
                 </div>
 
                 <div class="field-group">
                     <label class="field-label" for="regPassword">Password</label>
                     <div class="pw-wrapper">
-                        <input class="field-input"
-                               type="password"
-                               id="regPassword"
-                               placeholder="At least 6 characters"
-                               autocomplete="new-password"
-                               required/>
+                        <input class="field-input" type="password" id="regPassword"
+                               placeholder="At least 6 characters" autocomplete="new-password" required/>
                         <button class="pw-toggle" type="button"
-                                onclick="togglePw('regPassword', this)"
-                                aria-label="Show password">👁️</button>
+                                onclick="togglePw('regPassword', this)" aria-label="Show password">👁️</button>
                     </div>
                 </div>
 
                 <div class="field-group">
                     <label class="field-label" for="regConfirm">Confirm Password</label>
                     <div class="pw-wrapper">
-                        <input class="field-input"
-                               type="password"
-                               id="regConfirm"
-                               placeholder="Same password again"
-                               autocomplete="new-password"
-                               required/>
+                        <input class="field-input" type="password" id="regConfirm"
+                               placeholder="Same password again" autocomplete="new-password" required/>
                         <button class="pw-toggle" type="button"
-                                onclick="togglePw('regConfirm', this)"
-                                aria-label="Show password">👁️</button>
+                                onclick="togglePw('regConfirm', this)" aria-label="Show password">👁️</button>
                     </div>
                 </div>
 
@@ -632,6 +692,56 @@
                 <button class="btn-guest" onclick="handleGuest()">
                     👤 Continue as Guest
                 </button>
+            </div>
+
+            <!-- ─── FORGOT PASSWORD PANEL ─── -->
+            <div class="form-panel" id="panelForgot" role="tabpanel">
+
+                <button class="back-link" type="button" onclick="switchTab('signin')">
+                    ← Back to Sign In
+                </button>
+
+                <div class="form-message" id="msgForgot"></div>
+
+                <!-- Step 1: enter email -->
+                <div class="reset-step active" id="resetStep1">
+                    <div class="field-group">
+                        <label class="field-label" for="forgotEmail">Your Email</label>
+                        <input class="field-input" type="email" id="forgotEmail"
+                               placeholder="you@example.com" autocomplete="email"/>
+                    </div>
+                    <button class="btn-primary" id="btnForgotLookup" onclick="handleForgotLookup()">
+                        <span class="btn-text">🔍 Find My Account</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+
+                <!-- Step 2: set new password -->
+                <div class="reset-step" id="resetStep2">
+                    <div class="field-group">
+                        <label class="field-label" for="resetPassword">New Password</label>
+                        <div class="pw-wrapper">
+                            <input class="field-input" type="password" id="resetPassword"
+                                   placeholder="At least 6 characters" autocomplete="new-password"/>
+                            <button class="pw-toggle" type="button"
+                                    onclick="togglePw('resetPassword', this)" aria-label="Show password">👁️</button>
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="resetConfirm">Confirm New Password</label>
+                        <div class="pw-wrapper">
+                            <input class="field-input" type="password" id="resetConfirm"
+                                   placeholder="Same password again" autocomplete="new-password"/>
+                            <button class="pw-toggle" type="button"
+                                    onclick="togglePw('resetConfirm', this)" aria-label="Show password">👁️</button>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="btnResetConfirm" onclick="handleResetConfirm()">
+                        <span class="btn-text">🔒 Set New Password</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+
             </div>
 
             <!-- Footer note -->
@@ -652,59 +762,72 @@
     }
 
     function authError(msgId) {
-        showMessage(
-            msgId || 'msgSignIn',
-            '⚠️ Auth system failed to load. Make sure auth.js is in the same folder as login.html.',
-            'error'
-        );
-        console.error('[Login] window.AUTH is undefined — auth.js did not load correctly.');
+        showMessage(msgId || 'msgSignIn',
+            '⚠️ Auth system failed to load. Make sure script.js is in the same folder.',
+            'error');
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         if (!authReady()) {
-            showMessage('msgSignIn',   '⚠️ Auth system failed to load. Check that auth.js is present.', 'error');
-            showMessage('msgRegister', '⚠️ Auth system failed to load. Check that auth.js is present.', 'error');
+            showMessage('msgSignIn',   '⚠️ Auth system failed to load. Check that script.js is present.', 'error');
+            showMessage('msgRegister', '⚠️ Auth system failed to load. Check that script.js is present.', 'error');
             return;
         }
-        // Already logged in → skip straight to the app
         if (window.AUTH.isAuthenticated()) {
             window.location.replace('index.html');
         }
     });
 
     // ─────────────────────────────────────────────
-    //  TAB SWITCHING
+    //  TAB SWITCHING (signin | register | forgot)
     // ─────────────────────────────────────────────
     function switchTab(tab) {
-        const panels = { signin: 'panelSignIn', register: 'panelRegister' };
-        const tabs   = { signin: 'tabSignIn',   register: 'tabRegister' };
-        Object.keys(panels).forEach(key => {
-            document.getElementById(panels[key]).classList.toggle('active', key === tab);
-            const btn = document.getElementById(tabs[key]);
-            btn.classList.toggle('active', key === tab);
-            btn.setAttribute('aria-selected', key === tab);
+        // All panels
+        ['panelSignIn', 'panelRegister', 'panelForgot'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
         });
+        // Tab underline buttons (only signin & register have visible tabs)
+        ['tabSignIn', 'tabRegister'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const active = (id === 'tabSignIn' && tab === 'signin') ||
+                           (id === 'tabRegister' && tab === 'register');
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', active);
+        });
+
+        const panelMap = { signin: 'panelSignIn', register: 'panelRegister', forgot: 'panelForgot' };
+        const panel = document.getElementById(panelMap[tab]);
+        if (panel) panel.classList.add('active');
+
+        // Reset forgot flow when entering that panel
+        if (tab === 'forgot') {
+            showResetStep(1);
+            clearMessages();
+            const fe = document.getElementById('forgotEmail');
+            if (fe) fe.value = '';
+        }
+
         clearMessages();
     }
 
     function clearMessages() {
-        ['msgSignIn','msgRegister'].forEach(id => {
+        ['msgSignIn', 'msgRegister', 'msgForgot'].forEach(id => {
             const el = document.getElementById(id);
-            el.className = 'form-message';
-            el.textContent = '';
+            if (el) { el.className = 'form-message'; el.textContent = ''; }
         });
     }
 
     function showMessage(id, text, type) {
-        type = type || 'error';
         const el = document.getElementById(id);
         if (!el) return;
         el.textContent = text;
-        el.className = 'form-message ' + type;
+        el.className = 'form-message ' + (type || 'error');
     }
 
     // ─────────────────────────────────────────────
-    //  PASSWORD VISIBILITY TOGGLE
+    //  HELPERS
     // ─────────────────────────────────────────────
     function togglePw(inputId, btn) {
         const input = document.getElementById(inputId);
@@ -713,9 +836,6 @@
         btn.textContent = show ? '🙈' : '👁️';
     }
 
-    // ─────────────────────────────────────────────
-    //  LOADING STATE
-    // ─────────────────────────────────────────────
     function setLoading(btnId, loading) {
         const btn = document.getElementById(btnId);
         if (!btn) return;
@@ -723,18 +843,47 @@
         btn.classList.toggle('loading', loading);
     }
 
-    // ─────────────────────────────────────────────
-    //  SUCCESS TRANSITION
-    // ─────────────────────────────────────────────
     function showSuccessAndRedirect(message) {
         const overlay = document.getElementById('successOverlay');
         document.getElementById('successText').textContent = message;
         overlay.classList.add('visible');
-        setTimeout(function() { window.location.replace('index.html'); }, 900);
+        setTimeout(function () { window.location.replace('index.html'); }, 900);
     }
 
     // ─────────────────────────────────────────────
-    //  SIGN IN
+    //  GOOGLE SIGN-IN
+    // ─────────────────────────────────────────────
+    async function handleGoogleSignIn() {
+        clearMessages();
+        if (!authReady()) { authError('msgSignIn'); return; }
+
+        const btns = document.querySelectorAll('.btn-google');
+        btns.forEach(b => { b.disabled = true; b.textContent = 'Connecting…'; });
+
+        try {
+            const result = await window.AUTH.loginWithGoogle();
+            if (!result.ok) {
+                const activePanel = document.querySelector('.form-panel.active');
+                const msgId = activePanel?.id === 'panelRegister' ? 'msgRegister' : 'msgSignIn';
+                showMessage(msgId, result.error, 'error');
+            } else {
+                showSuccessAndRedirect('Welcome, ' + result.user.displayName + '! ✏️');
+                return;
+            }
+        } catch (err) {
+            showMessage('msgSignIn', 'Something went wrong. Please try again.', 'error');
+        }
+
+        // Restore buttons
+        const googleSVG = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;flex-shrink:0"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>';
+        document.getElementById('btnGoogleSignIn').disabled   = false;
+        document.getElementById('btnGoogleSignIn').innerHTML  = googleSVG + ' Continue with Google';
+        document.getElementById('btnGoogleRegister').disabled  = false;
+        document.getElementById('btnGoogleRegister').innerHTML = googleSVG + ' Sign up with Google';
+    }
+
+    // ─────────────────────────────────────────────
+    //  SIGN IN (email)
     // ─────────────────────────────────────────────
     async function handleSignIn() {
         clearMessages();
@@ -759,7 +908,7 @@
     }
 
     // ─────────────────────────────────────────────
-    //  REGISTER
+    //  REGISTER (email)
     // ─────────────────────────────────────────────
     async function handleRegister() {
         clearMessages();
@@ -800,7 +949,89 @@
     }
 
     // ─────────────────────────────────────────────
-    //  KEYBOARD SHORTCUT — Enter submits active form
+    //  FORGOT PASSWORD — Step 1: look up the email
+    // ─────────────────────────────────────────────
+    function showResetStep(n) {
+        document.getElementById('resetStep1').classList.toggle('active', n === 1);
+        document.getElementById('resetStep2').classList.toggle('active', n === 2);
+    }
+
+    function handleForgotLookup() {
+        clearMessages();
+        if (!authReady()) { authError('msgForgot'); return; }
+
+        const email = (document.getElementById('forgotEmail').value || '').trim();
+        if (!email) {
+            showMessage('msgForgot', 'Please enter your email address.', 'error');
+            return;
+        }
+
+        setLoading('btnForgotLookup', true);
+
+        // Small delay so it doesn't feel instant (avoids email enumeration feel)
+        setTimeout(() => {
+            const check = window.AUTH.emailExists(email);
+            setLoading('btnForgotLookup', false);
+
+            if (!check.found) {
+                showMessage('msgForgot', 'No account found with that email address.', 'error');
+                return;
+            }
+            if (check.oauthProvider) {
+                showMessage('msgForgot',
+                    `This account uses ${check.oauthProvider} sign-in — it has no password to reset. ` +
+                    `Use the "${check.oauthProvider.charAt(0).toUpperCase() + check.oauthProvider.slice(1)}" button to sign in.`,
+                    'error');
+                return;
+            }
+
+            // Account found — move to step 2
+            clearMessages();
+            showMessage('msgForgot', '✅ Account found. Set your new password below.', 'success');
+            showResetStep(2);
+        }, 400);
+    }
+
+    // ─────────────────────────────────────────────
+    //  FORGOT PASSWORD — Step 2: set new password
+    // ─────────────────────────────────────────────
+    async function handleResetConfirm() {
+        clearMessages();
+        if (!authReady()) { authError('msgForgot'); return; }
+
+        const email    = (document.getElementById('forgotEmail').value || '').trim();
+        const password = document.getElementById('resetPassword').value;
+        const confirm  = document.getElementById('resetConfirm').value;
+
+        if (password !== confirm) {
+            showMessage('msgForgot', 'Passwords do not match.', 'error');
+            return;
+        }
+
+        setLoading('btnResetConfirm', true);
+        try {
+            const result = await window.AUTH.resetPassword(email, password);
+            if (!result.ok) {
+                showMessage('msgForgot', result.error, 'error');
+                setLoading('btnResetConfirm', false);
+                return;
+            }
+            // Success — show message then switch back to sign in
+            showMessage('msgForgot', '🔒 Password updated! Redirecting to sign in…', 'success');
+            setTimeout(() => {
+                switchTab('signin');
+                // Pre-fill email so user just needs to type new password
+                const siEmail = document.getElementById('siEmail');
+                if (siEmail) siEmail.value = email;
+            }, 1500);
+        } catch (err) {
+            showMessage('msgForgot', 'Something went wrong. Please try again.', 'error');
+            setLoading('btnResetConfirm', false);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    //  KEYBOARD — Enter submits active form
     // ─────────────────────────────────────────────
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter') return;
@@ -808,6 +1039,11 @@
         if (!activePanel) return;
         if (activePanel.id === 'panelSignIn')   handleSignIn();
         if (activePanel.id === 'panelRegister') handleRegister();
+        if (activePanel.id === 'panelForgot') {
+            const step1Active = document.getElementById('resetStep1').classList.contains('active');
+            if (step1Active) handleForgotLookup();
+            else handleResetConfirm();
+        }
     });
 </script>
 </body>
