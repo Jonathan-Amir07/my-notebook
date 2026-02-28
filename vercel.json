@@ -1,9 +1,4 @@
 {
-  "cleanUrls": false,
-  "trailingSlash": false,
-  "routes": [
-    {
-      "handle": "filesystem"
-    }
-  ]
+  "cleanUrls": true,
+  "trailingSlash": false
 }
