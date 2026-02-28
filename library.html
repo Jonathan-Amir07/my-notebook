@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Note Library — Academic Notebook</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Kalam:wght@300;400;700&family=Patrick+Hand&display=swap" rel="stylesheet"/>
+    <script src="script.js"></script>
+    <style>
+        /* ═══════════════════════════════════════
+           BASE
+        ═══════════════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --paper-bg:     #f9f6ee;
+            --paper-line:   #d6cfc0;
+            --paper-dark:   #ede8dc;
+            --ink-dark:     #2c3e50;
+            --ink-mid:      #4a5568;
+            --ink-light:    #718096;
+            --red-margin:   #e8a9a9;
+            --accent:       #2980b9;
+            --accent-hover: #1a6fa8;
+            --danger:       #c0392b;
+            --success:      #27ae60;
+            --tag-bg:       rgba(41,128,185,0.12);
+            --tag-color:    #1a5276;
+            --shadow:       rgba(0,0,0,0.12);
+            --binding:      #b5a590;
+        }
+
+        body {
+            min-height: 100vh;
+            background-color: #d4c9b0;
+            background-image:
+                radial-gradient(ellipse at 20% 80%, rgba(180,160,120,0.3) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(160,140,100,0.3) 0%, transparent 50%);
+            font-family: 'Patrick Hand', cursive;
+            color: var(--ink-dark);
+        }
+
+        /* ═══════════════════════════════════════
+           TOP NAV BAR
+        ═══════════════════════════════════════ */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--ink-dark);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 20px;
+            height: 52px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        }
+        .topbar-back {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+            font-family: 'Caveat', cursive;
+            font-size: 1rem;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .topbar-back:hover { background: rgba(255,255,255,0.2); }
+        .topbar-title {
+            font-family: 'Caveat', cursive;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            flex: 1;
+        }
+        .topbar-user {
+            font-family: 'Kalam', cursive;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+        }
+        .btn-import {
+            background: rgba(39,174,96,0.2);
+            border: 1px solid rgba(39,174,96,0.4);
+            color: #2ecc71;
+            font-family: 'Caveat', cursive;
+            font-size: 1rem;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.15s;
+        }
+        .btn-import:hover { background: rgba(39,174,96,0.3); }
+        .btn-import input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* ═══════════════════════════════════════
+           PAGE WRAPPER — looks like a wide notebook
+        ═══════════════════════════════════════ */
+        .page-wrapper {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 0 20px 60px;
+        }
+
+        /* ═══════════════════════════════════════
+           SEARCH + FILTER BAR  (on a paper strip)
+        ═══════════════════════════════════════ */
+        .search-strip {
+            background: var(--paper-bg);
+            border-radius: 3px 8px 8px 3px;
+            box-shadow: -4px 0 0 var(--binding), 2px 2px 12px rgba(0,0,0,0.18);
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 24px;
+            position: relative;
+        }
+        .search-strip::before {
+            content: '';
+            position: absolute;
+            left: 36px; top: 0; bottom: 0;
+            width: 2px;
+            background: var(--red-margin);
+            pointer-events: none;
+        }
+        .search-label {
+            font-family: 'Caveat', cursive;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--ink-mid);
+            white-space: nowrap;
+            padding-left: 14px;
+        }
+        .search-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--paper-line);
+            padding: 6px 4px;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 1rem;
+            color: var(--ink-dark);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-input:focus { border-bottom-color: var(--accent); }
+        .search-input::placeholder { color: var(--paper-line); font-style: italic; }
+
+        .filter-select {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--paper-line);
+            padding: 6px 4px;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 0.9rem;
+            color: var(--ink-mid);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .result-count {
+            font-family: 'Kalam', cursive;
+            font-size: 0.82rem;
+            color: var(--ink-light);
+            white-space: nowrap;
+        }
+
+        /* ═══════════════════════════════════════
+           EMPTY STATE
+        ═══════════════════════════════════════ */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--paper-bg);
+            border-radius: 3px 12px 12px 3px;
+            box-shadow: -4px 0 0 var(--binding), 2px 2px 12px rgba(0,0,0,0.12);
+        }
+        .empty-state-icon { font-size: 3.5rem; display: block; margin-bottom: 10px; }
+        .empty-state-title {
+            font-family: 'Caveat', cursive;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--ink-dark);
+            margin-bottom: 8px;
+        }
+        .empty-state-sub {
+            font-family: 'Kalam', cursive;
+            font-size: 0.95rem;
+            color: var(--ink-light);
+            line-height: 1.6;
+        }
+
+        /* ═══════════════════════════════════════
+           NOTE CARDS GRID
+        ═══════════════════════════════════════ */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        /* Each card looks like a folded page */
+        .note-card {
+            background: var(--paper-bg);
+            border-radius: 3px 10px 10px 3px;
+            box-shadow: -4px 0 0 var(--binding), 2px 3px 14px rgba(0,0,0,0.15);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: default;
+        }
+        .note-card:hover {
+            transform: translateY(-3px);
+            box-shadow: -4px 0 0 var(--binding), 3px 8px 24px rgba(0,0,0,0.2);
+        }
+
+        /* Ruled lines on card */
+        .note-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent, transparent 23px,
+                var(--paper-line) 23px, var(--paper-line) 24px
+            );
+            background-position: 0 44px;
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        /* Red margin on card */
+        .card-margin {
+            position: absolute;
+            left: 38px;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: var(--red-margin);
+        }
+
+        .card-body {
+            padding: 18px 18px 14px 50px;
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-title {
+            font-family: 'Caveat', cursive;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--ink-dark);
+            margin-bottom: 6px;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+
+        .card-snippet {
+            font-family: 'Kalam', cursive;
+            font-size: 0.82rem;
+            color: var(--ink-mid);
+            line-height: 1.55;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+        .card-tag {
+            background: var(--tag-bg);
+            color: var(--tag-color);
+            font-family: 'Kalam', cursive;
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(41,128,185,0.2);
+        }
+
+        .card-meta {
+            font-family: 'Kalam', cursive;
+            font-size: 0.72rem;
+            color: var(--ink-light);
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .card-meta-author { font-weight: 700; color: var(--ink-mid); }
+
+        /* Card actions */
+        .card-actions {
+            display: flex;
+            gap: 6px;
+            padding: 10px 14px 12px 50px;
+            background: rgba(0,0,0,0.03);
+            border-top: 1px solid var(--paper-line);
+            position: relative;
+            z-index: 1;
+        }
+        .card-btn {
+            flex: 1;
+            padding: 6px 4px;
+            border: 1px solid var(--paper-line);
+            background: transparent;
+            border-radius: 5px;
+            font-family: 'Caveat', cursive;
+            font-size: 0.9rem;
+            color: var(--ink-mid);
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .card-btn:hover {
+            background: var(--ink-dark);
+            color: #fff;
+            border-color: var(--ink-dark);
+        }
+        .card-btn.btn-clone:hover  { background: var(--success); border-color: var(--success); }
+        .card-btn.btn-download:hover { background: var(--accent); border-color: var(--accent); }
+        .card-btn.btn-delete {
+            flex: 0;
+            padding: 6px 10px;
+            color: var(--danger);
+            border-color: transparent;
+        }
+        .card-btn.btn-delete:hover {
+            background: rgba(192,57,43,0.1);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* "Mine" badge */
+        .mine-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--ink-dark);
+            color: #fff;
+            font-family: 'Kalam', cursive;
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 8px;
+            z-index: 2;
+        }
+
+        /* ═══════════════════════════════════════
+           VIEW MODAL (read-only preview)
+        ═══════════════════════════════════════ */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(3px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s;
+        }
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-paper {
+            background: var(--paper-bg);
+            border-radius: 3px 12px 12px 3px;
+            box-shadow: -6px 0 0 var(--binding), 6px 6px 40px rgba(0,0,0,0.35);
+            width: 100%;
+            max-width: 720px;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        .modal-paper::before {
+            content: '';
+            position: absolute;
+            left: 42px; top: 0; bottom: 0;
+            width: 2px;
+            background: var(--red-margin);
+            pointer-events: none;
+        }
+        /* Ruled lines in modal */
+        .modal-lines {
+            position: absolute;
+            inset: 0;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent, transparent 31px,
+                var(--paper-line) 31px, var(--paper-line) 32px
+            );
+            background-position: 0 64px;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .modal-header {
+            padding: 18px 24px 14px 56px;
+            border-bottom: 1px solid var(--paper-line);
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .modal-title {
+            font-family: 'Caveat', cursive;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--ink-dark);
+            flex: 1;
+            line-height: 1.2;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.4rem;
+            cursor: pointer;
+            color: var(--ink-light);
+            line-height: 1;
+            padding: 2px 4px;
+            transition: color 0.15s;
+            flex-shrink: 0;
+        }
+        .modal-close:hover { color: var(--danger); }
+        .modal-meta {
+            padding: 8px 24px 10px 56px;
+            border-bottom: 1px solid var(--paper-line);
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .modal-content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 24px 24px 56px;
+            position: relative;
+            z-index: 1;
+            line-height: 1.8;
+            font-size: 0.95rem;
+            color: var(--ink-dark);
+        }
+        /* Render the HTML content but strip any interactive bits */
+        .modal-content-area * { max-width: 100%; }
+        .modal-content-area img { border-radius: 6px; }
+        .modal-footer {
+            padding: 12px 20px 12px 56px;
+            border-top: 1px solid var(--paper-line);
+            display: flex;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+        .modal-btn {
+            padding: 8px 18px;
+            border-radius: 6px;
+            font-family: 'Caveat', cursive;
+            font-size: 1.05rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .modal-btn-clone {
+            background: var(--success);
+            color: #fff;
+        }
+        .modal-btn-clone:hover { background: #219a52; }
+        .modal-btn-download {
+            background: var(--accent);
+            color: #fff;
+        }
+        .modal-btn-download:hover { background: var(--accent-hover); }
+        .modal-btn-close {
+            background: var(--paper-line);
+            color: var(--ink-dark);
+        }
+        .modal-btn-close:hover { background: #c4b9aa; }
+
+        /* ═══════════════════════════════════════
+           TOAST
+        ═══════════════════════════════════════ */
+        .lib-toast {
+            position: fixed;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--ink-dark);
+            color: #fff;
+            font-family: 'Caveat', cursive;
+            font-size: 1.05rem;
+            padding: 10px 22px;
+            border-radius: 20px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+            z-index: 2000;
+            white-space: nowrap;
+        }
+        .lib-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ═══════════════════════════════════════
+           ANIMATIONS
+        ═══════════════════════════════════════ */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .note-card { animation: fadeUp 0.3s ease both; }
+
+        @media (max-width: 600px) {
+            .topbar-title { font-size: 1.1rem; }
+            .search-strip { flex-wrap: wrap; }
+            .search-label { padding-left: 0; }
+            .modal-paper { border-radius: 8px; }
+            .modal-paper::before { display: none; }
+            .modal-header, .modal-meta, .modal-content-area, .modal-footer { padding-left: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ───────── TOP BAR ───────── -->
+<nav class="topbar">
+    <a class="topbar-back" href="index.html">← Notebook</a>
+    <div class="topbar-title">📚 Shared Note Library</div>
+    <div class="topbar-user" id="topbarUser"></div>
+    <label class="btn-import" title="Import a shared .json note file">
+        ⬆ Import Note
+        <input type="file" accept=".json" id="importFileInput"/>
+    </label>
+</nav>
+
+<!-- ───────── MAIN CONTENT ───────── -->
+<div class="page-wrapper">
+
+    <!-- Search + Filter strip -->
+    <div class="search-strip">
+        <span class="search-label">🔍 Search</span>
+        <input class="search-input"
+               id="searchInput"
+               type="text"
+               placeholder="title, #tag, or author…"
+               autocomplete="off"/>
+        <select class="filter-select" id="categoryFilter">
+            <option value="all">All categories</option>
+            <option value="general">General</option>
+            <option value="cs">Computer Science</option>
+            <option value="medical">Medical</option>
+            <option value="engineering">Engineering</option>
+        </select>
+        <span class="result-count" id="resultCount"></span>
+    </div>
+
+    <!-- Cards -->
+    <div class="cards-grid" id="cardsGrid"></div>
+
+    <!-- Empty state (shown when no results) -->
+    <div class="empty-state" id="emptyState" style="display:none;">
+        <span class="empty-state-icon">📭</span>
+        <div class="empty-state-title" id="emptyTitle">The library is empty</div>
+        <div class="empty-state-sub" id="emptySub">
+            Open your notebook and click the 📤 share icon next to any note<br>
+            to publish it here. Or import a shared .json file using the button above.
+        </div>
+    </div>
+
+</div>
+
+<!-- ───────── VIEW MODAL ───────── -->
+<div class="modal-overlay" id="viewModal" onclick="handleModalOverlayClick(event)">
+    <div class="modal-paper">
+        <div class="modal-lines"></div>
+        <div class="modal-header">
+            <div class="modal-title" id="modalTitle">—</div>
+            <button class="modal-close" onclick="closeModal()" title="Close">✕</button>
+        </div>
+        <div class="modal-meta" id="modalMeta"></div>
+        <div class="modal-content-area" id="modalContent"></div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-clone"    id="modalCloneBtn"    onclick="cloneCurrentEntry()">📋 Clone into my Notebook</button>
+            <button class="modal-btn modal-btn-download" id="modalDownloadBtn" onclick="downloadCurrentEntry()">⬇ Download .json</button>
+            <button class="modal-btn modal-btn-close"    onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="lib-toast" id="libToast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  AUTH CHECK
+// ─────────────────────────────────────────────
+(function () {
+    if (window.AUTH && !window.AUTH.isAuthenticated()) {
+        window.location.replace('login.html');
+    }
+})();
+
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+let currentEntryId = null;  // entry open in modal
+const user = window.AUTH ? window.AUTH.getCurrentUser() : null;
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+function init() {
+    // Show user info
+    const userEl = document.getElementById('topbarUser');
+    if (user) userEl.textContent = '👤 ' + user.displayName;
+
+    // Wire search + filter
+    document.getElementById('searchInput').addEventListener('input', renderCards);
+    document.getElementById('categoryFilter').addEventListener('change', renderCards);
+
+    // Wire import file
+    document.getElementById('importFileInput').addEventListener('change', handleImport);
+
+    renderCards();
+}
+
+// ─────────────────────────────────────────────
+//  RENDER CARDS
+// ─────────────────────────────────────────────
+function renderCards() {
+    const query    = document.getElementById('searchInput').value;
+    const category = document.getElementById('categoryFilter').value;
+    const entries  = window.LIBRARY.search(query, category);
+
+    const grid   = document.getElementById('cardsGrid');
+    const empty  = document.getElementById('emptyState');
+    const count  = document.getElementById('resultCount');
+
+    grid.innerHTML = '';
+
+    if (entries.length === 0) {
+        grid.style.display = 'none';
+        empty.style.display = 'block';
+
+        const hasAny = window.LIBRARY.getAll().length > 0;
+        document.getElementById('emptyTitle').textContent = hasAny ? 'No results found' : 'The library is empty';
+        document.getElementById('emptySub').innerHTML = hasAny
+            ? 'Try a different search term or category.'
+            : 'Open your notebook and click the 📤 share icon next to any note<br>to publish it here. Or import a shared .json file using the button above.';
+
+        count.textContent = '';
+        return;
+    }
+
+    grid.style.display = 'grid';
+    empty.style.display = 'none';
+    count.textContent = entries.length + ' note' + (entries.length !== 1 ? 's' : '');
+
+    entries.forEach((entry, i) => {
+        const card = buildCard(entry);
+        card.style.animationDelay = (i * 40) + 'ms';
+        grid.appendChild(card);
+    });
+}
+
+// ─────────────────────────────────────────────
+//  BUILD CARD
+// ─────────────────────────────────────────────
+function buildCard(entry) {
+    const isOwner = user && entry.authorId === user.userId;
+    const date    = entry.publishedAt
+        ? new Date(entry.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+
+    const card = document.createElement('div');
+    card.className = 'note-card';
+    card.dataset.id = entry.id;
+
+    // Red margin line
+    const margin = document.createElement('div');
+    margin.className = 'card-margin';
+    card.appendChild(margin);
+
+    // Mine badge
+    if (isOwner) {
+        const badge = document.createElement('div');
+        badge.className = 'mine-badge';
+        badge.textContent = '✏️ mine';
+        card.appendChild(badge);
+    }
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    // Tags
+    const tagsHtml = (entry.tags || []).length > 0
+        ? `<div class="card-tags">${entry.tags.map(t => `<span class="card-tag">#${t}</span>`).join('')}</div>`
+        : '';
+
+    body.innerHTML = `
+        <div class="card-title">${escHtml(entry.title)}</div>
+        <div class="card-snippet">${escHtml(entry.snippet || '(no preview)')}</div>
+        ${tagsHtml}
+        <div class="card-meta">
+            <span class="card-meta-author">✏️ ${escHtml(entry.author || 'Unknown')}</span>
+            ${date ? `<span>📅 ${date}</span>` : ''}
+        </div>
+    `;
+
+    card.appendChild(body);
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    actions.innerHTML = `
+        <button class="card-btn" onclick="openModal('${entry.id}')">👁 View</button>
+        <button class="card-btn btn-clone" onclick="cloneEntry('${entry.id}')">📋 Clone</button>
+        <button class="card-btn btn-download" onclick="downloadEntry('${entry.id}')">⬇ Download</button>
+        ${isOwner ? `<button class="card-btn btn-delete" onclick="deleteEntry('${entry.id}')" title="Remove from library">🗑</button>` : ''}
+    `;
+    card.appendChild(actions);
+
+    return card;
+}
+
+// ─────────────────────────────────────────────
+//  VIEW MODAL
+// ─────────────────────────────────────────────
+function openModal(id) {
+    const entry = window.LIBRARY.getById(id);
+    if (!entry) return;
+    currentEntryId = id;
+
+    const isOwner = user && entry.authorId === user.userId;
+    const date    = entry.publishedAt
+        ? new Date(entry.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+
+    document.getElementById('modalTitle').textContent = entry.title;
+
+    // Meta row
+    const tagsHtml = (entry.tags || []).map(t => `<span class="card-tag">#${t}</span>`).join('');
+    document.getElementById('modalMeta').innerHTML = `
+        <span class="card-meta-author" style="font-family:'Kalam',cursive;font-size:0.8rem;color:var(--ink-mid);">✏️ ${escHtml(entry.author)}</span>
+        ${date ? `<span style="font-family:'Kalam',cursive;font-size:0.8rem;color:var(--ink-light);">📅 ${date}</span>` : ''}
+        ${tagsHtml}
+        ${isOwner ? '<span style="font-family:\'Kalam\',cursive;font-size:0.75rem;background:var(--ink-dark);color:#fff;padding:2px 8px;border-radius:8px;">✏️ mine</span>' : ''}
+    `;
+
+    // Content — sanitise by removing scripts but keep formatting
+    const sanitised = (entry.content || '<p>(empty)</p>')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/on\w+="[^"]*"/gi, '');
+    document.getElementById('modalContent').innerHTML = sanitised;
+
+    // Hide clone/download for own notes? No — still useful
+    document.getElementById('viewModal').classList.add('open');
+}
+
+function closeModal() {
+    document.getElementById('viewModal').classList.remove('open');
+    currentEntryId = null;
+}
+
+function handleModalOverlayClick(e) {
+    if (e.target === document.getElementById('viewModal')) closeModal();
+}
+
+function cloneCurrentEntry()    { if (currentEntryId) cloneEntry(currentEntryId); }
+function downloadCurrentEntry() { if (currentEntryId) downloadEntry(currentEntryId); }
+
+// ─────────────────────────────────────────────
+//  ACTIONS
+// ─────────────────────────────────────────────
+function cloneEntry(id) {
+    const clone = window.LIBRARY.buildClone(id);
+    if (!clone) { toast('Note not found'); return; }
+
+    // Save into the current user's IndexedDB via a cross-page helper:
+    // We write a "pending clone" to localStorage that index.html picks up on load.
+    const pendingKey = window.AUTH ? window.AUTH.getStorageKey('nb_pending_clone') : 'nb_pending_clone';
+    localStorage.setItem(pendingKey, JSON.stringify(clone));
+
+    toast('📋 Cloned! Opening your notebook…');
+    setTimeout(() => window.location.href = 'index.html', 900);
+}
+
+function downloadEntry(id) {
+    window.LIBRARY.exportNote(id);
+    toast('⬇ Downloading share file…');
+}
+
+async function deleteEntry(id) {
+    if (!user) return;
+    if (!confirm('Remove this note from the library? It stays in your notebook.')) return;
+    const result = window.LIBRARY.deleteEntry(id, user.userId);
+    if (result.ok) {
+        toast('🗑 Removed from library');
+        closeModal();
+        renderCards();
+    } else {
+        toast('❌ ' + result.error);
+    }
+}
+
+// ─────────────────────────────────────────────
+//  IMPORT
+// ─────────────────────────────────────────────
+async function handleImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = ''; // reset so same file can be re-imported
+
+    const result = await window.LIBRARY.importFromFile(file);
+    if (result.ok) {
+        toast('✅ Note imported to library!');
+        renderCards();
+    } else {
+        toast('❌ ' + result.error);
+    }
+}
+
+// ─────────────────────────────────────────────
+//  TOAST
+// ─────────────────────────────────────────────
+let toastTimer = null;
+function toast(msg) {
+    const el = document.getElementById('libToast');
+    el.textContent = msg;
+    el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─────────────────────────────────────────────
+//  KEYBOARD
+// ─────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+});
+
+// ─────────────────────────────────────────────
+//  BOOT
+// ─────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

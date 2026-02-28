@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Sign In — Academic Notebook</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Kalam:wght@300;400;700&family=Patrick+Hand&display=swap" rel="stylesheet"/>
+    <script src="script.js"></script>
+    <style>
+        /* ═══════════════════════════════════════
+           RESET & BASE
+        ═══════════════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --paper-bg:     #f9f6ee;
+            --paper-line:   #d6cfc0;
+            --ink-dark:     #2c3e50;
+            --ink-mid:      #4a5568;
+            --ink-light:    #718096;
+            --red-margin:   #e8a9a9;
+            --accent:       #2980b9;
+            --accent-hover: #1a6fa8;
+            --danger:       #c0392b;
+            --success:      #27ae60;
+            --shadow:       rgba(0,0,0,0.12);
+        }
+
+        body {
+            min-height: 100vh;
+            background-color: #d4c9b0;
+            background-image:
+                /* Subtle cork/desk texture */
+                radial-gradient(ellipse at 20% 80%, rgba(180,160,120,0.3) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(160,140,100,0.3) 0%, transparent 50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Patrick Hand', cursive;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* ═══════════════════════════════════════
+           SCATTERED BACKGROUND NOTES (decorative)
+        ═══════════════════════════════════════ */
+        .bg-deco {
+            position: fixed;
+            pointer-events: none;
+            opacity: 0.18;
+            font-family: 'Caveat', cursive;
+            font-size: 13px;
+            color: #5a4a3a;
+            line-height: 1.9;
+            white-space: nowrap;
+        }
+        .bg-deco-1 {
+            top: 8%; left: 3%;
+            transform: rotate(-4deg);
+        }
+        .bg-deco-2 {
+            top: 55%; right: 2%;
+            transform: rotate(3deg);
+        }
+        .bg-deco-3 {
+            bottom: 10%; left: 5%;
+            transform: rotate(2deg);
+        }
+
+        /* ═══════════════════════════════════════
+           NOTEBOOK CARD
+        ═══════════════════════════════════════ */
+        .notebook-card {
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            background: var(--paper-bg);
+            border-radius: 3px 12px 12px 3px;
+            box-shadow:
+                /* Left binding shadow */
+                -6px 0 0 0 #b5a590,
+                -12px 0 0 0 #c9bba8,
+                /* Main shadow */
+                4px 4px 20px rgba(0,0,0,0.25),
+                0 8px 32px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        /* Spiral binding holes */
+        .binding-holes {
+            position: absolute;
+            left: -1px;
+            top: 0;
+            bottom: 0;
+            width: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            padding: 30px 0;
+            z-index: 10;
+        }
+        .binding-hole {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #c9bba8;
+            box-shadow:
+                inset 0 1px 3px rgba(0,0,0,0.3),
+                0 1px 2px rgba(255,255,255,0.5);
+        }
+
+        /* Red margin line */
+        .card-inner {
+            position: relative;
+            padding: 40px 36px 36px 50px;
+        }
+        .card-inner::before {
+            content: '';
+            position: absolute;
+            left: 40px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--red-margin);
+        }
+
+        /* Ruled lines on the paper */
+        .ruled-lines {
+            position: absolute;
+            inset: 0;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent,
+                transparent 31px,
+                var(--paper-line) 31px,
+                var(--paper-line) 32px
+            );
+            background-position: 0 60px;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* Content sits above the lines */
+        .card-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ═══════════════════════════════════════
+           HEADER
+        ═══════════════════════════════════════ */
+        .card-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .card-icon {
+            font-size: 3rem;
+            line-height: 1;
+            display: block;
+            margin-bottom: 6px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+        }
+        .card-title {
+            font-family: 'Caveat', cursive;
+            font-size: 2.1rem;
+            font-weight: 700;
+            color: var(--ink-dark);
+            line-height: 1;
+            letter-spacing: -0.5px;
+        }
+        .card-subtitle {
+            font-family: 'Kalam', cursive;
+            font-size: 0.9rem;
+            color: var(--ink-light);
+            margin-top: 3px;
+        }
+
+        /* ═══════════════════════════════════════
+           TABS
+        ═══════════════════════════════════════ */
+        .tab-row {
+            display: flex;
+            border-bottom: 2px solid var(--paper-line);
+            margin-bottom: 24px;
+        }
+        .tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 8px 0 10px;
+            font-family: 'Caveat', cursive;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--ink-light);
+            cursor: pointer;
+            position: relative;
+            transition: color 0.2s;
+        }
+        .tab-btn.active {
+            color: var(--ink-dark);
+        }
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 15%;
+            right: 15%;
+            height: 3px;
+            background: var(--accent);
+            border-radius: 3px 3px 0 0;
+        }
+        .tab-btn:hover:not(.active) {
+            color: var(--ink-mid);
+        }
+
+        /* ═══════════════════════════════════════
+           FORMS
+        ═══════════════════════════════════════ */
+        .form-panel {
+            display: none;
+        }
+        .form-panel.active {
+            display: block;
+        }
+
+        .field-group {
+            margin-bottom: 18px;
+        }
+        .field-label {
+            display: block;
+            font-family: 'Caveat', cursive;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--ink-mid);
+            margin-bottom: 5px;
+        }
+        .field-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--paper-line);
+            padding: 6px 2px 8px;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 1rem;
+            color: var(--ink-dark);
+            outline: none;
+            transition: border-color 0.2s;
+            line-height: 1.5;
+        }
+        .field-input:focus {
+            border-bottom-color: var(--accent);
+        }
+        .field-input::placeholder {
+            color: var(--paper-line);
+            font-family: 'Kalam', cursive;
+            font-style: italic;
+        }
+
+        /* Password wrapper with toggle */
+        .pw-wrapper {
+            position: relative;
+        }
+        .pw-toggle {
+            position: absolute;
+            right: 2px;
+            bottom: 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+            padding: 0;
+            line-height: 1;
+        }
+        .pw-toggle:hover { opacity: 1; }
+
+        /* ═══════════════════════════════════════
+           ERROR / SUCCESS MESSAGES
+        ═══════════════════════════════════════ */
+        .form-message {
+            display: none;
+            padding: 9px 12px;
+            border-radius: 4px;
+            font-family: 'Kalam', cursive;
+            font-size: 0.88rem;
+            margin-bottom: 16px;
+            line-height: 1.4;
+        }
+        .form-message.error {
+            display: block;
+            background: #fdecea;
+            border-left: 3px solid var(--danger);
+            color: var(--danger);
+        }
+        .form-message.success {
+            display: block;
+            background: #eafaf1;
+            border-left: 3px solid var(--success);
+            color: var(--success);
+        }
+
+        /* ═══════════════════════════════════════
+           BUTTONS
+        ═══════════════════════════════════════ */
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: var(--ink-dark);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-family: 'Caveat', cursive;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            letter-spacing: 0.3px;
+            margin-top: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover {
+            background: #3d5469;
+        }
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-primary .spinner {
+            display: none;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin: 0 auto;
+        }
+        .btn-primary.loading .btn-text { display: none; }
+        .btn-primary.loading .spinner  { display: block; }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 22px 0 16px;
+            color: var(--ink-light);
+            font-family: 'Kalam', cursive;
+            font-size: 0.8rem;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--paper-line);
+        }
+
+        .btn-guest {
+            width: 100%;
+            padding: 10px;
+            background: transparent;
+            border: 2px dashed var(--paper-line);
+            border-radius: 6px;
+            font-family: 'Caveat', cursive;
+            font-size: 1.05rem;
+            color: var(--ink-light);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-guest:hover {
+            border-color: var(--ink-mid);
+            color: var(--ink-mid);
+            background: rgba(0,0,0,0.02);
+        }
+
+        /* ═══════════════════════════════════════
+           FOOTER NOTE
+        ═══════════════════════════════════════ */
+        .card-footer-note {
+            text-align: center;
+            margin-top: 18px;
+            font-family: 'Kalam', cursive;
+            font-size: 0.78rem;
+            color: var(--ink-light);
+            line-height: 1.5;
+        }
+        .card-footer-note strong {
+            color: var(--ink-mid);
+        }
+
+        /* ═══════════════════════════════════════
+           SUCCESS TRANSITION OVERLAY
+        ═══════════════════════════════════════ */
+        .success-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--paper-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s;
+        }
+        .success-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+        .success-overlay .so-icon {
+            font-size: 4rem;
+            animation: bounce 0.5s ease forwards;
+        }
+        .success-overlay .so-text {
+            font-family: 'Caveat', cursive;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--ink-dark);
+            margin-top: 12px;
+        }
+
+        /* ═══════════════════════════════════════
+           ANIMATIONS
+        ═══════════════════════════════════════ */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes bounce {
+            0%   { transform: scale(0.5); opacity: 0; }
+            60%  { transform: scale(1.15); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .notebook-card {
+            animation: fadeSlideIn 0.4s ease forwards;
+        }
+
+        /* ═══════════════════════════════════════
+           RESPONSIVE
+        ═══════════════════════════════════════ */
+        @media (max-width: 480px) {
+            .card-inner { padding: 32px 24px 28px 44px; }
+            .card-title { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Decorative background text (like scattered notes on a desk) -->
+<div class="bg-deco bg-deco-1">
+    ∫ f(x) dx = F(x) + C<br>
+    Mitochondria → powerhouse<br>
+    Big O: O(n log n)<br>
+    V = IR &nbsp;&nbsp; F = ma
+</div>
+<div class="bg-deco bg-deco-2">
+    dV/dt = Q/C<br>
+    SOLID Principles<br>
+    Krebs cycle → ATP<br>
+    ΔG = ΔH - TΔS
+</div>
+<div class="bg-deco bg-deco-3">
+    SELECT * FROM notes<br>
+    WHERE topic = 'exam'<br>
+    Ohm's Law: V = IR<br>
+    PV = nRT
+</div>
+
+<!-- Success overlay shown after login -->
+<div class="success-overlay" id="successOverlay">
+    <div class="so-icon">✏️</div>
+    <div class="so-text" id="successText">Opening your notebook…</div>
+</div>
+
+<!-- ─────────── NOTEBOOK CARD ─────────── -->
+<div class="notebook-card" role="main">
+
+    <!-- Spiral holes -->
+    <div class="binding-holes" aria-hidden="true">
+        <div class="binding-hole"></div>
+        <div class="binding-hole"></div>
+        <div class="binding-hole"></div>
+        <div class="binding-hole"></div>
+        <div class="binding-hole"></div>
+        <div class="binding-hole"></div>
+        <div class="binding-hole"></div>
+    </div>
+
+    <div class="card-inner">
+        <!-- Ruled lines background -->
+        <div class="ruled-lines" aria-hidden="true"></div>
+
+        <div class="card-content">
+            <!-- Header -->
+            <header class="card-header">
+                <span class="card-icon" role="img" aria-label="notebook">📚</span>
+                <div class="card-title">Academic Notebook</div>
+                <div class="card-subtitle">Your personal study space</div>
+            </header>
+
+            <!-- Tabs -->
+            <div class="tab-row" role="tablist">
+                <button class="tab-btn active"
+                        id="tabSignIn"
+                        role="tab"
+                        aria-selected="true"
+                        aria-controls="panelSignIn"
+                        onclick="switchTab('signin')">
+                    Sign In
+                </button>
+                <button class="tab-btn"
+                        id="tabRegister"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="panelRegister"
+                        onclick="switchTab('register')">
+                    Create Account
+                </button>
+            </div>
+
+            <!-- ─── SIGN IN PANEL ─── -->
+            <div class="form-panel active" id="panelSignIn" role="tabpanel">
+                <div class="form-message" id="msgSignIn"></div>
+
+                <div class="field-group">
+                    <label class="field-label" for="siEmail">Email</label>
+                    <input class="field-input"
+                           type="email"
+                           id="siEmail"
+                           placeholder="you@example.com"
+                           autocomplete="email"
+                           required/>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="siPassword">Password</label>
+                    <div class="pw-wrapper">
+                        <input class="field-input"
+                               type="password"
+                               id="siPassword"
+                               placeholder="••••••••"
+                               autocomplete="current-password"
+                               required/>
+                        <button class="pw-toggle" type="button"
+                                onclick="togglePw('siPassword', this)"
+                                aria-label="Show password">👁️</button>
+                    </div>
+                </div>
+
+                <button class="btn-primary" id="btnSignIn" onclick="handleSignIn()">
+                    <span class="btn-text">✏️ Open My Notebook</span>
+                    <div class="spinner"></div>
+                </button>
+
+                <div class="divider">or</div>
+
+                <button class="btn-guest" onclick="handleGuest()">
+                    👤 Continue as Guest
+                </button>
+            </div>
+
+            <!-- ─── REGISTER PANEL ─── -->
+            <div class="form-panel" id="panelRegister" role="tabpanel">
+                <div class="form-message" id="msgRegister"></div>
+
+                <div class="field-group">
+                    <label class="field-label" for="regName">Your Name</label>
+                    <input class="field-input"
+                           type="text"
+                           id="regName"
+                           placeholder="e.g. Alex"
+                           autocomplete="name"
+                           required/>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="regEmail">Email</label>
+                    <input class="field-input"
+                           type="email"
+                           id="regEmail"
+                           placeholder="you@example.com"
+                           autocomplete="email"
+                           required/>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="regPassword">Password</label>
+                    <div class="pw-wrapper">
+                        <input class="field-input"
+                               type="password"
+                               id="regPassword"
+                               placeholder="At least 6 characters"
+                               autocomplete="new-password"
+                               required/>
+                        <button class="pw-toggle" type="button"
+                                onclick="togglePw('regPassword', this)"
+                                aria-label="Show password">👁️</button>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="regConfirm">Confirm Password</label>
+                    <div class="pw-wrapper">
+                        <input class="field-input"
+                               type="password"
+                               id="regConfirm"
+                               placeholder="Same password again"
+                               autocomplete="new-password"
+                               required/>
+                        <button class="pw-toggle" type="button"
+                                onclick="togglePw('regConfirm', this)"
+                                aria-label="Show password">👁️</button>
+                    </div>
+                </div>
+
+                <button class="btn-primary" id="btnRegister" onclick="handleRegister()">
+                    <span class="btn-text">📝 Create My Notebook</span>
+                    <div class="spinner"></div>
+                </button>
+
+                <div class="divider">or</div>
+
+                <button class="btn-guest" onclick="handleGuest()">
+                    👤 Continue as Guest
+                </button>
+            </div>
+
+            <!-- Footer note -->
+            <p class="card-footer-note">
+                <strong>100% local.</strong> Your notes never leave this device.<br>
+                Guest notes are temporary and cleared after 24 h.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ─────────────────────────────────────────────
+    //  AUTH LOAD GUARD
+    // ─────────────────────────────────────────────
+    function authReady() {
+        return typeof window.AUTH !== 'undefined' && window.AUTH !== null;
+    }
+
+    function authError(msgId) {
+        showMessage(
+            msgId || 'msgSignIn',
+            '⚠️ Auth system failed to load. Make sure auth.js is in the same folder as login.html.',
+            'error'
+        );
+        console.error('[Login] window.AUTH is undefined — auth.js did not load correctly.');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!authReady()) {
+            showMessage('msgSignIn',   '⚠️ Auth system failed to load. Check that auth.js is present.', 'error');
+            showMessage('msgRegister', '⚠️ Auth system failed to load. Check that auth.js is present.', 'error');
+            return;
+        }
+        // Already logged in → skip straight to the app
+        if (window.AUTH.isAuthenticated()) {
+            window.location.replace('index.html');
+        }
+    });
+
+    // ─────────────────────────────────────────────
+    //  TAB SWITCHING
+    // ─────────────────────────────────────────────
+    function switchTab(tab) {
+        const panels = { signin: 'panelSignIn', register: 'panelRegister' };
+        const tabs   = { signin: 'tabSignIn',   register: 'tabRegister' };
+        Object.keys(panels).forEach(key => {
+            document.getElementById(panels[key]).classList.toggle('active', key === tab);
+            const btn = document.getElementById(tabs[key]);
+            btn.classList.toggle('active', key === tab);
+            btn.setAttribute('aria-selected', key === tab);
+        });
+        clearMessages();
+    }
+
+    function clearMessages() {
+        ['msgSignIn','msgRegister'].forEach(id => {
+            const el = document.getElementById(id);
+            el.className = 'form-message';
+            el.textContent = '';
+        });
+    }
+
+    function showMessage(id, text, type) {
+        type = type || 'error';
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'form-message ' + type;
+    }
+
+    // ─────────────────────────────────────────────
+    //  PASSWORD VISIBILITY TOGGLE
+    // ─────────────────────────────────────────────
+    function togglePw(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const show  = input.type === 'password';
+        input.type  = show ? 'text' : 'password';
+        btn.textContent = show ? '🙈' : '👁️';
+    }
+
+    // ─────────────────────────────────────────────
+    //  LOADING STATE
+    // ─────────────────────────────────────────────
+    function setLoading(btnId, loading) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.disabled = loading;
+        btn.classList.toggle('loading', loading);
+    }
+
+    // ─────────────────────────────────────────────
+    //  SUCCESS TRANSITION
+    // ─────────────────────────────────────────────
+    function showSuccessAndRedirect(message) {
+        const overlay = document.getElementById('successOverlay');
+        document.getElementById('successText').textContent = message;
+        overlay.classList.add('visible');
+        setTimeout(function() { window.location.replace('index.html'); }, 900);
+    }
+
+    // ─────────────────────────────────────────────
+    //  SIGN IN
+    // ─────────────────────────────────────────────
+    async function handleSignIn() {
+        clearMessages();
+        if (!authReady()) { authError('msgSignIn'); return; }
+
+        const email    = document.getElementById('siEmail').value.trim();
+        const password = document.getElementById('siPassword').value;
+
+        setLoading('btnSignIn', true);
+        try {
+            const result = await window.AUTH.login(email, password);
+            if (!result.ok) {
+                showMessage('msgSignIn', result.error, 'error');
+                setLoading('btnSignIn', false);
+                return;
+            }
+            showSuccessAndRedirect('Welcome back, ' + result.user.displayName + '! ✏️');
+        } catch (err) {
+            showMessage('msgSignIn', 'Something went wrong. Please try again.', 'error');
+            setLoading('btnSignIn', false);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    //  REGISTER
+    // ─────────────────────────────────────────────
+    async function handleRegister() {
+        clearMessages();
+        if (!authReady()) { authError('msgRegister'); return; }
+
+        const name     = document.getElementById('regName').value.trim();
+        const email    = document.getElementById('regEmail').value.trim();
+        const password = document.getElementById('regPassword').value;
+        const confirm  = document.getElementById('regConfirm').value;
+
+        if (password !== confirm) {
+            showMessage('msgRegister', 'Passwords do not match.', 'error');
+            return;
+        }
+
+        setLoading('btnRegister', true);
+        try {
+            const result = await window.AUTH.register(email, password, name);
+            if (!result.ok) {
+                showMessage('msgRegister', result.error, 'error');
+                setLoading('btnRegister', false);
+                return;
+            }
+            showSuccessAndRedirect('Notebook ready, ' + result.user.displayName + '! 🎉');
+        } catch (err) {
+            showMessage('msgRegister', 'Something went wrong. Please try again.', 'error');
+            setLoading('btnRegister', false);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    //  GUEST
+    // ─────────────────────────────────────────────
+    function handleGuest() {
+        if (!authReady()) { authError('msgSignIn'); return; }
+        window.AUTH.loginAsGuest();
+        showSuccessAndRedirect('Opening guest notebook… 👤');
+    }
+
+    // ─────────────────────────────────────────────
+    //  KEYBOARD SHORTCUT — Enter submits active form
+    // ─────────────────────────────────────────────
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        const activePanel = document.querySelector('.form-panel.active');
+        if (!activePanel) return;
+        if (activePanel.id === 'panelSignIn')   handleSignIn();
+        if (activePanel.id === 'panelRegister') handleRegister();
+    });
+</script>
+</body>
+</html>
