@@ -117,17 +117,8 @@ class AuthManager {
     }
 
     requireAuth() {
-        const authenticated = this.isAuthenticated();
-        const isLoginPage = window.location.pathname.includes('login');
-
-        if (!authenticated && !isLoginPage) {
-            // Not logged in and NOT on login page? Go to login.
-            window.location.href = this.LOGIN_PAGE;
-            return false;
-        }
-        if (authenticated && isLoginPage) {
-            // Logged in but still on login page? Go to app.
-            window.location.href = this.APP_PAGE;
+        if (!this.isAuthenticated()) {
+            window.location.replace(this.LOGIN_PAGE);
             return false;
         }
         return true;
