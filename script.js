@@ -22,11 +22,11 @@
 
 class AuthManager {
     constructor() {
-        this.SESSION_KEY  = 'nb_auth_session';
-        this.USERS_KEY    = 'nb_auth_users';
-        this.LOGIN_PAGE   = 'login.html';
-        this.APP_PAGE     = 'index.html';
-        this._session     = null; // in-memory cache
+        this.SESSION_KEY = 'nb_auth_session';
+        this.USERS_KEY = 'nb_auth_users';
+        this.LOGIN_PAGE = 'login.html';
+        this.APP_PAGE = 'index.html';
+        this._session = null; // in-memory cache
     }
 
     // ─────────────────────────────────────────────
@@ -35,7 +35,7 @@ class AuthManager {
 
     async hashPassword(password) {
         const encoder = new TextEncoder();
-        const data    = encoder.encode(password + 'nb_salt_v1');
+        const data = encoder.encode(password + 'nb_salt_v1');
         const hashBuf = await crypto.subtle.digest('SHA-256', data);
         return Array.from(new Uint8Array(hashBuf))
             .map(b => b.toString(16).padStart(2, '0'))
@@ -94,13 +94,13 @@ class AuthManager {
             : 30 * 24 * 60 * 60 * 1000;    // 30 days
 
         const session = {
-            userId:      user.id,
-            email:       user.email,
+            userId: user.id,
+            email: user.email,
             displayName: user.displayName,
             avatarColor: user.avatarColor,
             isGuest,
-            createdAt:   Date.now(),
-            expiresAt:   Date.now() + ttl,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + ttl,
         };
         this._session = session;
         localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
@@ -117,8 +117,17 @@ class AuthManager {
     }
 
     requireAuth() {
-        if (!this.isAuthenticated()) {
-            window.location.replace(this.LOGIN_PAGE);
+        const authenticated = this.isAuthenticated();
+        const isLoginPage = window.location.pathname.includes('login');
+
+        if (!authenticated && !isLoginPage) {
+            // Not logged in and NOT on login page? Go to login.
+            window.location.href = this.LOGIN_PAGE;
+            return false;
+        }
+        if (authenticated && isLoginPage) {
+            // Logged in but still on login page? Go to app.
+            window.location.href = this.APP_PAGE;
             return false;
         }
         return true;
@@ -129,9 +138,9 @@ class AuthManager {
     // ─────────────────────────────────────────────
 
     async register(email, password, displayName) {
-        email       = (email || '').trim();
+        email = (email || '').trim();
         displayName = (displayName || '').trim();
-        password    = (password || '');
+        password = (password || '');
 
         // Validation
         if (!email || !email.includes('@'))
@@ -146,15 +155,15 @@ class AuthManager {
             return { ok: false, error: 'An account with this email already exists.' };
 
         const passwordHash = await this.hashPassword(password);
-        const avatarColor  = this._randomAvatarColor();
+        const avatarColor = this._randomAvatarColor();
 
         const user = {
-            id:           this._generateId(),
+            id: this._generateId(),
             email,
             displayName,
             passwordHash,
             avatarColor,
-            createdAt:    new Date().toISOString(),
+            createdAt: new Date().toISOString(),
         };
 
         users.push(user);
@@ -169,7 +178,7 @@ class AuthManager {
     // ─────────────────────────────────────────────
 
     async login(email, password) {
-        email    = (email || '').trim();
+        email = (email || '').trim();
         password = (password || '');
 
         if (!email || !password)
@@ -193,10 +202,10 @@ class AuthManager {
 
     loginAsGuest() {
         const guestUser = {
-            id:           'guest_' + Math.random().toString(36).slice(2, 10),
-            email:        'guest@local',
-            displayName:  'Guest',
-            avatarColor:  '#7f8c8d',
+            id: 'guest_' + Math.random().toString(36).slice(2, 10),
+            email: 'guest@local',
+            displayName: 'Guest',
+            avatarColor: '#7f8c8d',
         };
         this._setSession(guestUser, true);
         return { ok: true, user: guestUser };
@@ -223,7 +232,7 @@ class AuthManager {
         if (!session || session.isGuest) return;
 
         const users = this._getUsers();
-        const idx   = users.findIndex(u => u.id === session.userId);
+        const idx = users.findIndex(u => u.id === session.userId);
         if (idx !== -1) {
             users[idx].displayName = name;
             this._saveUsers(users);
@@ -243,7 +252,7 @@ class AuthManager {
             return { ok: false, error: 'New password must be at least 6 characters.' };
 
         const users = this._getUsers();
-        const user  = users.find(u => u.id === session.userId);
+        const user = users.find(u => u.id === session.userId);
         if (!user) return { ok: false, error: 'User not found.' };
 
         const oldHash = await this.hashPassword(oldPassword);
@@ -259,13 +268,13 @@ class AuthManager {
         const session = this.getCurrentUser();
         if (!session) return;
 
-        const users   = this._getUsers().filter(u => u.id !== session.userId);
+        const users = this._getUsers().filter(u => u.id !== session.userId);
         this._saveUsers(users);
 
         // Drop per-user IndexedDB
         try {
             indexedDB.deleteDatabase(this.getDbName());
-        } catch (_) {}
+        } catch (_) { }
 
         this.logout();
     }
@@ -294,8 +303,8 @@ class AuthManager {
 
     _randomAvatarColor() {
         const palette = [
-            '#2980b9','#27ae60','#8e44ad','#c0392b',
-            '#16a085','#d35400','#2c3e50','#f39c12',
+            '#2980b9', '#27ae60', '#8e44ad', '#c0392b',
+            '#16a085', '#d35400', '#2c3e50', '#f39c12',
         ];
         return palette[Math.floor(Math.random() * palette.length)];
     }
@@ -314,10 +323,10 @@ class AuthManager {
         const session = this.getCurrentUser();
         if (!session) return '';
         const initials = this.getInitials(session.displayName);
-        const color    = session.avatarColor || '#2c3e50';
+        const color = session.avatarColor || '#2c3e50';
         return `
             <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-                <circle cx="${size/2}" cy="${size/2}" r="${size/2}" fill="${color}"/>
+                <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="${color}"/>
                 <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle"
                       fill="white" font-size="${Math.round(size * 0.38)}"
                       font-family="Caveat, cursive" font-weight="700">
@@ -396,17 +405,17 @@ class SharedLibrary {
         const snippet = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
 
         const entry = {
-            id:          'lib_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
-            originalId:  chapter.id,
-            title:       chapter.title || 'Untitled',
+            id: 'lib_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
+            originalId: chapter.id,
+            title: chapter.title || 'Untitled',
             snippet,
-            tags:        chapter.tags || [],
-            category:    chapter.category || chapter.metadata?.discipline || 'General',
-            author:      user.displayName || 'Anonymous',
-            authorId:    user.userId,
+            tags: chapter.tags || [],
+            category: chapter.category || chapter.metadata?.discipline || 'General',
+            author: user.displayName || 'Anonymous',
+            authorId: user.userId,
             publishedAt: new Date().toISOString(),
-            content:     chapter.content || '',
-            metadata:    chapter.metadata || {},
+            content: chapter.content || '',
+            metadata: chapter.metadata || {},
         };
 
         entries.unshift(entry);
@@ -451,7 +460,7 @@ class SharedLibrary {
 
         return entries.filter(e => {
             const inTitle = (e.title || '').toLowerCase().includes(q);
-            const inTags  = (e.tags || []).some(t => t.toLowerCase().includes(q.replace('#', '')));
+            const inTags = (e.tags || []).some(t => t.toLowerCase().includes(q.replace('#', '')));
             const inAuthor = (e.author || '').toLowerCase().includes(q);
             return inTitle || inTags || inAuthor;
         });
@@ -482,22 +491,22 @@ class SharedLibrary {
         if (!entry) return;
 
         const shareData = {
-            _type:      'nb_shared_note_v1',
-            id:          entry.id,
-            title:       entry.title,
-            snippet:     entry.snippet,
-            tags:        entry.tags,
-            category:    entry.category,
-            author:      entry.author,
+            _type: 'nb_shared_note_v1',
+            id: entry.id,
+            title: entry.title,
+            snippet: entry.snippet,
+            tags: entry.tags,
+            category: entry.category,
+            author: entry.author,
             publishedAt: entry.publishedAt,
-            content:     entry.content,
-            metadata:    entry.metadata,
+            content: entry.content,
+            metadata: entry.metadata,
         };
 
         const blob = new Blob([JSON.stringify(shareData, null, 2)], { type: 'application/json' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
         a.download = `${entry.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_shared.json`;
         a.click();
         URL.revokeObjectURL(url);
@@ -524,17 +533,17 @@ class SharedLibrary {
 
                     // Strip internal id-based originalId to avoid confusion
                     const entry = {
-                        id:          data.id,
-                        originalId:  null, // imported — no local original
-                        title:       data.title || 'Untitled',
-                        snippet:     data.snippet || '',
-                        tags:        data.tags || [],
-                        category:    data.category || 'General',
-                        author:      data.author || 'Unknown',
-                        authorId:    null, // imported — not owner
+                        id: data.id,
+                        originalId: null, // imported — no local original
+                        title: data.title || 'Untitled',
+                        snippet: data.snippet || '',
+                        tags: data.tags || [],
+                        category: data.category || 'General',
+                        author: data.author || 'Unknown',
+                        authorId: null, // imported — not owner
                         publishedAt: data.publishedAt || new Date().toISOString(),
-                        content:     data.content || '',
-                        metadata:    data.metadata || {},
+                        content: data.content || '',
+                        metadata: data.metadata || {},
                     };
 
                     entries.unshift(entry);
@@ -557,13 +566,13 @@ class SharedLibrary {
         const entry = this.getById(id);
         if (!entry) return null;
         return {
-            id:       'ch_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
-            title:    entry.title + ' (clone)',
+            id: 'ch_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+            title: entry.title + ' (clone)',
             category: entry.category || 'General',
-            tags:     entry.tags || [],
-            content:  entry.content || '',
-            tool:     'pen',
-            sketch:   null,
+            tags: entry.tags || [],
+            content: entry.content || '',
+            tool: 'pen',
+            sketch: null,
             paperStyle: 'grid',
             lastEdited: new Date().toISOString(),
             metadata: { ...entry.metadata, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
@@ -2031,7 +2040,7 @@ const BRAIN_SVG = `
 
 // --- INDEXEDDB STORAGE ENGINE (DB v2) ---
 // DB name is per-user — each account gets its own isolated database
-const DB_NAME   = (window.AUTH && window.AUTH.isAuthenticated())
+const DB_NAME = (window.AUTH && window.AUTH.isAuthenticated())
     ? window.AUTH.getDbName()
     : 'NotebookDB_vSeq_anonymous';
 const STORE_NAME = 'chapters';
@@ -5184,9 +5193,9 @@ function renderUserProfile() {
     const user = window.AUTH.getCurrentUser();
     if (!user) return;
 
-    const avatarSvg   = window.AUTH.getAvatarHTML(34);
-    const isGuest     = user.isGuest;
-    const guestBadge  = isGuest
+    const avatarSvg = window.AUTH.getAvatarHTML(34);
+    const isGuest = user.isGuest;
+    const guestBadge = isGuest
         ? `<span class="up-guest-badge">Guest</span>`
         : '';
 
@@ -5254,7 +5263,7 @@ function openAccountModal() {
 
 async function saveDisplayName() {
     const input = document.getElementById('accName');
-    const name  = (input.value || '').trim();
+    const name = (input.value || '').trim();
     if (!name) return;
     window.AUTH.updateDisplayName(name);
     renderUserProfile();
@@ -5262,9 +5271,9 @@ async function saveDisplayName() {
 }
 
 async function savePassword() {
-    const msgEl  = document.getElementById('accMsg');
-    const oldPw  = document.getElementById('accOldPw').value;
-    const newPw  = document.getElementById('accNewPw').value;
+    const msgEl = document.getElementById('accMsg');
+    const oldPw = document.getElementById('accOldPw').value;
+    const newPw = document.getElementById('accNewPw').value;
     const confPw = document.getElementById('accConfPw').value;
 
     msgEl.style.display = 'none';
@@ -5281,7 +5290,7 @@ async function savePassword() {
     if (result.ok) {
         msgEl.textContent = '✓ Password updated!';
         msgEl.style.color = '#27ae60';
-        ['accOldPw','accNewPw','accConfPw'].forEach(id => document.getElementById(id).value = '');
+        ['accOldPw', 'accNewPw', 'accConfPw'].forEach(id => document.getElementById(id).value = '');
     } else {
         msgEl.textContent = '❌ ' + result.error;
         msgEl.style.color = '#e74c3c';
@@ -9054,7 +9063,7 @@ function renderChapterItem(ch, list) {
 
 // ─── PUBLISH TO SHARED LIBRARY ───────────────────────────────────────────────
 
-window.publishToLibrary = function(chapterId) {
+window.publishToLibrary = function (chapterId) {
     if (!window.LIBRARY || !window.AUTH) {
         showToast('Library not available');
         return;
