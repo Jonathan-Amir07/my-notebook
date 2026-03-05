@@ -579,6 +579,16 @@
             transition: all 0.15s;
         }
 
+        .modal-btn-view-style {
+            background: var(--ink-mid);
+            color: #fff;
+            margin-right: auto;
+        }
+
+        .modal-btn-view-style:hover {
+            background: var(--ink-dark);
+        }
+
         .modal-btn-clone {
             background: var(--success);
             color: #fff;
@@ -1143,6 +1153,15 @@
         ${isOwner ? '<span style="font-family:\'Kalam\',cursive;font-size:0.75rem;background:var(--ink-dark);color:#fff;padding:2px 8px;border-radius:8px;">✏️ mine</span>' : ''}
     `;
 
+            const btnViewStyle = document.getElementById('btnViewStyle');
+            if (btnViewStyle) {
+                if (entry.frontEndData?.metadata?.originalHtml || entry.metadata?.originalHtml) {
+                    btnViewStyle.style.display = 'inline-block';
+                } else {
+                    btnViewStyle.style.display = 'none';
+                }
+            }
+
             const overlay = document.getElementById('viewModal');
             const contentArea = document.getElementById('modalContent');
 
@@ -1228,12 +1247,25 @@
             if (e.target === document.getElementById('viewModal')) closeModal();
         }
 
-        function cloneCurrentEntry() { if (currentEntryId) cloneEntry(currentEntryId); }
-        function downloadCurrentEntry() { if (currentEntryId) downloadEntry(currentEntryId); }
-
         // ─────────────────────────────────────────────
         //  ACTIONS
         // ─────────────────────────────────────────────
+        function viewOriginalStyle() {
+            if (!currentEntryId) return;
+            const entry = window.LIBRARY.getById(currentEntryId);
+            if (!entry) return;
+
+            const rawHtml = entry.frontEndData?.metadata?.originalHtml || entry.metadata?.originalHtml;
+            if (rawHtml) {
+                const w = window.open('', '_blank');
+                w.document.write(rawHtml);
+                w.document.close();
+            }
+        }
+
+        function cloneCurrentEntry() { if (currentEntryId) cloneEntry(currentEntryId); }
+        function downloadCurrentEntry() { if (currentEntryId) downloadEntry(currentEntryId); }
+
         function cloneEntry(id) {
             const clone = window.LIBRARY.buildClone(id);
             if (!clone) { toast('Note not found'); return; }
@@ -1277,14 +1309,19 @@
 
             const result = await window.LIBRARY.importFromFile(file);
             if (result.ok) {
-                const pendingKey = window.api && window.api.auth.isLoggedIn()
-                    ? 'nb_pending_clone_' + window.api.auth.getCurrentUser()._id
-                    : 'nb_pending_clone';
-                localStorage.setItem(pendingKey, JSON.stringify(result.entry));
-                toast('✅ Note queuing into notebook...');
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 800);
+                try {
+                    toast('Uploading to Library...');
+                    const uploadRes = await window.api.library.upload(result.entry);
+                    if (uploadRes.sharedNote) {
+                        toast('✅ Note seamlessly added to Library!');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        toast('❌ Failed to upload');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    toast('❌ API error during upload');
+                }
             } else {
                 toast('❌ ' + result.error);
             }

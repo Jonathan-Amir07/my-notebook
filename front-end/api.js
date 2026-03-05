@@ -8,11 +8,11 @@ const getApiUrl = () => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return 'http://localhost:5000/api';
     }
-    
+
     // Production: API is served from same domain or configured separately
     // If your backend is deployed separately (e.g., Render, Railway, Heroku):
     // return 'https://your-backend-url.com/api';
-    
+
     // If backend is on same domain (e.g., Vercel with serverless functions):
     return '/api';
 };
@@ -37,11 +37,11 @@ async function apiRequest(endpoint, options = {}) {
 
     try {
         const response = await fetch(`${API_URL}${endpoint}`, config);
-        
+
         // Handle non-JSON responses
         const contentType = response.headers.get('content-type');
         let data;
-        
+
         if (contentType && contentType.includes('application/json')) {
             data = await response.json();
         } else {
@@ -51,8 +51,8 @@ async function apiRequest(endpoint, options = {}) {
 
         if (!response.ok) {
             // Token expired or invalid - redirect to login (except during login/register)
-            if ((response.status === 401 || response.status === 403) && 
-                endpoint !== '/auth/login' && 
+            if ((response.status === 401 || response.status === 403) &&
+                endpoint !== '/auth/login' &&
                 endpoint !== '/auth/register') {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
@@ -106,7 +106,7 @@ const auth = {
     isLoggedIn() {
         return !!getToken();
     },
-    
+
     getCurrentUser() {
         const u = localStorage.getItem('user');
         return u ? JSON.parse(u) : null;
@@ -117,7 +117,7 @@ const auth = {
         const params = new URLSearchParams(window.location.search);
         const token = params.get('token');
         const userStr = params.get('user');
-        
+
         if (token && userStr) {
             try {
                 const user = JSON.parse(decodeURIComponent(userStr));
@@ -200,6 +200,13 @@ const library = {
     async delete(id) {
         return await apiRequest(`/library/${id}`, {
             method: 'DELETE'
+        });
+    },
+
+    async upload(chapter) {
+        return await apiRequest('/library/upload', {
+            method: 'POST',
+            body: JSON.stringify(chapter)
         });
     }
 };

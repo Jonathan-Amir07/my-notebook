@@ -424,7 +424,7 @@ window.parseRawHtmlToSequence = function (htmlText) {
         tags: [],
         category: 'General',
         author: 'Imported',
-        metadata: { customSidebar, customStyles }
+        metadata: { customSidebar, customStyles, originalHtml: htmlText }
     };
 };
 

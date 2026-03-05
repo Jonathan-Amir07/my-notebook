@@ -163,4 +163,31 @@ router.delete('/:id', protect, async (req, res) => {
     }
 });
 
+// ─────────────────────────────────────────────
+// POST /api/library/upload — Upload a note directly without local DB dependency
+// ─────────────────────────────────────────────
+router.post('/upload', protect, async (req, res) => {
+    try {
+        const { title, content, description, tags, frontEndData } = req.body;
+        // Generate a mock ID for the required originalNoteId field since it doesn't exist locally
+        const mongoose = require('mongoose');
+        const mockOriginalId = new mongoose.Types.ObjectId();
+
+        const sharedNote = await SharedNote.create({
+            userId: req.user._id,
+            username: req.user.displayName || req.user.username,
+            originalNoteId: mockOriginalId,
+            title: title || 'Imported Note',
+            content: content || '',
+            description: description || '',
+            tags: tags || [],
+            frontEndData: frontEndData || {}
+        });
+        res.status(201).json({ sharedNote });
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({ error: 'Failed to upload note to library' });
+    }
+});
+
 module.exports = router;
