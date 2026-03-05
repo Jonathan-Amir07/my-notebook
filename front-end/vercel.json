@@ -36,7 +36,7 @@
         {
           "type": "cookie",
           "key": "token",
-          "value": null
+          "value": ""
         }
       ],
       "destination": "/login.html",
