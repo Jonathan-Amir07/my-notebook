@@ -23,8 +23,8 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Kalam:wght@300;400;700&family=Patrick+Hand&display=swap"
         rel="stylesheet" />
-    <script src="api.js"></script>
-    <script src="script.js"></script>
+    <script src="api.js?v=3"></script>
+    <script src="script.js?v=3"></script>
     <style>
         /* ═══════════════════════════════════════
            BASE
@@ -999,7 +999,7 @@
         //  STATE
         // ─────────────────────────────────────────────
         let currentEntryId = null;  // entry open in modal
-        const user = window.AUTH ? window.AUTH.getCurrentUser() : null;
+        const user = (window.api && window.api.auth) ? window.api.auth.getCurrentUser() : null;
 
         // ─────────────────────────────────────────────
         //  INIT
@@ -1062,7 +1062,7 @@
         //  BUILD CARD
         // ─────────────────────────────────────────────
         function buildCard(entry) {
-            const isOwner = user && entry.authorId === user.userId;
+            const isOwner = user && (entry.authorId === user.id || entry.authorId === user._id || entry.authorId === user.userId);
             const date = entry.publishedAt
                 ? new Date(entry.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
                 : '';
@@ -1255,10 +1255,12 @@
         async function deleteEntry(id) {
             if (!user) return;
             if (!confirm('Remove this note from the library? It stays in your notebook.')) return;
-            const result = window.LIBRARY.deleteEntry(id, user.userId);
+            const result = await window.LIBRARY.deleteEntry(id, user.id || user._id || user.userId);
             if (result.ok) {
                 toast('🗑 Removed from library');
                 closeModal();
+                // Remove from local memory so it disappears from UI
+                allEntries = allEntries.filter(e => e.id !== id);
                 renderCards();
             } else {
                 toast('❌ ' + result.error);
@@ -1275,13 +1277,18 @@
 
             const result = await window.LIBRARY.importFromFile(file);
             if (result.ok) {
-                toast('✅ Note imported to library!');
-                renderCards();
+                const pendingKey = window.api && window.api.auth.isLoggedIn()
+                    ? 'nb_pending_clone_' + window.api.auth.getCurrentUser()._id
+                    : 'nb_pending_clone';
+                localStorage.setItem(pendingKey, JSON.stringify(result.entry));
+                toast('✅ Note queuing into notebook...');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 800);
             } else {
                 toast('❌ ' + result.error);
             }
         }
-
         // ─────────────────────────────────────────────
         //  TOAST
         // ─────────────────────────────────────────────

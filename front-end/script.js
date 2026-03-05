@@ -138,7 +138,7 @@ class SharedLibrary {
     async loadMyPublished() {
         if (!window.api || !window.api.auth.isLoggedIn()) return;
         try {
-            const data = await window.api.apiRequest('/library/my-published');
+            const data = await window.api.library.getMyPublished();
             this.myPublishedCache.clear();
             (data.sharedNotes || []).forEach(sn => {
                 this.myPublishedCache.set(sn.originalNoteId, sn);
@@ -236,8 +236,13 @@ class SharedLibrary {
     async deleteEntry(id, userId) {
         if (!window.api || !window.api.auth.isLoggedIn()) return { ok: false };
         try {
-            // Wait, we need an endpoint for this in api.js:
-            await window.api.apiRequest(`/library/${id}`, { method: 'DELETE' });
+            await window.api.library.delete(id);
+            // Remove from local cache if present
+            for (let [chapterId, cacheEntry] of this.myPublishedCache.entries()) {
+                if (cacheEntry.id === id || cacheEntry._id === id) {
+                    this.myPublishedCache.delete(chapterId);
+                }
+            }
             return { ok: true };
         } catch (err) {
             return { ok: false, error: err.message };
@@ -391,6 +396,37 @@ ${jsonStr}
 //  GLOBAL SINGLETON
 // ─────────────────────────────────────────────
 window.LIBRARY = new SharedLibrary();
+
+// ─────────────────────────────────────────────
+//  HTML PARSER FOR ARBITRARY HTML IMPORTS
+// ─────────────────────────────────────────────
+window.parseRawHtmlToSequence = function (htmlText) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlText, 'text/html');
+    const title = doc.title || doc.querySelector('h1')?.textContent || 'Imported Note';
+
+    // Extract sidebars/styles if they exist
+    const nav = doc.querySelector('nav');
+    const customSidebar = nav ? nav.outerHTML : '';
+    const styleEl = doc.querySelector('style');
+    const customStyles = styleEl ? styleEl.outerHTML : '';
+
+    // Extract remaining content
+    const body = doc.body;
+    if (nav) nav.remove();
+    const content = body ? body.innerHTML : htmlText;
+
+    return {
+        _type: 'nb_shared_note_v1',
+        title,
+        snippet: body?.textContent?.trim().slice(0, 120) || '',
+        content,
+        tags: [],
+        category: 'General',
+        author: 'Imported',
+        metadata: { customSidebar, customStyles }
+    };
+};
 
 // ─────────────────────────────────────────────
 //  SHARED STYLED HTML BUILDER (async)
@@ -788,8 +824,22 @@ async function libHandleImport(e) {
     e.target.value = '';
     const result = await window.LIBRARY.importFromFile(file);
     if (result.ok) {
-        libToast('✅ Note imported to library!');
-        libRenderCards();
+        // Save as a pending clone so the main notebook logic picks it up
+        const pendingKey = window.api && window.api.auth.isLoggedIn()
+            ? 'nb_pending_clone_' + window.api.auth.getCurrentUser()._id
+            : 'nb_pending_clone';
+        localStorage.setItem(pendingKey, JSON.stringify(result.entry));
+
+        libToast('✅ Note imported into your Notebook!');
+        libCloseModal();
+        closeLibraryPanel();
+
+        // Trigger the pending-clone handler that exists in the main app
+        if (typeof window._checkPendingClone === 'function') {
+            window._checkPendingClone();
+        } else {
+            setTimeout(() => { if (typeof renderSidebar === 'function') renderSidebar(); }, 600);
+        }
     } else {
         libToast('❌ ' + result.error);
     }
@@ -10283,7 +10333,7 @@ window.publishToLibrary = async function (chapterId) {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    const result = window.LIBRARY.publish({ ...chapter, sections }, user);
+    const result = await window.LIBRARY.publish({ ...chapter, sections }, user);
     if (result.ok) {
         showToast('📤 Published to library!');
         renderSidebar(); // refresh share button state
