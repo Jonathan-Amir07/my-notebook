@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://my-notebook-hee8.vercel.app/sitemap.xml
