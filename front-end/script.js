@@ -10242,14 +10242,10 @@ function renderChapterItem(ch, list) {
     };
     li.appendChild(shareBtn);
 
-    // View Styled button
-    const hasOriginalHtml = ch.metadata && ch.metadata.originalHtml;
-    const isLibraryCloneWithOriginal = ch.isLibraryClone && ch._sourceLibraryEntry && (ch._sourceLibraryEntry.metadata?.originalHtml || ch._sourceLibraryEntry.frontEndData?.metadata?.originalHtml);
-
     if (hasOriginalHtml || isLibraryCloneWithOriginal) {
         const styledBtn = document.createElement('button');
         styledBtn.className = 'chapter-styled-btn';
-        styledBtn.innerHTML = '👁️';
+        styledBtn.innerHTML = '🎨';
         styledBtn.title = 'View original HTML style';
         styledBtn.onclick = (e) => {
             e.stopPropagation();

@@ -1283,6 +1283,17 @@
             const pendingKey = window.AUTH ? window.AUTH.getStorageKey('nb_pending_clone') : 'nb_pending_clone';
             localStorage.setItem(pendingKey, JSON.stringify(clone));
 
+            // Dual action: If it has original HTML, open it in a new tab now.
+            const entry = window.LIBRARY.getById(id);
+            if (entry) {
+                const rawHtml = entry.frontEndData?.metadata?.originalHtml || entry.metadata?.originalHtml;
+                if (rawHtml) {
+                    const w = window.open('', '_blank');
+                    w.document.write(rawHtml);
+                    w.document.close();
+                }
+            }
+
             toast('📋 Cloned! Opening your notebook…');
             setTimeout(() => window.location.href = 'index.html', 900);
         }
