@@ -10242,15 +10242,22 @@ function renderChapterItem(ch, list) {
     };
     li.appendChild(shareBtn);
 
-    // View Styled button — only shown for notes cloned from the library
-    if (ch.isLibraryClone && ch._sourceLibraryEntry) {
+    // View Styled button
+    const hasOriginalHtml = ch.metadata && ch.metadata.originalHtml;
+    const isLibraryCloneWithOriginal = ch.isLibraryClone && ch._sourceLibraryEntry && (ch._sourceLibraryEntry.metadata?.originalHtml || ch._sourceLibraryEntry.frontEndData?.metadata?.originalHtml);
+
+    if (hasOriginalHtml || isLibraryCloneWithOriginal) {
         const styledBtn = document.createElement('button');
         styledBtn.className = 'chapter-styled-btn';
-        styledBtn.innerHTML = '🎨';
-        styledBtn.title = 'View styled version';
+        styledBtn.innerHTML = '👁️';
+        styledBtn.title = 'View original HTML style';
         styledBtn.onclick = (e) => {
             e.stopPropagation();
-            if (window.LIBRARY && typeof window.LIBRARY.openStyledTab === 'function') {
+            if (hasOriginalHtml) {
+                const w = window.open('', '_blank');
+                w.document.write(ch.metadata.originalHtml);
+                w.document.close();
+            } else if (window.LIBRARY && typeof window.LIBRARY.openStyledTab === 'function') {
                 window.LIBRARY.openStyledTab(ch._sourceLibraryEntry);
             }
         };

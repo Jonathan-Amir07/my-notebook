@@ -380,8 +380,9 @@
                 background: rgba(231, 76, 60, 0.4);
             }
 
-            /* Share-to-library button on sidebar note cards */
-            .chapter-share-btn {
+            /* Share and Style buttons on sidebar note cards */
+            .chapter-share-btn,
+            .chapter-styled-btn {
                 background: transparent;
                 border: none;
                 font-size: 1rem;
@@ -394,11 +395,13 @@
                 line-height: 1;
             }
 
-            .chapter-item:hover .chapter-share-btn {
+            .chapter-item:hover .chapter-share-btn,
+            .chapter-item:hover .chapter-styled-btn {
                 opacity: 1;
             }
 
-            .chapter-share-btn:hover {
+            .chapter-share-btn:hover,
+            .chapter-styled-btn:hover {
                 background: rgba(41, 128, 185, 0.15);
                 transform: scale(1.1);
             }

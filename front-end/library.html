@@ -1118,8 +1118,12 @@
             // Actions
             const actions = document.createElement('div');
             actions.className = 'card-actions';
+            const rawHtml = entry.frontEndData?.metadata?.originalHtml || entry.metadata?.originalHtml;
+            const viewStyleBtn = rawHtml ? `<button class="card-btn btn-view-style" onclick="viewOriginalStyleDirect('${entry.id}')">👁 Style</button>` : '';
+
             actions.innerHTML = `
         <button class="card-btn" onclick="openModal('${entry.id}')">👁 View</button>
+        ${viewStyleBtn}
         <button class="card-btn btn-clone" onclick="cloneEntry('${entry.id}')">📋 Clone</button>
         <button class="card-btn btn-download" onclick="downloadEntry('${entry.id}')">⬇ Download</button>
         ${isOwner ? `<button class="card-btn btn-delete" onclick="deleteEntry('${entry.id}')" title="Remove from library">🗑</button>` : ''}
@@ -1252,7 +1256,11 @@
         // ─────────────────────────────────────────────
         function viewOriginalStyle() {
             if (!currentEntryId) return;
-            const entry = window.LIBRARY.getById(currentEntryId);
+            viewOriginalStyleDirect(currentEntryId);
+        }
+
+        function viewOriginalStyleDirect(id) {
+            const entry = window.LIBRARY.getById(id);
             if (!entry) return;
 
             const rawHtml = entry.frontEndData?.metadata?.originalHtml || entry.metadata?.originalHtml;
