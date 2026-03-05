@@ -1,13 +1,18 @@
 {
   "version": 2,
-  "name": "notes-app-frontend",
+  "name": "notes-app",
   "cleanUrls": true,
   "trailingSlash": false,
   "public": true,
+  "functions": {
+    "api/[...path].js": {
+      "maxDuration": 10
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://YOUR-BACKEND-NAME.onrender.com/api/$1"
+      "destination": "/api/[...path]"
     }
   ],
   "headers": [
@@ -27,20 +32,6 @@
           "value": "1; mode=block"
         }
       ]
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/",
-      "has": [
-        {
-          "type": "cookie",
-          "key": "token",
-          "value": ""
-        }
-      ],
-      "destination": "/login.html",
-      "permanent": false
     }
   ]
 }
