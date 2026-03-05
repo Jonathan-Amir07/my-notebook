@@ -4883,6 +4883,17 @@ window.saveSharedNoteToSequence = async function (importedData) {
         await saveChapterToDB(c);
     }
 
+    if (importedData._autoPublish && window.LIBRARY && window.api && window.api.auth.isLoggedIn()) {
+        const user = window.api.auth.getCurrentUser();
+        const main = newChapters[0];
+        const sects = newChapters.length > 1 ? newChapters.slice(1).map(ch => ({
+            title: ch.title,
+            content: ch.content
+        })) : null;
+
+        window.LIBRARY.publish({ ...main, sections: sects }, user).catch(console.error);
+    }
+
     renderSidebar();
     loadChapter(newChapters[0].id);
     showToast(`Note "${importedData.title}" imported` + (hasSections ? ` as a ${newChapters.length}-page sequence!` : '!'));
@@ -4906,12 +4917,15 @@ window.importData = (input) => {
         try {
             let text = e.target.result;
             let importedData = null;
+            let isHtmlImport = false;
             if (text.trim().startsWith('<')) {
                 const match = text.match(/<script type="application\/json" id="nb_shared_note_data">([\s\S]*?)<\/script>/);
                 if (match && match[1]) {
                     importedData = JSON.parse(match[1]);
+                    isHtmlImport = true;
                 } else {
                     importedData = window.parseRawHtmlToSequence(text);
+                    isHtmlImport = true;
                 }
             } else {
                 importedData = JSON.parse(text);
@@ -4925,6 +4939,9 @@ window.importData = (input) => {
                 initApp();
                 showToast("Backup Restored!");
             } else if (importedData && importedData._type === 'nb_shared_note_v1') {
+                if (isHtmlImport && file.name.endsWith('.html')) {
+                    importedData._autoPublish = true;
+                }
                 await window.saveSharedNoteToSequence(importedData);
             } else {
                 alert("Invalid backup file format.");
