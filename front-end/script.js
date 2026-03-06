@@ -404,6 +404,14 @@ window.LIBRARY = new SharedLibrary();
 // ─────────────────────────────────────────────
 window.buildStyledHtml = async function (entry) {
     if (!entry) return null;
+
+    // If we have original HTML stored (e.g. from an HTML file import), 
+    // it already represents a full page and doesn't need to be forced into the RO paper view.
+    const originalHtml = entry.metadata?.originalHtml || (entry.frontEndData?.metadata?.originalHtml);
+    if (originalHtml) {
+        return originalHtml;
+    }
+
     const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
     let appCss = '';
