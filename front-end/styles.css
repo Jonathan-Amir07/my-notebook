@@ -3322,9 +3322,11 @@ body.dark-mode .continuation-label {
     background: transparent;
 }
 
-body.sketch-mode .content-area {
+body.sketch-mode .content-area,
+body.sketch-mode .sequence-editor-block .content-area {
     pointer-events: none;
     user-select: none;
+    z-index: 0;
 }
 
 /* UNIFIED PAPER LAYOUT - Remove borders and unify textures */
