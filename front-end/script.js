@@ -826,7 +826,12 @@ async function libHandleImport(e) {
     if (result.ok) {
         if (file.name.endsWith('.html') && window.api && window.api.auth.isLoggedIn()) {
             try {
-                await window.api.library.upload(result.entry);
+                await window.api.library.upload({
+                    title: result.entry.title,
+                    content: result.entry.content,
+                    tags: result.entry.tags,
+                    frontEndData: result.entry
+                });
                 libToast('✅ HTML imported to Library!');
                 libRenderCards();
                 if (typeof renderSidebar === 'function') renderSidebar();
@@ -4954,7 +4959,12 @@ window.importData = (input) => {
                 if (isHtmlImport) {
                     if (window.api && window.api.auth.isLoggedIn()) {
                         try {
-                            await window.api.library.upload(importedData);
+                            await window.api.library.upload({
+                                title: importedData.title,
+                                content: importedData.content,
+                                tags: importedData.tags,
+                                frontEndData: importedData
+                            });
                             showToast("✅ HTML imported to Library!");
                             if (typeof openLibraryPanel === 'function') openLibraryPanel();
                         } catch (err) {
