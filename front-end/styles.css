@@ -61,9 +61,8 @@ body {
 
 /* --- STYLES --- */
 .writing-tool-pencil {
-    font-family: inherit;
+    font-family: 'Caveat', cursive;
     color: var(--pencil-color);
-    cursor: url('data:image/svg+xml;utf8,<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="%237f8c8d" d="M14.06 9.02l.92.92L5.92 19H5v-.92l9.06-9.06M17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75z"/></svg>') 0 18, auto;
 }
 
 .writing-tool-pen {
@@ -74,13 +73,11 @@ body {
 .writing-tool-marker {
     font-family: 'Permanent Marker', cursive;
     color: var(--marker-color);
-    cursor: url('data:image/svg+xml;utf8,<svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="%23000" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m0 16H5V5h14v14z"/><path fill="%23ffd54f" d="M7 7h10v10H7z"/></svg>') 10 10, auto;
 }
 
 .writing-tool-brush {
-    font-family: 'Kalam', cursive;
-    color: var(--brush-color);
-    cursor: url('data:image/svg+xml;utf8,<svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="%23e74c3c" d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3m13.71-9.37l-1.34-1.34a1.996 1.996 0 0 0-2.83 0L9 10.83l4.17 4.17 7.54-7.54c.78-.79.78-2.05 0-2.83"/></svg>') 0 18, auto;
+    font-family: 'Shadows Into Light', cursive;
+    color: var(--ink-color);
 }
 
 .writing-tool-chalk {
@@ -2368,18 +2365,12 @@ optgroup {
 .tag-cloud-item {
     background: rgba(255, 255, 255, 0.1);
     color: var(--sidebar-text);
-    padding: 6px 12px;
-    border-radius: 4px 15px 15px 4px;
-    /* Tab shape */
-    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
     cursor: pointer;
     transition: 0.2s;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-left: 4px solid var(--accent-color);
-    /* Physical touch */
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
-    margin-bottom: 4px;
-    font-weight: 500;
+    border: 1px solid transparent;
 }
 
 .tag-cloud-item:hover {
@@ -2388,12 +2379,8 @@ optgroup {
 }
 
 .tag-cloud-item.active {
-    border-color: rgba(255, 255, 255, 0.3);
-    border-left: 6px solid #f1c40f;
-    /* Active tab protrudes more */
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateX(4px);
-    /* Physically sticks out */
+    border-color: var(--accent-color);
+    background: rgba(255, 255, 255, 0.15);
 }
 
 /* Install Button (Hidden by default) */
@@ -3330,34 +3317,6 @@ body:not(.sketch-mode) .paper,
     max-width: 850px;
     width: 100%;
     margin: 0 auto;
-
-    /* Notebook Realism */
-    box-shadow:
-        1px 0px 0px rgba(0, 0, 0, 0.05),
-        2px 0px 0px rgba(0, 0, 0, 0.05),
-        3px 0px 0px rgba(0, 0, 0, 0.05),
-        4px 0px 0px rgba(0, 0, 0, 0.08),
-        15px 15px 30px rgba(0, 0, 0, 0.15);
-    /* Page stack depth */
-
-    position: relative;
-    border-radius: 2px 4px 4px 2px;
-}
-
-/* Simulated Spine / Binding */
-.paper::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 45px;
-    background: linear-gradient(to right,
-            rgba(0, 0, 0, 0.1) 0%,
-            rgba(0, 0, 0, 0.02) 20%,
-            transparent 100%);
-    pointer-events: none;
-    z-index: 10;
 }
 
 /* Apply texture to the entire paper, not individual blocks */
@@ -3366,48 +3325,6 @@ body:not(.sketch-mode) .paper,
         linear-gradient(var(--grid-line) 1px, transparent 1px),
         linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
     background-size: 25px 25px;
-}
-
-/* Notebook Bookmark Dog-Ear Fold */
-.paper.bookmarked::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    border-width: 0 40px 40px 0;
-    border-style: solid;
-    border-color: #ddd var(--workspace-bg, #f0f3f5) #fff #ddd;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    border-radius: 0 0 0 2px;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.paper.bookmarked:hover::after {
-    border-width: 0 45px 45px 0;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
-}
-
-/* Page Turn Animation */
-@keyframes pageTurn {
-    0% {
-        transform: perspective(1200px) rotateY(0deg);
-        opacity: 1;
-    }
-
-    50% {
-        transform: perspective(1200px) rotateY(-45deg) scale(0.95);
-        opacity: 0.5;
-    }
-
-    100% {
-        transform: perspective(1200px) rotateY(0deg);
-        opacity: 1;
-    }
-}
-
-.page-turn-animation {
-    animation: pageTurn 0.4s ease-in-out;
 }
 
 .paper.lined-texture {
