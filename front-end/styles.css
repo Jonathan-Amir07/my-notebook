@@ -2861,12 +2861,11 @@ body.focus-mode .btn-menu-mobile {
     width: 100%;
     height: 100%;
     z-index: 999;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 /* FIX: Added touch-action: none to prevent iPad scrolling while drawing */
 body.sketch-mode #sketchCanvas {
-    pointer-events: auto;
     cursor: crosshair;
     touch-action: none;
 }
@@ -3321,6 +3320,11 @@ body.dark-mode .continuation-label {
     position: relative;
     z-index: 2;
     background: transparent;
+}
+
+body.sketch-mode .content-area {
+    pointer-events: none;
+    user-select: none;
 }
 
 /* UNIFIED PAPER LAYOUT - Remove borders and unify textures */
