@@ -397,38 +397,8 @@ ${jsonStr}
 // ─────────────────────────────────────────────
 window.LIBRARY = new SharedLibrary();
 
-// ─────────────────────────────────────────────
-//  HTML PARSER FOR ARBITRARY HTML IMPORTS
-// ─────────────────────────────────────────────
-window.parseRawHtmlToSequence = function (htmlText) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlText, 'text/html');
-    const title = doc.title || doc.querySelector('h1')?.textContent || 'Imported Note';
+// (Removed duplicate parseRawHtmlToSequence)
 
-    // Extract sidebars/styles if they exist
-    const nav = doc.querySelector('nav');
-    const customSidebar = nav ? nav.outerHTML : '';
-    const styleEl = doc.querySelector('style');
-    const customStyles = styleEl ? styleEl.outerHTML : '';
-
-    // Extract remaining content
-    const body = doc.body;
-    if (nav) nav.remove();
-    const content = body ? body.innerHTML : htmlText;
-
-    return {
-        _type: 'nb_shared_note_v1',
-        title,
-        snippet: body?.textContent?.trim().slice(0, 120) || '',
-        content,
-        tags: [],
-        category: 'General',
-        author: 'Imported',
-        metadata: { customSidebar, customStyles, originalHtml: htmlText }
-    };
-};
-
-// ─────────────────────────────────────────────
 //  SHARED STYLED HTML BUILDER (async)
 //  Fetches styles.css + embeds all fonts/nav for full-fidelity read-only view
 // ─────────────────────────────────────────────
@@ -4831,8 +4801,9 @@ window.parseRawHtmlToSequence = function (htmlText) {
     Array.from(doc.querySelectorAll('script')).forEach(s => s.remove());
 
     // Get the main content
-    const main = doc.querySelector('main') || doc.querySelector('.main') || doc.body;
-    const content = main ? main.innerHTML : htmlText;
+    // We prefer the entire body's HTML, but if not we take the raw text
+    const mainHtml = doc.body ? doc.body.innerHTML : htmlText;
+    const content = mainHtml;
 
     return {
         _type: 'nb_shared_note_v1',
@@ -4849,6 +4820,7 @@ window.parseRawHtmlToSequence = function (htmlText) {
             customSidebar: customSidebar,
             customStyles: styles,
             customLinks: linkTags,
+            originalHtml: htmlText
         }
     };
 };
