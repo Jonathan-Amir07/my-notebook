@@ -4670,8 +4670,8 @@ function draw(e) {
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     } else if (activeSketchTool === 'highlighter') {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)';
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 1)'; // Solid color works best with multiply
         ctx.lineWidth = 20;
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
@@ -5459,6 +5459,14 @@ function loadChapter(id) {
     const pdfContainer = document.getElementById('pdfBackground');
     pdfContainer.innerHTML = '';
 
+    const paper = document.getElementById('paper');
+
+    // Page Turn Animation Logic
+    paper.classList.remove('page-turn-animation');
+    // Force a reflow to restart animation
+    void paper.offsetWidth;
+    paper.classList.add('page-turn-animation');
+
     setTimeout(() => resizeCanvas(), 0);
 
     // SEQUENCE LOGIC with De-duplication
@@ -5575,8 +5583,6 @@ function loadChapter(id) {
     // Set title bar to the requested ID's title initially
     document.getElementById('pageTitle').value = chapter.title;
 
-    // Background & Sketch Logic
-    // PDFs are now stored in chapter.content as HTML with images
     if (chapter.backgroundImage) {
         document.getElementById('paper').style.backgroundImage = `url('${chapter.backgroundImage}')`;
         document.getElementById('paper').classList.add('annotate-mode');
@@ -5584,6 +5590,14 @@ function loadChapter(id) {
         document.getElementById('paper').style.backgroundImage = '';
         document.getElementById('paper').classList.remove('annotate-mode');
         // Paper texture is now controlled by user via cyclePaperStyle button
+    }
+
+    // Notebook Realism: Restore Bookmark State
+    if (!chapter.metadata) chapter.metadata = {};
+    if (chapter.metadata.isBookmarked) {
+        document.getElementById('paper').classList.add('bookmarked');
+    } else {
+        document.getElementById('paper').classList.remove('bookmarked');
     }
 
     if (chapter.sketch) {
@@ -5794,25 +5808,32 @@ function insertHtml(html) {
                 targetArea = focusedBlock.querySelector('.content-area');
             } else {
                 // Priority 4: Fallback to first content area
-                targetArea = document.querySelector('.content-area');
             }
         }
-    }
 
-    if (!targetArea) return;
+        if (!targetArea) return;
 
-    // Focus the target area
-    targetArea.focus();
+        // Focus the target area
+        targetArea.focus();
 
-    // If we have a saved range, restore it
-    if (insertRange && document.contains(insertRange.commonAncestorContainer)) {
-        try {
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(insertRange);
-        } catch (e) {
-            console.warn('Could not restore cursor position:', e);
-            // Move to end of content
+        // If we have a saved range, restore it
+        if (insertRange && document.contains(insertRange.commonAncestorContainer)) {
+            try {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(insertRange);
+            } catch (e) {
+                console.warn('Could not restore cursor position:', e);
+                // Move to end of content
+                const range = document.createRange();
+                range.selectNodeContents(targetArea);
+                range.collapse(false);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        } else {
+            // Move cursor to end
             const range = document.createRange();
             range.selectNodeContents(targetArea);
             range.collapse(false);
@@ -5820,132 +5841,123 @@ function insertHtml(html) {
             sel.removeAllRanges();
             sel.addRange(range);
         }
-    } else {
-        // Move cursor to end
-        const range = document.createRange();
-        range.selectNodeContents(targetArea);
-        range.collapse(false);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
+
+        // Insert the HTML
+        document.execCommand('insertHTML', false, html);
+
+        // Trigger save
+        if (targetArea.oninput) targetArea.oninput();
+
+        // Save new cursor position
+        saveCursorPosition();
     }
 
-    // Insert the HTML
-    document.execCommand('insertHTML', false, html);
+    window.toggleTemplates = () => {
+        const p = document.getElementById('templatePopup');
+        p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+    };
 
-    // Trigger save
-    if (targetArea.oninput) targetArea.oninput();
+    // NEW: TEMPLATE NAVIGATION LOGIC
+    window.showCSTemplates = () => {
+        document.getElementById('tmpl-main-view').style.display = 'none';
+        document.getElementById('tmpl-cs-view').style.display = 'block';
+        document.getElementById('tmpl-med-view').style.display = 'none';
+        document.getElementById('tmpl-dentistry-view').style.display = 'none';
+        document.getElementById('tmpl-eng-view').style.display = 'none';
+    };
 
-    // Save new cursor position
-    saveCursorPosition();
-}
+    window.showMedTemplates = () => {
+        document.getElementById('tmpl-main-view').style.display = 'none';
+        document.getElementById('tmpl-cs-view').style.display = 'none';
+        document.getElementById('tmpl-med-view').style.display = 'block';
+        document.getElementById('tmpl-dentistry-view').style.display = 'none';
+        document.getElementById('tmpl-eng-view').style.display = 'none';
+    };
 
-window.toggleTemplates = () => {
-    const p = document.getElementById('templatePopup');
-    p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
-};
+    window.showDentistryTemplates = () => {
+        document.getElementById('tmpl-main-view').style.display = 'none';
+        document.getElementById('tmpl-cs-view').style.display = 'none';
+        document.getElementById('tmpl-med-view').style.display = 'none';
+        document.getElementById('tmpl-dentistry-view').style.display = 'block';
+        document.getElementById('tmpl-eng-view').style.display = 'none';
+    };
 
-// NEW: TEMPLATE NAVIGATION LOGIC
-window.showCSTemplates = () => {
-    document.getElementById('tmpl-main-view').style.display = 'none';
-    document.getElementById('tmpl-cs-view').style.display = 'block';
-    document.getElementById('tmpl-med-view').style.display = 'none';
-    document.getElementById('tmpl-dentistry-view').style.display = 'none';
-    document.getElementById('tmpl-eng-view').style.display = 'none';
-};
+    window.showEngineeringTemplates = () => {
+        document.getElementById('tmpl-main-view').style.display = 'none';
+        document.getElementById('tmpl-cs-view').style.display = 'none';
+        document.getElementById('tmpl-med-view').style.display = 'none';
+        document.getElementById('tmpl-dentistry-view').style.display = 'none';
+        document.getElementById('tmpl-eng-view').style.display = 'block';
+    };
 
-window.showMedTemplates = () => {
-    document.getElementById('tmpl-main-view').style.display = 'none';
-    document.getElementById('tmpl-cs-view').style.display = 'none';
-    document.getElementById('tmpl-med-view').style.display = 'block';
-    document.getElementById('tmpl-dentistry-view').style.display = 'none';
-    document.getElementById('tmpl-eng-view').style.display = 'none';
-};
+    window.showMainTemplates = () => {
+        document.getElementById('tmpl-main-view').style.display = 'block';
+        document.getElementById('tmpl-cs-view').style.display = 'none';
+        document.getElementById('tmpl-med-view').style.display = 'none';
+        document.getElementById('tmpl-dentistry-view').style.display = 'none';
+        document.getElementById('tmpl-eng-view').style.display = 'none';
+        document.getElementById('tmpl-advanced-view').style.display = 'none';
+    };
 
-window.showDentistryTemplates = () => {
-    document.getElementById('tmpl-main-view').style.display = 'none';
-    document.getElementById('tmpl-cs-view').style.display = 'none';
-    document.getElementById('tmpl-med-view').style.display = 'none';
-    document.getElementById('tmpl-dentistry-view').style.display = 'block';
-    document.getElementById('tmpl-eng-view').style.display = 'none';
-};
+    window.showAdvancedTemplates = () => {
+        document.getElementById('tmpl-main-view').style.display = 'none';
+        document.getElementById('tmpl-cs-view').style.display = 'none';
+        document.getElementById('tmpl-med-view').style.display = 'none';
+        document.getElementById('tmpl-dentistry-view').style.display = 'none';
+        document.getElementById('tmpl-eng-view').style.display = 'none';
+        document.getElementById('tmpl-advanced-view').style.display = 'block';
+    };
 
-window.showEngineeringTemplates = () => {
-    document.getElementById('tmpl-main-view').style.display = 'none';
-    document.getElementById('tmpl-cs-view').style.display = 'none';
-    document.getElementById('tmpl-med-view').style.display = 'none';
-    document.getElementById('tmpl-dentistry-view').style.display = 'none';
-    document.getElementById('tmpl-eng-view').style.display = 'block';
-};
+    window.applyTemplate = async (key) => {
+        const chapter = chapters.find(c => c.id === currentId);
+        if (!chapter) return;
 
-window.showMainTemplates = () => {
-    document.getElementById('tmpl-main-view').style.display = 'block';
-    document.getElementById('tmpl-cs-view').style.display = 'none';
-    document.getElementById('tmpl-med-view').style.display = 'none';
-    document.getElementById('tmpl-dentistry-view').style.display = 'none';
-    document.getElementById('tmpl-eng-view').style.display = 'none';
-    document.getElementById('tmpl-advanced-view').style.display = 'none';
-};
+        const temps = {
+            default: { title: "New Note", content: "<div>Start typing...</div>", isWhiteboard: false, type: PAGE_TYPES.NOTE },
+            meeting: { title: "Meeting: " + new Date().toLocaleDateString(), content: "<h2 class='styled-header'>Participants</h2><p>• </p><h2 class='styled-header'>Notes</h2><p></p><h2 class='styled-header'>Action Items</h2>", type: PAGE_TYPES.NOTE },
+            journal: { title: "Entry: " + new Date().toLocaleDateString(), content: "<div class='sticky-note'>What happened today?</div>", type: PAGE_TYPES.NOTE },
+            project: { title: "Project Tracker", content: "<h2 class='styled-header'>Phase 1</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Milestone</div></div>", type: PAGE_TYPES.PROJECT },
+            eisenhower: {
+                title: "Eisenhower Matrix",
+                content: "<h2 class='styled-header' style='color:#c0392b'>1. Do First (Urgent & Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Crisis / Deadline</div></div><h2 class='styled-header' style='color:#2980b9'>2. Schedule (Less Urgent, Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Planning / Strategy</div></div><h2 class='styled-header' style='color:#d35400'>3. Delegate (Urgent, Less Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Interruptions / Meetings</div></div><h2 class='styled-header' style='color:#7f8c8d'>4. Don't Do (Not Urgent, Not Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Distractions</div></div>",
+                type: PAGE_TYPES.NOTE
+            },
+            whiteboard: {
+                title: "Infinite Whiteboard",
+                content: "<div>Start Brainstorming...</div>",
+                isWhiteboard: true,
+                type: PAGE_TYPES.WHITEBOARD
+            },
+            algo: { title: "Algorithm Analysis", content: "<h2 class='styled-header'>Problem Statement</h2><p>Describe the problem...</p><h2 class='styled-header'>Complexity</h2><span class='algo-badge'>Time: O(n)</span><span class='algo-badge'>Space: O(1)</span><h2 class='styled-header'>Pseudocode</h2><div class='chalk-code'>// Logic here</div>", type: PAGE_TYPES.ALGORITHM },
+            logicGates: { title: "Logic Gates Simulator", content: "<h2 class='styled-header'>Logic Circuit Design</h2><div id='logicGatesSimulator'></div><h2 class='styled-header'>Truth Table</h2><p>Document your results...</p><h2 class='styled-header'>Notes</h2><p>Analysis...</p>", type: PAGE_TYPES.LOGIC_GATES },
+            sysDesign: { title: "System Design", content: "<h2 class='styled-header'>Requirements</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scalability</div></div><h2 class='styled-header'>Architecture Diagram</h2><p>(Use Sketch Mode)</p>", isWhiteboard: true, type: PAGE_TYPES.SYSTEM },
+            codeStudy: { title: "Code Study", content: "<h2 class='styled-header'>Code Snippet</h2><div class='cs-code-container' contenteditable='false'><div class='cs-code-header'><span>Main.java</span></div><div class='cs-code-editor' contenteditable='true'>public static void main(String[] args) {}</div><div class='cs-code-output' contenteditable='true'>Output...</div></div><h2 class='styled-header'>Trace / Logic</h2><p>Step 1: ...</p>", type: PAGE_TYPES.NOTE },
+            anatomy: { title: "Anatomy Sheet", content: "<h2 class='styled-header'>Structure & Function</h2><p>Describe location, origin, insertion...</p><h2 class='styled-header'>Relations</h2><p>Anterior, posterior...</p><h2 class='styled-header'>Clinical Relevance</h2><div class='sticky-note'>Important clinical notes...</div><h2 class='styled-header'>Sketch Area</h2><p>(Draw below)</p>", type: PAGE_TYPES.ANATOMY },
+            disease: { title: "Disease Profile", content: "<h2 class='styled-header'>Definition & Etiology</h2><p>...</p><h2 class='styled-header'>Pathophysiology</h2><p>...</p><h2 class='styled-header'>Clinical Features</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Symptom 1</div></div><h2 class='styled-header'>Management</h2><p>...</p>", type: PAGE_TYPES.DISEASE },
+            drug: { title: "Drug Monograph", content: "<h2 class='styled-header'>Class & Mechanism</h2><p>...</p><h2 class='styled-header'>Indications</h2><p>...</p><h2 class='styled-header'>Contraindications & Side Effects</h2><div class='sticky-note'>Warning: ...</div><h2 class='styled-header'>Dosage</h2><p>...</p>", type: PAGE_TYPES.DRUG },
+            physio: { title: "Physio Case", content: "<h2 class='styled-header'>Patient Profile</h2><p>Age, Gender, Occupation...</p><h2 class='styled-header'>Assessment (SOAP)</h2><p>Subjective: ...</p><p>Objective: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Exercise 1</div></div>", type: PAGE_TYPES.CLINICAL_CASE },
+            pathway: { title: "Pathway Breakdown", content: "<h2 class='styled-header'>Overview</h2><p>...</p><h2 class='styled-header'>Steps</h2><div class='chalk-code'>1. Signal -> Receptor</div><h2 class='styled-header'>Regulation</h2><p>...</p>", type: PAGE_TYPES.PATHWAY },
+            lab: { title: "Lab Interpretation", content: "<h2 class='styled-header'>Test Name</h2><p>...</p><h2 class='styled-header'>Normal Range</h2><p>...</p><h2 class='styled-header'>Interpretation</h2><p>High: ...</p><p>Low: ...</p>", type: PAGE_TYPES.LAB },
+            dental_anatomy: { title: "Dental Anatomy", content: "<h2 class='styled-header'>Tooth Name / Number</h2><p>...</p><h2 class='styled-header'>Morphology & Surfaces</h2><p>...</p><h2 class='styled-header'>Root Anatomy</h2><p>...</p><h2 class='styled-header'>Clinical Notes</h2><div class='sticky-note'>Eruption: ...</div>", type: PAGE_TYPES.DENTAL_ANATOMY },
+            oral_pathology: { title: "Oral Pathology", content: "<h2 class='styled-header'>Condition</h2><p>...</p><h2 class='styled-header'>Etiology</h2><p>...</p><h2 class='styled-header'>Clinical Appearance</h2><p>...</p><h2 class='styled-header'>Radiographic Features</h2><p>...</p><h2 class='styled-header'>Management</h2><p>...</p>", type: PAGE_TYPES.ORAL_PATHOLOGY },
+            dental_procedure: { title: "Dental Procedure", content: "<h2 class='styled-header'>Procedure Name</h2><p>...</p><h2 class='styled-header'>Indications</h2><p>...</p><h2 class='styled-header'>Instruments Required</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Mirror/Probe</div></div><h2 class='styled-header'>Step-by-Step</h2><p>1. Anesthesia...</p>", type: PAGE_TYPES.DENTAL_PROCEDURE },
+            dental_case: { title: "Dental Case", content: "<h2 class='styled-header'>Patient Profile</h2><p>...</p><h2 class='styled-header'>Chief Complaint (C/O)</h2><p>...</p><h2 class='styled-header'>Examination (O/E)</h2><p>Intraoral: ...</p><h2 class='styled-header'>Diagnosis & Plan</h2><p>...</p>", type: PAGE_TYPES.DENTAL_CASE },
+            prostho_plan: { title: "Prostho Plan", content: "<h2 class='styled-header'>Edentulous Space</h2><p>...</p><h2 class='styled-header'>Abutment Evaluation</h2><p>...</p><h2 class='styled-header'>Design Components</h2><p>Major Connector: ...</p><p>Clasps: ...</p>", type: PAGE_TYPES.PROSTHO_PLAN },
+            endo_case: { title: "Endo Case", content: "<h2 class='styled-header'>Tooth & Diagnosis</h2><p>...</p><h2 class='styled-header'>Access & WL</h2><p>Working Length: ...mm</p><h2 class='styled-header'>Instrumentation</h2><p>MAF: ...</p><h2 class='styled-header'>Obturation</h2><p>Technique: ...</p>", type: PAGE_TYPES.ENDO_CASE },
+            perio_case: { title: "Perio Charting", content: "<h2 class='styled-header'>Periodontal Status</h2><p>Pockets > 4mm: ...</p><h2 class='styled-header'>Diagnosis</h2><p>Stage: ... Grade: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scaling & Root Planing</div></div>", type: PAGE_TYPES.PERIO_CASE },
+            oral_radiology: { title: "Radiographic Report", content: "<h2 class='styled-header'>Image Type</h2><p>IOPA / OPG / CBCT</p><h2 class='styled-header'>Findings</h2><p>Radio-opacity/lucency: ...</p><h2 class='styled-header'>Interpretation</h2><p>...</p>", type: PAGE_TYPES.ORAL_RADIOLOGY },
+            prob_sol: { title: "Problem Solution", content: "<h2 class='styled-header'>Problem Statement</h2><p>...</p><h2 class='styled-header'>Given & Assumptions</h2><p>...</p><h2 class='styled-header'>Diagram</h2><p>(Use Sketch Mode)</p><h2 class='styled-header'>Governing Equations</h2><p>...</p><h2 class='styled-header'>Solution</h2><p>...</p><h2 class='styled-header'>Final Answer</h2><div class='sticky-note'>Result: ...</div>", type: PAGE_TYPES.PROBLEM_SOLUTION },
+            circuit: { title: "Circuit Analysis", content: "<h2 class='styled-header'>Circuit Diagram</h2><div style='background:#e8f4f8; border-left:4px solid #3498db; padding:12px; margin:10px 0; border-radius:4px; font-size:0.85rem;'>💡 <strong>Instructions:</strong> Click the ⚡ Components button in the toolbar to open the component library. Drag components onto the canvas, then use sketch mode to draw wires between them. Double-click components to delete.</div><div id='circuitDiagramCanvas' style='position:relative; min-height:400px; background:#f8f9fa; border:2px solid #3498db; border-radius:8px; margin:15px 0;'><svg id='circuitSvg' style='position:absolute; width:100%; height:100%; pointer-events:none;'></svg><div id='circuitComponentsLayer' style='position:absolute; width:100%; height:100%;'></div></div><h2 class='styled-header'>Known Values</h2><p>R1 = ...</p><h2 class='styled-header'>Laws Applied</h2><p>KCL / KVL</p><h2 class='styled-header'>Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CIRCUIT_ANALYSIS },
+            mech_sys: { title: "Mechanical System", content: "<h2 class='styled-header'>System Description</h2><p>...</p><h2 class='styled-header'>Free Body Diagram</h2><p>(Draw FBD)</p><h2 class='styled-header'>Equations of Motion</h2><p>F = ma...</p><h2 class='styled-header'>Solution</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.MECHANICAL_SYSTEM },
+            struct: { title: "Structural Analysis", content: "<h2 class='styled-header'>Structure Description</h2><p>...</p><h2 class='styled-header'>Load Diagram</h2><p>...</p><h2 class='styled-header'>Calculations</h2><p>...</p><h2 class='styled-header'>Design Checks</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Safety Factor OK</div></div>", type: PAGE_TYPES.STRUCTURAL_ANALYSIS },
+            control: { title: "Control System", content: "<h2 class='styled-header'>Block Diagram</h2><p>...</p><h2 class='styled-header'>Transfer Function</h2><p>G(s) = ...</p><h2 class='styled-header'>Stability Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CONTROL_SYSTEM },
+            process: { title: "Process Flow", content: "<h2 class='styled-header'>Overview</h2><p>...</p><h2 class='styled-header'>Flow Diagram</h2><p>...</p><h2 class='styled-header'>Inputs / Outputs</h2><p>...</p><h2 class='styled-header'>Bottlenecks</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.PROCESS_FLOW },
+            lab_exp: { title: "Lab Experiment", content: "<h2 class='styled-header'>Objective</h2><p>...</p><h2 class='styled-header'>Apparatus</h2><p>...</p><h2 class='styled-header'>Procedure</h2><p>1. ...</p><h2 class='styled-header'>Observations</h2><p>...</p><h2 class='styled-header'>Calculations & Conclusion</h2><p>...</p>", type: PAGE_TYPES.LAB_EXPERIMENT },
 
-window.showAdvancedTemplates = () => {
-    document.getElementById('tmpl-main-view').style.display = 'none';
-    document.getElementById('tmpl-cs-view').style.display = 'none';
-    document.getElementById('tmpl-med-view').style.display = 'none';
-    document.getElementById('tmpl-dentistry-view').style.display = 'none';
-    document.getElementById('tmpl-eng-view').style.display = 'none';
-    document.getElementById('tmpl-advanced-view').style.display = 'block';
-};
-
-window.applyTemplate = async (key) => {
-    const chapter = chapters.find(c => c.id === currentId);
-    if (!chapter) return;
-
-    const temps = {
-        default: { title: "New Note", content: "<div>Start typing...</div>", isWhiteboard: false, type: PAGE_TYPES.NOTE },
-        meeting: { title: "Meeting: " + new Date().toLocaleDateString(), content: "<h2 class='styled-header'>Participants</h2><p>• </p><h2 class='styled-header'>Notes</h2><p></p><h2 class='styled-header'>Action Items</h2>", type: PAGE_TYPES.NOTE },
-        journal: { title: "Entry: " + new Date().toLocaleDateString(), content: "<div class='sticky-note'>What happened today?</div>", type: PAGE_TYPES.NOTE },
-        project: { title: "Project Tracker", content: "<h2 class='styled-header'>Phase 1</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Milestone</div></div>", type: PAGE_TYPES.PROJECT },
-        eisenhower: {
-            title: "Eisenhower Matrix",
-            content: "<h2 class='styled-header' style='color:#c0392b'>1. Do First (Urgent & Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Crisis / Deadline</div></div><h2 class='styled-header' style='color:#2980b9'>2. Schedule (Less Urgent, Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Planning / Strategy</div></div><h2 class='styled-header' style='color:#d35400'>3. Delegate (Urgent, Less Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Interruptions / Meetings</div></div><h2 class='styled-header' style='color:#7f8c8d'>4. Don't Do (Not Urgent, Not Important)</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Distractions</div></div>",
-            type: PAGE_TYPES.NOTE
-        },
-        whiteboard: {
-            title: "Infinite Whiteboard",
-            content: "<div>Start Brainstorming...</div>",
-            isWhiteboard: true,
-            type: PAGE_TYPES.WHITEBOARD
-        },
-        algo: { title: "Algorithm Analysis", content: "<h2 class='styled-header'>Problem Statement</h2><p>Describe the problem...</p><h2 class='styled-header'>Complexity</h2><span class='algo-badge'>Time: O(n)</span><span class='algo-badge'>Space: O(1)</span><h2 class='styled-header'>Pseudocode</h2><div class='chalk-code'>// Logic here</div>", type: PAGE_TYPES.ALGORITHM },
-        logicGates: { title: "Logic Gates Simulator", content: "<h2 class='styled-header'>Logic Circuit Design</h2><div id='logicGatesSimulator'></div><h2 class='styled-header'>Truth Table</h2><p>Document your results...</p><h2 class='styled-header'>Notes</h2><p>Analysis...</p>", type: PAGE_TYPES.LOGIC_GATES },
-        sysDesign: { title: "System Design", content: "<h2 class='styled-header'>Requirements</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scalability</div></div><h2 class='styled-header'>Architecture Diagram</h2><p>(Use Sketch Mode)</p>", isWhiteboard: true, type: PAGE_TYPES.SYSTEM },
-        codeStudy: { title: "Code Study", content: "<h2 class='styled-header'>Code Snippet</h2><div class='cs-code-container' contenteditable='false'><div class='cs-code-header'><span>Main.java</span></div><div class='cs-code-editor' contenteditable='true'>public static void main(String[] args) {}</div><div class='cs-code-output' contenteditable='true'>Output...</div></div><h2 class='styled-header'>Trace / Logic</h2><p>Step 1: ...</p>", type: PAGE_TYPES.NOTE },
-        anatomy: { title: "Anatomy Sheet", content: "<h2 class='styled-header'>Structure & Function</h2><p>Describe location, origin, insertion...</p><h2 class='styled-header'>Relations</h2><p>Anterior, posterior...</p><h2 class='styled-header'>Clinical Relevance</h2><div class='sticky-note'>Important clinical notes...</div><h2 class='styled-header'>Sketch Area</h2><p>(Draw below)</p>", type: PAGE_TYPES.ANATOMY },
-        disease: { title: "Disease Profile", content: "<h2 class='styled-header'>Definition & Etiology</h2><p>...</p><h2 class='styled-header'>Pathophysiology</h2><p>...</p><h2 class='styled-header'>Clinical Features</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Symptom 1</div></div><h2 class='styled-header'>Management</h2><p>...</p>", type: PAGE_TYPES.DISEASE },
-        drug: { title: "Drug Monograph", content: "<h2 class='styled-header'>Class & Mechanism</h2><p>...</p><h2 class='styled-header'>Indications</h2><p>...</p><h2 class='styled-header'>Contraindications & Side Effects</h2><div class='sticky-note'>Warning: ...</div><h2 class='styled-header'>Dosage</h2><p>...</p>", type: PAGE_TYPES.DRUG },
-        physio: { title: "Physio Case", content: "<h2 class='styled-header'>Patient Profile</h2><p>Age, Gender, Occupation...</p><h2 class='styled-header'>Assessment (SOAP)</h2><p>Subjective: ...</p><p>Objective: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Exercise 1</div></div>", type: PAGE_TYPES.CLINICAL_CASE },
-        pathway: { title: "Pathway Breakdown", content: "<h2 class='styled-header'>Overview</h2><p>...</p><h2 class='styled-header'>Steps</h2><div class='chalk-code'>1. Signal -> Receptor</div><h2 class='styled-header'>Regulation</h2><p>...</p>", type: PAGE_TYPES.PATHWAY },
-        lab: { title: "Lab Interpretation", content: "<h2 class='styled-header'>Test Name</h2><p>...</p><h2 class='styled-header'>Normal Range</h2><p>...</p><h2 class='styled-header'>Interpretation</h2><p>High: ...</p><p>Low: ...</p>", type: PAGE_TYPES.LAB },
-        dental_anatomy: { title: "Dental Anatomy", content: "<h2 class='styled-header'>Tooth Name / Number</h2><p>...</p><h2 class='styled-header'>Morphology & Surfaces</h2><p>...</p><h2 class='styled-header'>Root Anatomy</h2><p>...</p><h2 class='styled-header'>Clinical Notes</h2><div class='sticky-note'>Eruption: ...</div>", type: PAGE_TYPES.DENTAL_ANATOMY },
-        oral_pathology: { title: "Oral Pathology", content: "<h2 class='styled-header'>Condition</h2><p>...</p><h2 class='styled-header'>Etiology</h2><p>...</p><h2 class='styled-header'>Clinical Appearance</h2><p>...</p><h2 class='styled-header'>Radiographic Features</h2><p>...</p><h2 class='styled-header'>Management</h2><p>...</p>", type: PAGE_TYPES.ORAL_PATHOLOGY },
-        dental_procedure: { title: "Dental Procedure", content: "<h2 class='styled-header'>Procedure Name</h2><p>...</p><h2 class='styled-header'>Indications</h2><p>...</p><h2 class='styled-header'>Instruments Required</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Mirror/Probe</div></div><h2 class='styled-header'>Step-by-Step</h2><p>1. Anesthesia...</p>", type: PAGE_TYPES.DENTAL_PROCEDURE },
-        dental_case: { title: "Dental Case", content: "<h2 class='styled-header'>Patient Profile</h2><p>...</p><h2 class='styled-header'>Chief Complaint (C/O)</h2><p>...</p><h2 class='styled-header'>Examination (O/E)</h2><p>Intraoral: ...</p><h2 class='styled-header'>Diagnosis & Plan</h2><p>...</p>", type: PAGE_TYPES.DENTAL_CASE },
-        prostho_plan: { title: "Prostho Plan", content: "<h2 class='styled-header'>Edentulous Space</h2><p>...</p><h2 class='styled-header'>Abutment Evaluation</h2><p>...</p><h2 class='styled-header'>Design Components</h2><p>Major Connector: ...</p><p>Clasps: ...</p>", type: PAGE_TYPES.PROSTHO_PLAN },
-        endo_case: { title: "Endo Case", content: "<h2 class='styled-header'>Tooth & Diagnosis</h2><p>...</p><h2 class='styled-header'>Access & WL</h2><p>Working Length: ...mm</p><h2 class='styled-header'>Instrumentation</h2><p>MAF: ...</p><h2 class='styled-header'>Obturation</h2><p>Technique: ...</p>", type: PAGE_TYPES.ENDO_CASE },
-        perio_case: { title: "Perio Charting", content: "<h2 class='styled-header'>Periodontal Status</h2><p>Pockets > 4mm: ...</p><h2 class='styled-header'>Diagnosis</h2><p>Stage: ... Grade: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scaling & Root Planing</div></div>", type: PAGE_TYPES.PERIO_CASE },
-        oral_radiology: { title: "Radiographic Report", content: "<h2 class='styled-header'>Image Type</h2><p>IOPA / OPG / CBCT</p><h2 class='styled-header'>Findings</h2><p>Radio-opacity/lucency: ...</p><h2 class='styled-header'>Interpretation</h2><p>...</p>", type: PAGE_TYPES.ORAL_RADIOLOGY },
-        prob_sol: { title: "Problem Solution", content: "<h2 class='styled-header'>Problem Statement</h2><p>...</p><h2 class='styled-header'>Given & Assumptions</h2><p>...</p><h2 class='styled-header'>Diagram</h2><p>(Use Sketch Mode)</p><h2 class='styled-header'>Governing Equations</h2><p>...</p><h2 class='styled-header'>Solution</h2><p>...</p><h2 class='styled-header'>Final Answer</h2><div class='sticky-note'>Result: ...</div>", type: PAGE_TYPES.PROBLEM_SOLUTION },
-        circuit: { title: "Circuit Analysis", content: "<h2 class='styled-header'>Circuit Diagram</h2><div style='background:#e8f4f8; border-left:4px solid #3498db; padding:12px; margin:10px 0; border-radius:4px; font-size:0.85rem;'>💡 <strong>Instructions:</strong> Click the ⚡ Components button in the toolbar to open the component library. Drag components onto the canvas, then use sketch mode to draw wires between them. Double-click components to delete.</div><div id='circuitDiagramCanvas' style='position:relative; min-height:400px; background:#f8f9fa; border:2px solid #3498db; border-radius:8px; margin:15px 0;'><svg id='circuitSvg' style='position:absolute; width:100%; height:100%; pointer-events:none;'></svg><div id='circuitComponentsLayer' style='position:absolute; width:100%; height:100%;'></div></div><h2 class='styled-header'>Known Values</h2><p>R1 = ...</p><h2 class='styled-header'>Laws Applied</h2><p>KCL / KVL</p><h2 class='styled-header'>Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CIRCUIT_ANALYSIS },
-        mech_sys: { title: "Mechanical System", content: "<h2 class='styled-header'>System Description</h2><p>...</p><h2 class='styled-header'>Free Body Diagram</h2><p>(Draw FBD)</p><h2 class='styled-header'>Equations of Motion</h2><p>F = ma...</p><h2 class='styled-header'>Solution</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.MECHANICAL_SYSTEM },
-        struct: { title: "Structural Analysis", content: "<h2 class='styled-header'>Structure Description</h2><p>...</p><h2 class='styled-header'>Load Diagram</h2><p>...</p><h2 class='styled-header'>Calculations</h2><p>...</p><h2 class='styled-header'>Design Checks</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Safety Factor OK</div></div>", type: PAGE_TYPES.STRUCTURAL_ANALYSIS },
-        control: { title: "Control System", content: "<h2 class='styled-header'>Block Diagram</h2><p>...</p><h2 class='styled-header'>Transfer Function</h2><p>G(s) = ...</p><h2 class='styled-header'>Stability Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CONTROL_SYSTEM },
-        process: { title: "Process Flow", content: "<h2 class='styled-header'>Overview</h2><p>...</p><h2 class='styled-header'>Flow Diagram</h2><p>...</p><h2 class='styled-header'>Inputs / Outputs</h2><p>...</p><h2 class='styled-header'>Bottlenecks</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.PROCESS_FLOW },
-        lab_exp: { title: "Lab Experiment", content: "<h2 class='styled-header'>Objective</h2><p>...</p><h2 class='styled-header'>Apparatus</h2><p>...</p><h2 class='styled-header'>Procedure</h2><p>1. ...</p><h2 class='styled-header'>Observations</h2><p>...</p><h2 class='styled-header'>Calculations & Conclusion</h2><p>...</p>", type: PAGE_TYPES.LAB_EXPERIMENT },
-
-        // ADVANCED TEMPLATES
-        cornell: {
-            title: "Cornell Notes",
-            content: `<div class="cornell-container" id="cornellTemplate">
+            // ADVANCED TEMPLATES
+            cornell: {
+                title: "Cornell Notes",
+                content: `<div class="cornell-container" id="cornellTemplate">
                         <div class="cornell-header">
                             <input type="text" placeholder="Topic / Lecture Title" id="cornellTopic" class="cornell-topic" />
                             <div class="cornell-meta">
@@ -5973,12 +5985,12 @@ window.applyTemplate = async (key) => {
                             <button class="cornell-btn" onclick="toggleCornellStudyMode()">👁️ Study Mode</button>
                         </div>
                     </div>`,
-            type: PAGE_TYPES.CORNELL
-        },
+                type: PAGE_TYPES.CORNELL
+            },
 
-        zettelkasten: {
-            title: "Zettelkasten Note",
-            content: `<div class="zettel-container">
+            zettelkasten: {
+                title: "Zettelkasten Note",
+                content: `<div class="zettel-container">
                         <div class="zettel-id">ID: ${Date.now()}</div>
                         <input type="text" class="zettel-title" placeholder="Note Title (max 60 chars)" maxlength="60" id="zettelTitle" />
                         <div contenteditable="true" class="zettel-content" id="zettelContent" oninput="checkZettelWordCount()">
@@ -6010,12 +6022,12 @@ window.applyTemplate = async (key) => {
                             </div>
                         </div>
                     </div>`,
-            type: PAGE_TYPES.ZETTELKASTEN
-        },
+                type: PAGE_TYPES.ZETTELKASTEN
+            },
 
-        outline: {
-            title: "Outline",
-            content: `<div class="outline-container">
+            outline: {
+                title: "Outline",
+                content: `<div class="outline-container">
                         <div class="outline-header">
                             <input type="text" class="outline-title" placeholder="Chapter / Topic" />
                             <div class="outline-controls">
@@ -6035,12 +6047,12 @@ window.applyTemplate = async (key) => {
                             <strong>💡 Tip:</strong> Press <b>Enter</b> to add a new item. <b>Tab</b> to indent, <b>Backspace</b> (at start) or <b>Shift+Tab</b> to outdent. Max 4 levels.
                         </div>
                     </div>`,
-            type: PAGE_TYPES.OUTLINE
-        },
+                type: PAGE_TYPES.OUTLINE
+            },
 
-        mindmap: {
-            title: "Mind Map",
-            content: `<div class="mindmap-container" id="mindmapContainer">
+            mindmap: {
+                title: "Mind Map",
+                content: `<div class="mindmap-container" id="mindmapContainer">
                         <div class="mindmap-toolbar">
                             <button class="cornell-btn" onclick="addMindmapNode()">+ Node</button>
                             <button class="cornell-btn" onclick="addMindmapLink()">🔗 Link</button>
@@ -6052,12 +6064,12 @@ window.applyTemplate = async (key) => {
                             </div>
                         </div>
                     </div>`,
-            type: PAGE_TYPES.MINDMAP
-        },
+                type: PAGE_TYPES.MINDMAP
+            },
 
-        sq3r: {
-            title: "SQ3R Reading Notes",
-            content: `<div class="sq3r-container">
+            sq3r: {
+                title: "SQ3R Reading Notes",
+                content: `<div class="sq3r-container">
                         <div class="sq3r-header">
                             <input type="text" class="sq3r-source" placeholder="Reading Source (Title, Chapter, Pages)" />
                         </div>
@@ -6116,12 +6128,12 @@ window.applyTemplate = async (key) => {
                             </div>
                         </div>
                     </div>`,
-            type: PAGE_TYPES.SQ3R
-        },
+                type: PAGE_TYPES.SQ3R
+            },
 
-        feynman: {
-            title: "Feynman Technique",
-            content: `<div class="feynman-container">
+            feynman: {
+                title: "Feynman Technique",
+                content: `<div class="feynman-container">
                         <div class="feynman-header">
                             <input type="text" class="feynman-concept" placeholder="Concept to Master" />
                         </div>
@@ -6171,157 +6183,157 @@ window.applyTemplate = async (key) => {
                             <div class="feynman-iteration">Iteration #<span id="feynmanIterationCount">1</span></div>
                         </div>
                     </div>`,
-            type: PAGE_TYPES.FEYNMAN
+                type: PAGE_TYPES.FEYNMAN
+            }
+        };
+
+        const selected = temps[key];
+        if (selected) {
+            document.getElementById('pageTitle').value = selected.title;
+
+            // Apply to the ACTIVE chapter's content area
+            const activeBlock = document.getElementById(`page-block-${currentId}`);
+            const contentArea = activeBlock ? activeBlock.querySelector('.content-area') : document.querySelector('.content-area');
+            if (contentArea) {
+                contentArea.innerHTML = selected.content;
+            }
+
+            if (selected.isWhiteboard) {
+                chapter.isWhiteboard = true;
+                document.getElementById('paper').classList.add('infinite');
+            } else {
+                chapter.isWhiteboard = false;
+                document.getElementById('paper').classList.remove('infinite');
+            }
+
+            let disc = 'general';
+            if (['algo', 'codeStudy', 'sysDesign', 'project', 'logicGates'].includes(key)) disc = 'cs';
+            if (['anatomy', 'disease', 'drug', 'physio', 'pathway', 'lab'].includes(key)) disc = 'medical';
+            if (['dental_anatomy', 'oral_pathology', 'dental_procedure', 'dental_case', 'prostho_plan', 'endo_case', 'perio_case', 'oral_radiology'].includes(key)) disc = 'medical';
+            if (['prob_sol', 'circuit', 'mech_sys', 'struct', 'control', 'process', 'lab_exp'].includes(key)) disc = 'engineering';
+
+            // Advanced templates can be used in any discipline
+            if (['cornell', 'zettelkasten', 'outline', 'mindmap', 'sq3r', 'feynman'].includes(key)) {
+                // Keep existing discipline or set to general
+                disc = chapter.metadata?.discipline || 'general';
+            }
+
+            chapter.metadata.discipline = disc;
+            chapter.metadata.type = selected.type || PAGE_TYPES.NOTE;
+
+            if (disc === 'engineering') {
+                if (key === 'circuit' || key === 'control') chapter.metadata.branch = 'Electrical';
+                else if (key === 'mech_sys') chapter.metadata.branch = 'Mechanical';
+                else if (key === 'struct') chapter.metadata.branch = 'Civil';
+                else if (key === 'process') chapter.metadata.branch = 'Industrial';
+                else chapter.metadata.branch = 'General';
+            }
+
+            await saveChapterToDB(chapter);
+            renderSidebar();
+            updateToolVisibility(chapter);
+
+            // Initialize Logic Gates Simulator if this template was selected
+            if (key === 'logicGates') {
+                setTimeout(() => initLogicGatesSimulator(), 100);
+            }
+
+            // Initialize advanced template features
+            if (['cornell', 'zettelkasten', 'sq3r', 'feynman'].includes(key)) {
+                setTimeout(() => {
+                    const cornellNotes = document.getElementById('cornellNotes');
+                    if (cornellNotes) cornellNotes.addEventListener('input', checkCornellNotesLength);
+
+                    const zettelContent = document.getElementById('zettelContent');
+                    if (zettelContent) checkZettelWordCount();
+
+                    const feynmanSimple = document.getElementById('feynmanSimple');
+                    if (feynmanSimple) feynmanSimple.addEventListener('input', checkFeynmanReadability);
+                }, 100);
+            }
+
+            // Initialize outline template
+            if (key === 'outline') {
+                setTimeout(() => {
+                    if (typeof initOutlineTemplate === 'function') {
+                        initOutlineTemplate();
+                    }
+                }, 100);
+            }
+
+            // Initialize mindmap template
+            if (key === 'mindmap') {
+                setTimeout(() => {
+                    if (typeof initMindmapTemplate === 'function') {
+                        initMindmapTemplate();
+                    }
+                }, 100);
+            }
+
+            // Circuit symbols tray will be toggled via Components button
+            // No auto-initialization needed
         }
+        toggleTemplates();
+        resizeCanvas();
     };
 
-    const selected = temps[key];
-    if (selected) {
-        document.getElementById('pageTitle').value = selected.title;
+    window.renderSidebar = () => {
+        const list = document.getElementById('chapterList');
+        const searchStr = document.getElementById('sidebarSearch').value.toLowerCase();
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        list.innerHTML = '';
 
-        // Apply to the ACTIVE chapter's content area
-        const activeBlock = document.getElementById(`page-block-${currentId}`);
-        const contentArea = activeBlock ? activeBlock.querySelector('.content-area') : document.querySelector('.content-area');
-        if (contentArea) {
-            contentArea.innerHTML = selected.content;
-        }
+        const filtered = chapters.filter(ch => {
+            const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
+            const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
+            const matchesSearch = titleMatch || tagMatch;
 
-        if (selected.isWhiteboard) {
-            chapter.isWhiteboard = true;
-            document.getElementById('paper').classList.add('infinite');
-        } else {
-            chapter.isWhiteboard = false;
-            document.getElementById('paper').classList.remove('infinite');
-        }
+            // Smart Filtering based on Discipline or Category
+            let matchesCat = true;
+            if (categoryFilter !== 'all') {
+                if (['Algorithms', 'Systems', 'Projects'].includes(categoryFilter)) {
+                    matchesCat = (ch.category === categoryFilter);
+                    if (ch.metadata?.type === PAGE_TYPES.ALGORITHM && categoryFilter === 'Algorithms') matchesCat = true;
+                    if (ch.metadata?.type === PAGE_TYPES.SYSTEM && categoryFilter === 'Systems') matchesCat = true;
+                    if (ch.metadata?.type === PAGE_TYPES.PROJECT && categoryFilter === 'Projects') matchesCat = true;
+                } else if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter)) {
+                    if (ch.metadata?.discipline !== 'medical') return false;
+                    if (categoryFilter === 'Anatomy' && ch.metadata?.type !== PAGE_TYPES.ANATOMY) matchesCat = false;
+                    if (categoryFilter === 'Pathology' && ch.metadata?.type !== PAGE_TYPES.DISEASE) matchesCat = false;
+                    if (categoryFilter === 'Pharmacology' && ch.metadata?.type !== PAGE_TYPES.DRUG) matchesCat = false;
+                    if (categoryFilter === 'Clinical' && ![PAGE_TYPES.CLINICAL_CASE, PAGE_TYPES.LAB].includes(ch.metadata?.type)) matchesCat = false;
+                } else if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter)) {
+                    if (ch.metadata?.discipline !== 'medical') return false;
+                    if (categoryFilter === 'Dental Anatomy' && ch.metadata?.type !== PAGE_TYPES.DENTAL_ANATOMY) matchesCat = false;
+                    if (categoryFilter === 'Procedures' && ![PAGE_TYPES.DENTAL_PROCEDURE, PAGE_TYPES.PROSTHO_PLAN].includes(ch.metadata?.type)) matchesCat = false;
+                    if (categoryFilter === 'Dental Cases' && ![PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.ENDO_CASE, PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY, PAGE_TYPES.ORAL_PATHOLOGY].includes(ch.metadata?.type)) matchesCat = false;
 
-        let disc = 'general';
-        if (['algo', 'codeStudy', 'sysDesign', 'project', 'logicGates'].includes(key)) disc = 'cs';
-        if (['anatomy', 'disease', 'drug', 'physio', 'pathway', 'lab'].includes(key)) disc = 'medical';
-        if (['dental_anatomy', 'oral_pathology', 'dental_procedure', 'dental_case', 'prostho_plan', 'endo_case', 'perio_case', 'oral_radiology'].includes(key)) disc = 'medical';
-        if (['prob_sol', 'circuit', 'mech_sys', 'struct', 'control', 'process', 'lab_exp'].includes(key)) disc = 'engineering';
-
-        // Advanced templates can be used in any discipline
-        if (['cornell', 'zettelkasten', 'outline', 'mindmap', 'sq3r', 'feynman'].includes(key)) {
-            // Keep existing discipline or set to general
-            disc = chapter.metadata?.discipline || 'general';
-        }
-
-        chapter.metadata.discipline = disc;
-        chapter.metadata.type = selected.type || PAGE_TYPES.NOTE;
-
-        if (disc === 'engineering') {
-            if (key === 'circuit' || key === 'control') chapter.metadata.branch = 'Electrical';
-            else if (key === 'mech_sys') chapter.metadata.branch = 'Mechanical';
-            else if (key === 'struct') chapter.metadata.branch = 'Civil';
-            else if (key === 'process') chapter.metadata.branch = 'Industrial';
-            else chapter.metadata.branch = 'General';
-        }
-
-        await saveChapterToDB(chapter);
-        renderSidebar();
-        updateToolVisibility(chapter);
-
-        // Initialize Logic Gates Simulator if this template was selected
-        if (key === 'logicGates') {
-            setTimeout(() => initLogicGatesSimulator(), 100);
-        }
-
-        // Initialize advanced template features
-        if (['cornell', 'zettelkasten', 'sq3r', 'feynman'].includes(key)) {
-            setTimeout(() => {
-                const cornellNotes = document.getElementById('cornellNotes');
-                if (cornellNotes) cornellNotes.addEventListener('input', checkCornellNotesLength);
-
-                const zettelContent = document.getElementById('zettelContent');
-                if (zettelContent) checkZettelWordCount();
-
-                const feynmanSimple = document.getElementById('feynmanSimple');
-                if (feynmanSimple) feynmanSimple.addEventListener('input', checkFeynmanReadability);
-            }, 100);
-        }
-
-        // Initialize outline template
-        if (key === 'outline') {
-            setTimeout(() => {
-                if (typeof initOutlineTemplate === 'function') {
-                    initOutlineTemplate();
+                } else if (['Electrical', 'Mechanical', 'Civil', 'Electronics', 'Mechatronics', 'Industrial'].includes(categoryFilter)) {
+                    if (ch.metadata?.discipline !== 'engineering') return false;
+                    if (ch.metadata?.branch !== categoryFilter) matchesCat = false;
+                } else if (categoryFilter === 'General') {
+                    matchesCat = ch.metadata?.discipline === 'general';
                 }
-            }, 100);
-        }
-
-        // Initialize mindmap template
-        if (key === 'mindmap') {
-            setTimeout(() => {
-                if (typeof initMindmapTemplate === 'function') {
-                    initMindmapTemplate();
-                }
-            }, 100);
-        }
-
-        // Circuit symbols tray will be toggled via Components button
-        // No auto-initialization needed
-    }
-    toggleTemplates();
-    resizeCanvas();
-};
-
-window.renderSidebar = () => {
-    const list = document.getElementById('chapterList');
-    const searchStr = document.getElementById('sidebarSearch').value.toLowerCase();
-    const categoryFilter = document.getElementById('categoryFilter').value;
-    list.innerHTML = '';
-
-    const filtered = chapters.filter(ch => {
-        const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
-        const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
-        const matchesSearch = titleMatch || tagMatch;
-
-        // Smart Filtering based on Discipline or Category
-        let matchesCat = true;
-        if (categoryFilter !== 'all') {
-            if (['Algorithms', 'Systems', 'Projects'].includes(categoryFilter)) {
-                matchesCat = (ch.category === categoryFilter);
-                if (ch.metadata?.type === PAGE_TYPES.ALGORITHM && categoryFilter === 'Algorithms') matchesCat = true;
-                if (ch.metadata?.type === PAGE_TYPES.SYSTEM && categoryFilter === 'Systems') matchesCat = true;
-                if (ch.metadata?.type === PAGE_TYPES.PROJECT && categoryFilter === 'Projects') matchesCat = true;
-            } else if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter)) {
-                if (ch.metadata?.discipline !== 'medical') return false;
-                if (categoryFilter === 'Anatomy' && ch.metadata?.type !== PAGE_TYPES.ANATOMY) matchesCat = false;
-                if (categoryFilter === 'Pathology' && ch.metadata?.type !== PAGE_TYPES.DISEASE) matchesCat = false;
-                if (categoryFilter === 'Pharmacology' && ch.metadata?.type !== PAGE_TYPES.DRUG) matchesCat = false;
-                if (categoryFilter === 'Clinical' && ![PAGE_TYPES.CLINICAL_CASE, PAGE_TYPES.LAB].includes(ch.metadata?.type)) matchesCat = false;
-            } else if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter)) {
-                if (ch.metadata?.discipline !== 'medical') return false;
-                if (categoryFilter === 'Dental Anatomy' && ch.metadata?.type !== PAGE_TYPES.DENTAL_ANATOMY) matchesCat = false;
-                if (categoryFilter === 'Procedures' && ![PAGE_TYPES.DENTAL_PROCEDURE, PAGE_TYPES.PROSTHO_PLAN].includes(ch.metadata?.type)) matchesCat = false;
-                if (categoryFilter === 'Dental Cases' && ![PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.ENDO_CASE, PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY, PAGE_TYPES.ORAL_PATHOLOGY].includes(ch.metadata?.type)) matchesCat = false;
-
-            } else if (['Electrical', 'Mechanical', 'Civil', 'Electronics', 'Mechatronics', 'Industrial'].includes(categoryFilter)) {
-                if (ch.metadata?.discipline !== 'engineering') return false;
-                if (ch.metadata?.branch !== categoryFilter) matchesCat = false;
-            } else if (categoryFilter === 'General') {
-                matchesCat = ch.metadata?.discipline === 'general';
             }
-        }
 
-        return matchesSearch && matchesCat;
-    });
+            return matchesSearch && matchesCat;
+        });
 
-    filtered.forEach(ch => {
-        const li = document.createElement('li');
-        li.className = `nav-item ${ch.id === currentId ? 'active' : ''}`;
+        filtered.forEach(ch => {
+            const li = document.createElement('li');
+            li.className = `nav-item ${ch.id === currentId ? 'active' : ''}`;
 
-        const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, '');
-        let snippet = cleanContent.substring(0, 60) + (cleanContent.length > 60 ? '...' : '');
+            const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, '');
+            let snippet = cleanContent.substring(0, 60) + (cleanContent.length > 60 ? '...' : '');
 
-        let tagsHtml = (ch.tags || []).map(t => `<span class="tag-mini">#${t}</span>`).join('');
-        let catBadge = '';
-        const disp = ch.metadata?.discipline || ch.category;
-        if (disp && disp !== 'general' && categoryFilter === 'all') {
-            catBadge = `<div class="cat-badge">${disp.toUpperCase()}</div>`;
-        }
+            let tagsHtml = (ch.tags || []).map(t => `<span class="tag-mini">#${t}</span>`).join('');
+            let catBadge = '';
+            const disp = ch.metadata?.discipline || ch.category;
+            if (disp && disp !== 'general' && categoryFilter === 'all') {
+                catBadge = `<div class="cat-badge">${disp.toUpperCase()}</div>`;
+            }
 
-        li.innerHTML = `
+            li.innerHTML = `
                     <div class="nav-info" onclick="loadChapter('${ch.id}')">
                         <div class="nav-item-title">${ch.title || 'Untitled'}</div>
                         <div class="nav-item-snippet">${snippet}</div>
@@ -6330,28 +6342,28 @@ window.renderSidebar = () => {
                     </div>
                     <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">🗑️</button>
                 `;
-        list.appendChild(li);
-    });
+            list.appendChild(li);
+        });
 
-    renderTagsSidebar(); // Refresh tags sidebar when sidebar updates
-};
+        renderTagsSidebar(); // Refresh tags sidebar when sidebar updates
+    };
 
-// ─── USER PROFILE WIDGET ─────────────────────────────────────────────────────
+    // ─── USER PROFILE WIDGET ─────────────────────────────────────────────────────
 
-function renderUserProfile() {
-    const bar = document.getElementById('userProfileBar');
-    if (!bar || !window.AUTH) return;
+    function renderUserProfile() {
+        const bar = document.getElementById('userProfileBar');
+        if (!bar || !window.AUTH) return;
 
-    const user = window.AUTH.getCurrentUser();
-    if (!user) return;
+        const user = window.AUTH.getCurrentUser();
+        if (!user) return;
 
-    const avatarSvg = window.AUTH.getAvatarHTML(34);
-    const isGuest = user.isGuest;
-    const guestBadge = isGuest
-        ? `<span class="up-guest-badge">Guest</span>`
-        : '';
+        const avatarSvg = window.AUTH.getAvatarHTML(34);
+        const isGuest = user.isGuest;
+        const guestBadge = isGuest
+            ? `<span class="up-guest-badge">Guest</span>`
+            : '';
 
-    bar.innerHTML = `
+        bar.innerHTML = `
         <div class="up-avatar">${avatarSvg}</div>
         <div class="up-info">
             <div class="up-name">${user.displayName}${guestBadge}</div>
@@ -6362,23 +6374,23 @@ function renderUserProfile() {
             <button class="up-btn up-logout" onclick="window.AUTH.logout()" title="Sign out">↩️</button>
         </div>
     `;
-}
+    }
 
-// ─── ACCOUNT SETTINGS MODAL ──────────────────────────────────────────────────
+    // ─── ACCOUNT SETTINGS MODAL ──────────────────────────────────────────────────
 
-function openAccountModal() {
-    // Remove existing if present
-    const existing = document.getElementById('accountModal');
-    if (existing) existing.remove();
+    function openAccountModal() {
+        // Remove existing if present
+        const existing = document.getElementById('accountModal');
+        if (existing) existing.remove();
 
-    const user = window.AUTH.getCurrentUser();
-    if (!user) return;
+        const user = window.AUTH.getCurrentUser();
+        if (!user) return;
 
-    const modal = document.createElement('div');
-    modal.id = 'accountModal';
-    modal.className = 'floating-pane';
-    modal.style.cssText = 'display:block; width:310px; z-index:3000; top:80px; left:20px;';
-    modal.innerHTML = `
+        const modal = document.createElement('div');
+        modal.id = 'accountModal';
+        modal.className = 'floating-pane';
+        modal.style.cssText = 'display:block; width:310px; z-index:3000; top:80px; left:20px;';
+        modal.innerHTML = `
         <h3 style="margin-bottom:15px; font-family:'Caveat',cursive; font-size:1.3rem;">👤 Account</h3>
 
         <div class="meta-group" style="margin-bottom:12px;">
@@ -6410,399 +6422,399 @@ function openAccountModal() {
                 onclick="document.getElementById('accountModal').remove()">Close</button>
     `;
 
-    document.body.appendChild(modal);
-}
+        document.body.appendChild(modal);
+    }
 
-async function saveDisplayName() {
-    const input = document.getElementById('accName');
-    const name = (input.value || '').trim();
-    if (!name) return;
-    window.AUTH.updateDisplayName(name);
-    renderUserProfile();
-    showToast('✓ Name updated');
-}
+    async function saveDisplayName() {
+        const input = document.getElementById('accName');
+        const name = (input.value || '').trim();
+        if (!name) return;
+        window.AUTH.updateDisplayName(name);
+        renderUserProfile();
+        showToast('✓ Name updated');
+    }
 
-async function savePassword() {
-    const msgEl = document.getElementById('accMsg');
-    const oldPw = document.getElementById('accOldPw').value;
-    const newPw = document.getElementById('accNewPw').value;
-    const confPw = document.getElementById('accConfPw').value;
+    async function savePassword() {
+        const msgEl = document.getElementById('accMsg');
+        const oldPw = document.getElementById('accOldPw').value;
+        const newPw = document.getElementById('accNewPw').value;
+        const confPw = document.getElementById('accConfPw').value;
 
-    msgEl.style.display = 'none';
+        msgEl.style.display = 'none';
 
-    if (newPw !== confPw) {
-        msgEl.textContent = '❌ Passwords do not match.';
-        msgEl.style.color = '#e74c3c';
+        if (newPw !== confPw) {
+            msgEl.textContent = '❌ Passwords do not match.';
+            msgEl.style.color = '#e74c3c';
+            msgEl.style.display = 'block';
+            return;
+        }
+
+        const result = await window.AUTH.updatePassword(oldPw, newPw);
         msgEl.style.display = 'block';
-        return;
-    }
-
-    const result = await window.AUTH.updatePassword(oldPw, newPw);
-    msgEl.style.display = 'block';
-    if (result.ok) {
-        msgEl.textContent = '✓ Password updated!';
-        msgEl.style.color = '#27ae60';
-        ['accOldPw', 'accNewPw', 'accConfPw'].forEach(id => document.getElementById(id).value = '');
-    } else {
-        msgEl.textContent = '❌ ' + result.error;
-        msgEl.style.color = '#e74c3c';
-    }
-}
-
-async function confirmDeleteAccount() {
-    if (!confirm('⚠️ This will permanently delete your account and ALL notes. This cannot be undone.\n\nAre you sure?')) return;
-    await window.AUTH.deleteAccount(); // redirects to login
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-window.toggleDarkMode = () => {
-    const isDark = document.body.classList.toggle('dark-mode');
-    document.getElementById('darkModeToggle').innerText = isDark ? '☀️' : '🌙';
-};
-
-window.showToast = (msg) => {
-    const t = document.getElementById('toast');
-    t.innerText = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-};
-
-// --- PWA LOGIC ---
-const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#2c3e50"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="300">📝</text></svg>`;
-const iconUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(iconSVG)}`;
-
-document.getElementById('appIcon').href = iconUrl;
-document.getElementById('appleIcon').href = iconUrl;
-
-const manifest = {
-    "name": "Academic Notebook",
-    "short_name": "Notebook",
-    "start_url": ".",
-    "display": "standalone",
-    "background_color": "#fdfbf7",
-    "theme_color": "#2c3e50",
-    "orientation": "any",
-    "icons": [
-        {
-            "src": iconUrl,
-            "sizes": "512x512",
-            "type": "image/svg+xml",
-            "purpose": "any maskable"
-        }
-    ]
-};
-
-const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-document.getElementById('appManifest').href = URL.createObjectURL(manifestBlob);
-
-let deferredPrompt;
-const installBtn = document.getElementById('installAppBtn');
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.style.display = 'flex';
-});
-
-window.installPWA = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-        installBtn.style.display = 'none';
-    }
-    deferredPrompt = null;
-};
-
-window.addEventListener('appinstalled', () => {
-    installBtn.style.display = 'none';
-    showToast("App Installed Successfully!");
-});
-
-// ==================== POMODORO TIMER ====================
-let pomodoroInterval = null;
-let pomodoroTimeLeft = 25 * 60; // 25 minutes in seconds
-let pomodoroTotalTime = 25 * 60;
-let pomodoroMode = 'focus'; // 'focus' or 'break'
-let pomodoroPaused = false;
-let dndEnabled = false;
-let pomodoroSessionCount = 0;
-let pomodoroTodayCount = 0;
-let pomodoroLastDate = null;
-
-// Load saved stats from localStorage
-function loadPomodoroStats() {
-    const POMODORO_KEY = window.AUTH ? window.AUTH.getStorageKey('pomodoroStats') : 'pomodoroStats';
-    const saved = localStorage.getItem(POMODORO_KEY);
-    if (saved) {
-        const stats = JSON.parse(saved);
-        pomodoroSessionCount = stats.sessions || 0;
-        pomodoroLastDate = stats.lastDate || null;
-
-        // Reset today count if it's a new day
-        const today = new Date().toDateString();
-        if (pomodoroLastDate === today) {
-            pomodoroTodayCount = stats.todayCount || 0;
+        if (result.ok) {
+            msgEl.textContent = '✓ Password updated!';
+            msgEl.style.color = '#27ae60';
+            ['accOldPw', 'accNewPw', 'accConfPw'].forEach(id => document.getElementById(id).value = '');
         } else {
-            pomodoroTodayCount = 0;
+            msgEl.textContent = '❌ ' + result.error;
+            msgEl.style.color = '#e74c3c';
         }
     }
-    updatePomodoroStats();
-}
 
-// Save stats to localStorage
-function savePomodoroStats() {
-    const POMODORO_KEY = window.AUTH ? window.AUTH.getStorageKey('pomodoroStats') : 'pomodoroStats';
-    const stats = {
-        sessions: pomodoroSessionCount,
-        todayCount: pomodoroTodayCount,
-        lastDate: new Date().toDateString()
+    async function confirmDeleteAccount() {
+        if (!confirm('⚠️ This will permanently delete your account and ALL notes. This cannot be undone.\n\nAre you sure?')) return;
+        await window.AUTH.deleteAccount(); // redirects to login
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    window.toggleDarkMode = () => {
+        const isDark = document.body.classList.toggle('dark-mode');
+        document.getElementById('darkModeToggle').innerText = isDark ? '☀️' : '🌙';
     };
-    localStorage.setItem(POMODORO_KEY, JSON.stringify(stats));
-}
 
-// Update stats display
-function updatePomodoroStats() {
-    document.getElementById('pomodoroSessionCount').innerText = pomodoroSessionCount;
-    document.getElementById('pomodoroTodayCount').innerText = pomodoroTodayCount;
-}
+    window.showToast = (msg) => {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    };
 
-function updatePomodoroDisplay() {
-    const minutes = Math.floor(pomodoroTimeLeft / 60);
-    const seconds = pomodoroTimeLeft % 60;
-    const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    // --- PWA LOGIC ---
+    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#2c3e50"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="300">📝</text></svg>`;
+    const iconUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(iconSVG)}`;
 
-    document.getElementById('pomodoroDisplay').innerText = timeString;
-    if (dndEnabled) {
-        document.getElementById('dndTimer').innerText = timeString;
-    }
+    document.getElementById('appIcon').href = iconUrl;
+    document.getElementById('appleIcon').href = iconUrl;
 
-    // Update progress bar
-    const progress = ((pomodoroTotalTime - pomodoroTimeLeft) / pomodoroTotalTime) * 100;
-    document.getElementById('pomodoroProgressBar').style.width = progress + '%';
+    const manifest = {
+        "name": "Academic Notebook",
+        "short_name": "Notebook",
+        "start_url": ".",
+        "display": "standalone",
+        "background_color": "#fdfbf7",
+        "theme_color": "#2c3e50",
+        "orientation": "any",
+        "icons": [
+            {
+                "src": iconUrl,
+                "sizes": "512x512",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+            }
+        ]
+    };
 
-    // Update page title if timer is running
-    if (pomodoroInterval && !pomodoroPaused) {
-        document.title = `${timeString} - ${pomodoroMode === 'focus' ? '🍅 Focus' : '☕ Break'}`;
-    }
-}
+    const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    document.getElementById('appManifest').href = URL.createObjectURL(manifestBlob);
 
-function startPomodoro() {
-    if (pomodoroInterval) return; // Already running
+    let deferredPrompt;
+    const installBtn = document.getElementById('installAppBtn');
 
-    pomodoroPaused = false;
-    document.getElementById('pomodoroStartBtn').style.display = 'none';
-    document.getElementById('pomodoroPauseBtn').style.display = 'inline-block';
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.style.display = 'flex';
+    });
 
-    // Enable DND if checkbox is checked
-    if (document.getElementById('dndToggle').checked) {
-        enableDnd();
-    }
+    window.installPWA = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            installBtn.style.display = 'none';
+        }
+        deferredPrompt = null;
+    };
 
-    // Show encouraging toast
-    if (pomodoroMode === 'focus') {
-        showToast("🍅 Focus session started! You've got this!");
-    } else {
-        showToast("☕ Break time! Relax and recharge.");
-    }
+    window.addEventListener('appinstalled', () => {
+        installBtn.style.display = 'none';
+        showToast("App Installed Successfully!");
+    });
 
-    pomodoroInterval = setInterval(() => {
-        if (!pomodoroPaused) {
-            pomodoroTimeLeft--;
-            updatePomodoroDisplay();
+    // ==================== POMODORO TIMER ====================
+    let pomodoroInterval = null;
+    let pomodoroTimeLeft = 25 * 60; // 25 minutes in seconds
+    let pomodoroTotalTime = 25 * 60;
+    let pomodoroMode = 'focus'; // 'focus' or 'break'
+    let pomodoroPaused = false;
+    let dndEnabled = false;
+    let pomodoroSessionCount = 0;
+    let pomodoroTodayCount = 0;
+    let pomodoroLastDate = null;
 
-            if (pomodoroTimeLeft <= 0) {
-                // Timer finished
-                clearInterval(pomodoroInterval);
-                pomodoroInterval = null;
+    // Load saved stats from localStorage
+    function loadPomodoroStats() {
+        const POMODORO_KEY = window.AUTH ? window.AUTH.getStorageKey('pomodoroStats') : 'pomodoroStats';
+        const saved = localStorage.getItem(POMODORO_KEY);
+        if (saved) {
+            const stats = JSON.parse(saved);
+            pomodoroSessionCount = stats.sessions || 0;
+            pomodoroLastDate = stats.lastDate || null;
 
-                // Play notification sound
-                playBeep();
-
-                // Switch modes
-                if (pomodoroMode === 'focus') {
-                    // Focus session completed - increment counters
-                    pomodoroSessionCount++;
-                    pomodoroTodayCount++;
-                    savePomodoroStats();
-                    updatePomodoroStats();
-
-                    pomodoroMode = 'break';
-                    pomodoroTimeLeft = 5 * 60; // 5 minute break
-                    pomodoroTotalTime = 5 * 60;
-                    document.getElementById('pomodoroMode').innerText = 'Break Time';
-                    showToast("🎉 Great work! You completed a focus session! Time for a 5-minute break.");
-                    disableDnd();
-                } else {
-                    pomodoroMode = 'focus';
-                    pomodoroTimeLeft = 25 * 60; // 25 minute focus
-                    pomodoroTotalTime = 25 * 60;
-                    document.getElementById('pomodoroMode').innerText = 'Focus Time';
-                    showToast("☕ Break over! Ready for another focus session?");
-                }
-
-                document.getElementById('pomodoroStartBtn').style.display = 'inline-block';
-                document.getElementById('pomodoroPauseBtn').style.display = 'none';
-                document.title = 'Academic Notebook';
-                updatePomodoroDisplay();
+            // Reset today count if it's a new day
+            const today = new Date().toDateString();
+            if (pomodoroLastDate === today) {
+                pomodoroTodayCount = stats.todayCount || 0;
+            } else {
+                pomodoroTodayCount = 0;
             }
         }
-    }, 1000);
-}
-
-function pausePomodoro() {
-    if (!pomodoroInterval) return;
-
-    pomodoroPaused = !pomodoroPaused;
-    const pauseBtn = document.getElementById('pomodoroPauseBtn');
-
-    if (pomodoroPaused) {
-        pauseBtn.innerHTML = '▶️ Resume';
-        pauseBtn.title = 'Resume timer';
-        document.title = '⏸️ Paused - Academic Notebook';
-        showToast("⏸️ Timer paused");
-    } else {
-        pauseBtn.innerHTML = '⏸️ Pause';
-        pauseBtn.title = 'Pause timer';
-        showToast("▶️ Timer resumed");
-    }
-}
-
-function resetPomodoro() {
-    const wasRunning = pomodoroInterval !== null;
-
-    clearInterval(pomodoroInterval);
-    pomodoroInterval = null;
-    pomodoroPaused = false;
-
-    pomodoroMode = 'focus';
-    pomodoroTimeLeft = 25 * 60;
-    pomodoroTotalTime = 25 * 60;
-
-    document.getElementById('pomodoroMode').innerText = 'Focus Time';
-    document.getElementById('pomodoroStartBtn').style.display = 'inline-block';
-    document.getElementById('pomodoroPauseBtn').style.display = 'none';
-    document.getElementById('pomodoroProgressBar').style.width = '0%';
-    document.title = 'Academic Notebook';
-
-    updatePomodoroDisplay();
-    disableDnd();
-
-    if (wasRunning) {
-        showToast("🔄 Timer reset to 25 minutes");
-    }
-}
-
-function enableDnd() {
-    dndEnabled = true;
-    document.getElementById('dndOverlay').classList.add('active');
-
-    // Disable toolbar and sketch tools, but keep some navigation
-    const toolbar = document.querySelector('.toolbar');
-    if (toolbar) toolbar.style.pointerEvents = 'none';
-
-    // Keep sidebar accessible but make it semi-transparent as a hint
-    const sidebar = document.querySelector('.sidebar');
-    if (sidebar) {
-        sidebar.style.opacity = '0.5';
-        sidebar.style.pointerEvents = 'auto'; // Allow sidebar interaction
+        updatePomodoroStats();
     }
 
-    // But allow the DND overlay to be clickable
-    document.getElementById('dndOverlay').style.pointerEvents = 'auto';
-
-    showToast("🔇 Do Not Disturb mode enabled");
-}
-
-function disableDnd() {
-    dndEnabled = false;
-    document.getElementById('dndOverlay').classList.remove('active');
-
-    // Re-enable toolbar and sketch tools
-    const toolbar = document.querySelector('.toolbar');
-    const sidebar = document.querySelector('.sidebar');
-    if (toolbar) toolbar.style.pointerEvents = 'auto';
-    if (sidebar) {
-        sidebar.style.pointerEvents = 'auto';
-        sidebar.style.opacity = '1';
+    // Save stats to localStorage
+    function savePomodoroStats() {
+        const POMODORO_KEY = window.AUTH ? window.AUTH.getStorageKey('pomodoroStats') : 'pomodoroStats';
+        const stats = {
+            sessions: pomodoroSessionCount,
+            todayCount: pomodoroTodayCount,
+            lastDate: new Date().toDateString()
+        };
+        localStorage.setItem(POMODORO_KEY, JSON.stringify(stats));
     }
-}
 
-function exitDnd() {
-    disableDnd();
-    // Pause the timer when exiting DND
-    if (pomodoroInterval && !pomodoroPaused) {
-        pausePomodoro();
+    // Update stats display
+    function updatePomodoroStats() {
+        document.getElementById('pomodoroSessionCount').innerText = pomodoroSessionCount;
+        document.getElementById('pomodoroTodayCount').innerText = pomodoroTodayCount;
     }
-    showToast("Focus mode exited - timer paused");
-}
 
-function updateDndSetting() {
-    // If timer is running and DND checkbox changes
-    if (pomodoroInterval && !pomodoroPaused) {
-        if (document.getElementById('dndToggle').checked) {
-            enableDnd();
-        } else {
-            disableDnd();
+    function updatePomodoroDisplay() {
+        const minutes = Math.floor(pomodoroTimeLeft / 60);
+        const seconds = pomodoroTimeLeft % 60;
+        const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+        document.getElementById('pomodoroDisplay').innerText = timeString;
+        if (dndEnabled) {
+            document.getElementById('dndTimer').innerText = timeString;
+        }
+
+        // Update progress bar
+        const progress = ((pomodoroTotalTime - pomodoroTimeLeft) / pomodoroTotalTime) * 100;
+        document.getElementById('pomodoroProgressBar').style.width = progress + '%';
+
+        // Update page title if timer is running
+        if (pomodoroInterval && !pomodoroPaused) {
+            document.title = `${timeString} - ${pomodoroMode === 'focus' ? '🍅 Focus' : '☕ Break'}`;
         }
     }
-}
 
-function playBeep() {
-    // Create a pleasant notification sound using Web Audio API
-    try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    function startPomodoro() {
+        if (pomodoroInterval) return; // Already running
 
-        // First beep
-        const osc1 = audioContext.createOscillator();
-        const gain1 = audioContext.createGain();
-        osc1.connect(gain1);
-        gain1.connect(audioContext.destination);
-        osc1.frequency.value = 800;
-        osc1.type = 'sine';
-        gain1.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gain1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-        osc1.start(audioContext.currentTime);
-        osc1.stop(audioContext.currentTime + 0.2);
+        pomodoroPaused = false;
+        document.getElementById('pomodoroStartBtn').style.display = 'none';
+        document.getElementById('pomodoroPauseBtn').style.display = 'inline-block';
 
-        // Second beep
-        const osc2 = audioContext.createOscillator();
-        const gain2 = audioContext.createGain();
-        osc2.connect(gain2);
-        gain2.connect(audioContext.destination);
-        osc2.frequency.value = 1000;
-        osc2.type = 'sine';
-        gain2.gain.setValueAtTime(0.3, audioContext.currentTime + 0.3);
-        gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        osc2.start(audioContext.currentTime + 0.3);
-        osc2.stop(audioContext.currentTime + 0.5);
-    } catch (e) {
-        console.log('Audio not supported');
+        // Enable DND if checkbox is checked
+        if (document.getElementById('dndToggle').checked) {
+            enableDnd();
+        }
+
+        // Show encouraging toast
+        if (pomodoroMode === 'focus') {
+            showToast("🍅 Focus session started! You've got this!");
+        } else {
+            showToast("☕ Break time! Relax and recharge.");
+        }
+
+        pomodoroInterval = setInterval(() => {
+            if (!pomodoroPaused) {
+                pomodoroTimeLeft--;
+                updatePomodoroDisplay();
+
+                if (pomodoroTimeLeft <= 0) {
+                    // Timer finished
+                    clearInterval(pomodoroInterval);
+                    pomodoroInterval = null;
+
+                    // Play notification sound
+                    playBeep();
+
+                    // Switch modes
+                    if (pomodoroMode === 'focus') {
+                        // Focus session completed - increment counters
+                        pomodoroSessionCount++;
+                        pomodoroTodayCount++;
+                        savePomodoroStats();
+                        updatePomodoroStats();
+
+                        pomodoroMode = 'break';
+                        pomodoroTimeLeft = 5 * 60; // 5 minute break
+                        pomodoroTotalTime = 5 * 60;
+                        document.getElementById('pomodoroMode').innerText = 'Break Time';
+                        showToast("🎉 Great work! You completed a focus session! Time for a 5-minute break.");
+                        disableDnd();
+                    } else {
+                        pomodoroMode = 'focus';
+                        pomodoroTimeLeft = 25 * 60; // 25 minute focus
+                        pomodoroTotalTime = 25 * 60;
+                        document.getElementById('pomodoroMode').innerText = 'Focus Time';
+                        showToast("☕ Break over! Ready for another focus session?");
+                    }
+
+                    document.getElementById('pomodoroStartBtn').style.display = 'inline-block';
+                    document.getElementById('pomodoroPauseBtn').style.display = 'none';
+                    document.title = 'Academic Notebook';
+                    updatePomodoroDisplay();
+                }
+            }
+        }, 1000);
     }
-}
 
-// Initialize pomodoro
-loadPomodoroStats();
-updatePomodoroDisplay();
+    function pausePomodoro() {
+        if (!pomodoroInterval) return;
 
-// ==================== LOGIC GATES SIMULATOR ====================
-let logicSimulator = {
-    gates: [],
-    inputs: [],
-    outputs: [],
-    wires: [],
-    selectedGate: null,
-    dragging: null,
-    canvas: null,
-    nextId: 1
-};
+        pomodoroPaused = !pomodoroPaused;
+        const pauseBtn = document.getElementById('pomodoroPauseBtn');
 
-function initLogicGatesSimulator() {
-    const container = document.getElementById('logicGatesSimulator');
-    if (!container) return;
+        if (pomodoroPaused) {
+            pauseBtn.innerHTML = '▶️ Resume';
+            pauseBtn.title = 'Resume timer';
+            document.title = '⏸️ Paused - Academic Notebook';
+            showToast("⏸️ Timer paused");
+        } else {
+            pauseBtn.innerHTML = '⏸️ Pause';
+            pauseBtn.title = 'Pause timer';
+            showToast("▶️ Timer resumed");
+        }
+    }
 
-    container.innerHTML = `
+    function resetPomodoro() {
+        const wasRunning = pomodoroInterval !== null;
+
+        clearInterval(pomodoroInterval);
+        pomodoroInterval = null;
+        pomodoroPaused = false;
+
+        pomodoroMode = 'focus';
+        pomodoroTimeLeft = 25 * 60;
+        pomodoroTotalTime = 25 * 60;
+
+        document.getElementById('pomodoroMode').innerText = 'Focus Time';
+        document.getElementById('pomodoroStartBtn').style.display = 'inline-block';
+        document.getElementById('pomodoroPauseBtn').style.display = 'none';
+        document.getElementById('pomodoroProgressBar').style.width = '0%';
+        document.title = 'Academic Notebook';
+
+        updatePomodoroDisplay();
+        disableDnd();
+
+        if (wasRunning) {
+            showToast("🔄 Timer reset to 25 minutes");
+        }
+    }
+
+    function enableDnd() {
+        dndEnabled = true;
+        document.getElementById('dndOverlay').classList.add('active');
+
+        // Disable toolbar and sketch tools, but keep some navigation
+        const toolbar = document.querySelector('.toolbar');
+        if (toolbar) toolbar.style.pointerEvents = 'none';
+
+        // Keep sidebar accessible but make it semi-transparent as a hint
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            sidebar.style.opacity = '0.5';
+            sidebar.style.pointerEvents = 'auto'; // Allow sidebar interaction
+        }
+
+        // But allow the DND overlay to be clickable
+        document.getElementById('dndOverlay').style.pointerEvents = 'auto';
+
+        showToast("🔇 Do Not Disturb mode enabled");
+    }
+
+    function disableDnd() {
+        dndEnabled = false;
+        document.getElementById('dndOverlay').classList.remove('active');
+
+        // Re-enable toolbar and sketch tools
+        const toolbar = document.querySelector('.toolbar');
+        const sidebar = document.querySelector('.sidebar');
+        if (toolbar) toolbar.style.pointerEvents = 'auto';
+        if (sidebar) {
+            sidebar.style.pointerEvents = 'auto';
+            sidebar.style.opacity = '1';
+        }
+    }
+
+    function exitDnd() {
+        disableDnd();
+        // Pause the timer when exiting DND
+        if (pomodoroInterval && !pomodoroPaused) {
+            pausePomodoro();
+        }
+        showToast("Focus mode exited - timer paused");
+    }
+
+    function updateDndSetting() {
+        // If timer is running and DND checkbox changes
+        if (pomodoroInterval && !pomodoroPaused) {
+            if (document.getElementById('dndToggle').checked) {
+                enableDnd();
+            } else {
+                disableDnd();
+            }
+        }
+    }
+
+    function playBeep() {
+        // Create a pleasant notification sound using Web Audio API
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            // First beep
+            const osc1 = audioContext.createOscillator();
+            const gain1 = audioContext.createGain();
+            osc1.connect(gain1);
+            gain1.connect(audioContext.destination);
+            osc1.frequency.value = 800;
+            osc1.type = 'sine';
+            gain1.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gain1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            osc1.start(audioContext.currentTime);
+            osc1.stop(audioContext.currentTime + 0.2);
+
+            // Second beep
+            const osc2 = audioContext.createOscillator();
+            const gain2 = audioContext.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioContext.destination);
+            osc2.frequency.value = 1000;
+            osc2.type = 'sine';
+            gain2.gain.setValueAtTime(0.3, audioContext.currentTime + 0.3);
+            gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            osc2.start(audioContext.currentTime + 0.3);
+            osc2.stop(audioContext.currentTime + 0.5);
+        } catch (e) {
+            console.log('Audio not supported');
+        }
+    }
+
+    // Initialize pomodoro
+    loadPomodoroStats();
+    updatePomodoroDisplay();
+
+    // ==================== LOGIC GATES SIMULATOR ====================
+    let logicSimulator = {
+        gates: [],
+        inputs: [],
+        outputs: [],
+        wires: [],
+        selectedGate: null,
+        dragging: null,
+        canvas: null,
+        nextId: 1
+    };
+
+    function initLogicGatesSimulator() {
+        const container = document.getElementById('logicGatesSimulator');
+        if (!container) return;
+
+        container.innerHTML = `
                 <div class="logic-toolbar">
                     <button class="logic-gate-btn" onclick="addLogicInput()">
                         <span>🟢</span> Add Input
@@ -6827,235 +6839,235 @@ function initLogicGatesSimulator() {
                 </div>
             `;
 
-    logicSimulator.canvas = document.getElementById('logicCanvas');
-    renderLogicCanvas();
-}
-
-function addLogicInput() {
-    const input = {
-        id: logicSimulator.nextId++,
-        type: 'input',
-        x: 50,
-        y: 50 + (logicSimulator.inputs.length * 60),
-        state: false, // false = OFF (0), true = ON (1)
-        label: `IN${logicSimulator.inputs.length + 1}`
-    };
-    logicSimulator.inputs.push(input);
-    renderLogicCanvas();
-    showToast(`Input ${input.label} added`);
-}
-
-function addLogicGate(gateType) {
-    const gate = {
-        id: logicSimulator.nextId++,
-        type: 'gate',
-        gateType: gateType,
-        x: 250,
-        y: 100 + (logicSimulator.gates.length * 80),
-        inputs: [],
-        output: null
-    };
-    logicSimulator.gates.push(gate);
-    renderLogicCanvas();
-    showToast(`${gateType} gate added`);
-}
-
-function addLogicOutput() {
-    const output = {
-        id: logicSimulator.nextId++,
-        type: 'output',
-        x: 500,
-        y: 150,
-        connectedTo: null,
-        state: false,
-        label: `OUT${logicSimulator.outputs.length + 1}`
-    };
-    logicSimulator.outputs.push(output);
-    renderLogicCanvas();
-    showToast(`Output ${output.label} added`);
-}
-
-function renderLogicCanvas() {
-    if (!logicSimulator.canvas) return;
-
-    logicSimulator.canvas.innerHTML = '';
-
-    // Render inputs
-    logicSimulator.inputs.forEach(input => {
-        const el = document.createElement('div');
-        el.className = `logic-input ${input.state ? 'on' : 'off'}`;
-        el.style.left = input.x + 'px';
-        el.style.top = input.y + 'px';
-        el.innerHTML = input.state ? '1' : '0';
-        el.title = `${input.label}: Click to toggle`;
-        el.onclick = (e) => {
-            e.stopPropagation();
-            input.state = !input.state;
-            renderLogicCanvas();
-            evaluateCircuit();
-        };
-        makeDraggable(el, input);
-        logicSimulator.canvas.appendChild(el);
-
-        // Label
-        const label = document.createElement('div');
-        label.style.position = 'absolute';
-        label.style.left = (input.x) + 'px';
-        label.style.top = (input.y + 45) + 'px';
-        label.style.fontSize = '0.75rem';
-        label.style.fontWeight = 'bold';
-        label.style.color = '#2c3e50';
-        label.textContent = input.label;
-        logicSimulator.canvas.appendChild(label);
-    });
-
-    // Render gates
-    logicSimulator.gates.forEach(gate => {
-        const el = document.createElement('div');
-        el.className = `logic-gate ${logicSimulator.selectedGate === gate ? 'selected' : ''}`;
-        el.style.left = gate.x + 'px';
-        el.style.top = gate.y + 'px';
-        el.textContent = gate.gateType;
-        el.title = `${gate.gateType} Gate`;
-        el.onclick = (e) => {
-            e.stopPropagation();
-            logicSimulator.selectedGate = gate;
-            renderLogicCanvas();
-        };
-        makeDraggable(el, gate);
-        logicSimulator.canvas.appendChild(el);
-    });
-
-    // Render outputs
-    logicSimulator.outputs.forEach(output => {
-        const el = document.createElement('div');
-        el.className = `logic-output ${output.state ? 'on' : ''}`;
-        el.style.left = output.x + 'px';
-        el.style.top = output.y + 'px';
-        el.innerHTML = output.state ? '1' : '0';
-        el.title = output.label;
-        makeDraggable(el, output);
-        logicSimulator.canvas.appendChild(el);
-
-        // Label
-        const label = document.createElement('div');
-        label.style.position = 'absolute';
-        label.style.left = (output.x + 5) + 'px';
-        label.style.top = (output.y + 55) + 'px';
-        label.style.fontSize = '0.75rem';
-        label.style.fontWeight = 'bold';
-        label.style.color = '#2c3e50';
-        label.textContent = output.label;
-        logicSimulator.canvas.appendChild(label);
-    });
-}
-
-function makeDraggable(element, dataObj) {
-    let isDragging = false;
-    let startX, startY, initialX, initialY;
-
-    element.addEventListener('mousedown', (e) => {
-        if (e.target !== element) return;
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        initialX = dataObj.x;
-        initialY = dataObj.y;
-        element.style.cursor = 'grabbing';
-        e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        dataObj.x = Math.max(0, Math.min(initialX + dx, logicSimulator.canvas.offsetWidth - 100));
-        dataObj.y = Math.max(0, Math.min(initialY + dy, logicSimulator.canvas.offsetHeight - 50));
-        element.style.left = dataObj.x + 'px';
-        element.style.top = dataObj.y + 'px';
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            element.style.cursor = 'move';
-        }
-    });
-}
-
-function evaluateCircuit() {
-    // Simple evaluation: compute gate outputs based on connected inputs
-    logicSimulator.gates.forEach(gate => {
-        // For demo purposes, we'll simulate simple logic
-        // In a full implementation, you'd track connections and compute based on those
-        const inputStates = logicSimulator.inputs.map(i => i.state);
-
-        // Simple logic for demonstration
-        switch (gate.gateType) {
-            case 'AND':
-                gate.output = inputStates.every(s => s === true);
-                break;
-            case 'OR':
-                gate.output = inputStates.some(s => s === true);
-                break;
-            case 'NOT':
-                gate.output = !inputStates[0];
-                break;
-            case 'NAND':
-                gate.output = !inputStates.every(s => s === true);
-                break;
-            case 'NOR':
-                gate.output = !inputStates.some(s => s === true);
-                break;
-            case 'XOR':
-                gate.output = inputStates.filter(s => s === true).length === 1;
-                break;
-        }
-    });
-
-    // Update outputs (simplified - connect last gate output to first output)
-    if (logicSimulator.gates.length > 0 && logicSimulator.outputs.length > 0) {
-        logicSimulator.outputs[0].state = logicSimulator.gates[logicSimulator.gates.length - 1].output;
-    }
-
-    renderLogicCanvas();
-    showToast("Circuit evaluated!");
-}
-
-function clearCircuit() {
-    if (confirm('Clear all gates, inputs, and outputs?')) {
-        logicSimulator.gates = [];
-        logicSimulator.inputs = [];
-        logicSimulator.outputs = [];
-        logicSimulator.wires = [];
-        logicSimulator.selectedGate = null;
+        logicSimulator.canvas = document.getElementById('logicCanvas');
         renderLogicCanvas();
-        showToast("Circuit cleared");
     }
-}
 
-// --- ANATOMY ATLAS FUNCTIONS ---
+    function addLogicInput() {
+        const input = {
+            id: logicSimulator.nextId++,
+            type: 'input',
+            x: 50,
+            y: 50 + (logicSimulator.inputs.length * 60),
+            state: false, // false = OFF (0), true = ON (1)
+            label: `IN${logicSimulator.inputs.length + 1}`
+        };
+        logicSimulator.inputs.push(input);
+        renderLogicCanvas();
+        showToast(`Input ${input.label} added`);
+    }
 
-window.openAnatomyModal = () => {
-    renderAnatomyMap('body'); // Default to body
-    document.getElementById('anatomyModal').style.display = 'flex';
-};
+    function addLogicGate(gateType) {
+        const gate = {
+            id: logicSimulator.nextId++,
+            type: 'gate',
+            gateType: gateType,
+            x: 250,
+            y: 100 + (logicSimulator.gates.length * 80),
+            inputs: [],
+            output: null
+        };
+        logicSimulator.gates.push(gate);
+        renderLogicCanvas();
+        showToast(`${gateType} gate added`);
+    }
 
-window.closeAnatomyModal = () => {
-    document.getElementById('anatomyModal').style.display = 'none';
-};
+    function addLogicOutput() {
+        const output = {
+            id: logicSimulator.nextId++,
+            type: 'output',
+            x: 500,
+            y: 150,
+            connectedTo: null,
+            state: false,
+            label: `OUT${logicSimulator.outputs.length + 1}`
+        };
+        logicSimulator.outputs.push(output);
+        renderLogicCanvas();
+        showToast(`Output ${output.label} added`);
+    }
 
-window.renderAnatomyMap = (type) => {
-    const container = document.getElementById('anatomyContainer');
-    if (type === 'body') container.innerHTML = BODY_SVG;
-    if (type === 'tooth') container.innerHTML = TOOTH_SVG;
-    if (type === 'brain') container.innerHTML = BRAIN_SVG;
-};
+    function renderLogicCanvas() {
+        if (!logicSimulator.canvas) return;
 
-window.handleRegionClick = (region) => {
-    // Highlight effect handled by CSS, functionality handled here
-    if (confirm(`Start note for region: ${region}?`)) {
-        insertHtml(`
+        logicSimulator.canvas.innerHTML = '';
+
+        // Render inputs
+        logicSimulator.inputs.forEach(input => {
+            const el = document.createElement('div');
+            el.className = `logic-input ${input.state ? 'on' : 'off'}`;
+            el.style.left = input.x + 'px';
+            el.style.top = input.y + 'px';
+            el.innerHTML = input.state ? '1' : '0';
+            el.title = `${input.label}: Click to toggle`;
+            el.onclick = (e) => {
+                e.stopPropagation();
+                input.state = !input.state;
+                renderLogicCanvas();
+                evaluateCircuit();
+            };
+            makeDraggable(el, input);
+            logicSimulator.canvas.appendChild(el);
+
+            // Label
+            const label = document.createElement('div');
+            label.style.position = 'absolute';
+            label.style.left = (input.x) + 'px';
+            label.style.top = (input.y + 45) + 'px';
+            label.style.fontSize = '0.75rem';
+            label.style.fontWeight = 'bold';
+            label.style.color = '#2c3e50';
+            label.textContent = input.label;
+            logicSimulator.canvas.appendChild(label);
+        });
+
+        // Render gates
+        logicSimulator.gates.forEach(gate => {
+            const el = document.createElement('div');
+            el.className = `logic-gate ${logicSimulator.selectedGate === gate ? 'selected' : ''}`;
+            el.style.left = gate.x + 'px';
+            el.style.top = gate.y + 'px';
+            el.textContent = gate.gateType;
+            el.title = `${gate.gateType} Gate`;
+            el.onclick = (e) => {
+                e.stopPropagation();
+                logicSimulator.selectedGate = gate;
+                renderLogicCanvas();
+            };
+            makeDraggable(el, gate);
+            logicSimulator.canvas.appendChild(el);
+        });
+
+        // Render outputs
+        logicSimulator.outputs.forEach(output => {
+            const el = document.createElement('div');
+            el.className = `logic-output ${output.state ? 'on' : ''}`;
+            el.style.left = output.x + 'px';
+            el.style.top = output.y + 'px';
+            el.innerHTML = output.state ? '1' : '0';
+            el.title = output.label;
+            makeDraggable(el, output);
+            logicSimulator.canvas.appendChild(el);
+
+            // Label
+            const label = document.createElement('div');
+            label.style.position = 'absolute';
+            label.style.left = (output.x + 5) + 'px';
+            label.style.top = (output.y + 55) + 'px';
+            label.style.fontSize = '0.75rem';
+            label.style.fontWeight = 'bold';
+            label.style.color = '#2c3e50';
+            label.textContent = output.label;
+            logicSimulator.canvas.appendChild(label);
+        });
+    }
+
+    function makeDraggable(element, dataObj) {
+        let isDragging = false;
+        let startX, startY, initialX, initialY;
+
+        element.addEventListener('mousedown', (e) => {
+            if (e.target !== element) return;
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            initialX = dataObj.x;
+            initialY = dataObj.y;
+            element.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            dataObj.x = Math.max(0, Math.min(initialX + dx, logicSimulator.canvas.offsetWidth - 100));
+            dataObj.y = Math.max(0, Math.min(initialY + dy, logicSimulator.canvas.offsetHeight - 50));
+            element.style.left = dataObj.x + 'px';
+            element.style.top = dataObj.y + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                element.style.cursor = 'move';
+            }
+        });
+    }
+
+    function evaluateCircuit() {
+        // Simple evaluation: compute gate outputs based on connected inputs
+        logicSimulator.gates.forEach(gate => {
+            // For demo purposes, we'll simulate simple logic
+            // In a full implementation, you'd track connections and compute based on those
+            const inputStates = logicSimulator.inputs.map(i => i.state);
+
+            // Simple logic for demonstration
+            switch (gate.gateType) {
+                case 'AND':
+                    gate.output = inputStates.every(s => s === true);
+                    break;
+                case 'OR':
+                    gate.output = inputStates.some(s => s === true);
+                    break;
+                case 'NOT':
+                    gate.output = !inputStates[0];
+                    break;
+                case 'NAND':
+                    gate.output = !inputStates.every(s => s === true);
+                    break;
+                case 'NOR':
+                    gate.output = !inputStates.some(s => s === true);
+                    break;
+                case 'XOR':
+                    gate.output = inputStates.filter(s => s === true).length === 1;
+                    break;
+            }
+        });
+
+        // Update outputs (simplified - connect last gate output to first output)
+        if (logicSimulator.gates.length > 0 && logicSimulator.outputs.length > 0) {
+            logicSimulator.outputs[0].state = logicSimulator.gates[logicSimulator.gates.length - 1].output;
+        }
+
+        renderLogicCanvas();
+        showToast("Circuit evaluated!");
+    }
+
+    function clearCircuit() {
+        if (confirm('Clear all gates, inputs, and outputs?')) {
+            logicSimulator.gates = [];
+            logicSimulator.inputs = [];
+            logicSimulator.outputs = [];
+            logicSimulator.wires = [];
+            logicSimulator.selectedGate = null;
+            renderLogicCanvas();
+            showToast("Circuit cleared");
+        }
+    }
+
+    // --- ANATOMY ATLAS FUNCTIONS ---
+
+    window.openAnatomyModal = () => {
+        renderAnatomyMap('body'); // Default to body
+        document.getElementById('anatomyModal').style.display = 'flex';
+    };
+
+    window.closeAnatomyModal = () => {
+        document.getElementById('anatomyModal').style.display = 'none';
+    };
+
+    window.renderAnatomyMap = (type) => {
+        const container = document.getElementById('anatomyContainer');
+        if (type === 'body') container.innerHTML = BODY_SVG;
+        if (type === 'tooth') container.innerHTML = TOOTH_SVG;
+        if (type === 'brain') container.innerHTML = BRAIN_SVG;
+    };
+
+    window.handleRegionClick = (region) => {
+        // Highlight effect handled by CSS, functionality handled here
+        if (confirm(`Start note for region: ${region}?`)) {
+            insertHtml(`
                     <h2 class="styled-header">Anatomy: ${region}</h2>
                     <div class="sticky-note">
                         <strong>Clinical Notes:</strong><br>
@@ -7063,25 +7075,25 @@ window.handleRegionClick = (region) => {
                     </div>
                     <p><br></p>
                 `);
-    }
-};
+        }
+    };
 
-// Make functions globally accessible
-window.addLogicInput = addLogicInput;
-window.addLogicGate = addLogicGate;
-window.addLogicOutput = addLogicOutput;
-window.evaluateCircuit = evaluateCircuit;
-window.clearCircuit = clearCircuit;
-window.initLogicGatesSimulator = initLogicGatesSimulator;
+    // Make functions globally accessible
+    window.addLogicInput = addLogicInput;
+    window.addLogicGate = addLogicGate;
+    window.addLogicOutput = addLogicOutput;
+    window.evaluateCircuit = evaluateCircuit;
+    window.clearCircuit = clearCircuit;
+    window.initLogicGatesSimulator = initLogicGatesSimulator;
 
-// ==================== KNOWLEDGE BASE SYSTEM ====================
-const knowledgeBaseData = {
-    cs: {
-        title: "💻 Computer Science Reference",
-        categories: [
-            {
-                name: "Algorithmic Complexity (Big-O)",
-                content: `
+    // ==================== KNOWLEDGE BASE SYSTEM ====================
+    const knowledgeBaseData = {
+        cs: {
+            title: "💻 Computer Science Reference",
+            categories: [
+                {
+                    name: "Algorithmic Complexity (Big-O)",
+                    content: `
                             <table class="kb-table">
                                 <tr><th>Complexity</th><th>Typical Meaning</th><th>Common Examples</th></tr>
                                 <tr><td>O(1)</td><td>Constant</td><td>Array access, stack push/pop</td></tr>
@@ -7092,10 +7104,10 @@ const knowledgeBaseData = {
                                 <tr><td>O(2ⁿ)</td><td>Exponential</td><td>Recursive Fibonacci</td></tr>
                             </table>
                         `
-            },
-            {
-                name: "Data Structures at a Glance",
-                content: `
+                },
+                {
+                    name: "Data Structures at a Glance",
+                    content: `
                             <table class="kb-table">
                                 <tr><th>Structure</th><th>Access</th><th>Insert</th><th>Delete</th><th>Notes</th></tr>
                                 <tr><td>Array</td><td>O(1)</td><td>O(n)</td><td>O(n)</td><td>Contiguous memory</td></tr>
@@ -7106,10 +7118,10 @@ const knowledgeBaseData = {
                                 <tr><td>Binary Tree</td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td><td>If balanced</td></tr>
                             </table>
                         `
-            },
-            {
-                name: "OS & Systems Concepts",
-                content: `
+                },
+                {
+                    name: "OS & Systems Concepts",
+                    content: `
                             <div class="kb-section-header">Process States</div>
                             <div>New → Ready → Running → Waiting → Terminated</div>
                             
@@ -7130,10 +7142,10 @@ const knowledgeBaseData = {
                                 <li><strong>Primitives:</strong> Mutex, Semaphore, Atomic operations</li>
                             </ul>
                         `
-            },
-            {
-                name: "HTTP Status Codes",
-                content: `
+                },
+                {
+                    name: "HTTP Status Codes",
+                    content: `
                             <ul class="kb-list">
                                 <li><span class="kb-code">200 OK</span> - Success</li>
                                 <li><span class="kb-code">201 Created</span> - Resource created</li>
@@ -7146,10 +7158,10 @@ const knowledgeBaseData = {
                                 <li><span class="kb-code">502 Bad Gateway</span> - Invalid upstream response</li>
                             </ul>
                         `
-            },
-            {
-                name: "Regex Cheatsheet",
-                content: `
+                },
+                {
+                    name: "Regex Cheatsheet",
+                    content: `
                             <table class="kb-table">
                                 <tr><td><span class="kb-code">^</span></td><td>Start of string</td></tr>
                                 <tr><td><span class="kb-code">$</span></td><td>End of string</td></tr>
@@ -7164,10 +7176,10 @@ const knowledgeBaseData = {
                                 <tr><td><span class="kb-code">(...)</span></td><td>Capture group</td></tr>
                             </table>
                         `
-            },
-            {
-                name: "ASCII & Encoding",
-                content: `
+                },
+                {
+                    name: "ASCII & Encoding",
+                    content: `
                             <ul class="kb-list">
                                 <li><strong>32:</strong> Space</li>
                                 <li><strong>48-57:</strong> Digits (0-9)</li>
@@ -7178,10 +7190,10 @@ const knowledgeBaseData = {
                                 <li><strong>UTF-8:</strong> Variable-length encoding (1-4 bytes)</li>
                             </ul>
                         `
-            },
-            {
-                name: "SQL Basics (CRUD)",
-                content: `
+                },
+                {
+                    name: "SQL Basics (CRUD)",
+                    content: `
                             <div class="kb-section-header">SELECT</div>
                             <div class="kb-code">SELECT * FROM table WHERE col = 'val' ORDER BY col;</div>
                             
@@ -7200,10 +7212,10 @@ const knowledgeBaseData = {
                                 <li><strong>LEFT JOIN:</strong> All from left, matches from right</li>
                             </ul>
                         `
-            },
-            {
-                name: "System Design Concepts",
-                content: `
+                },
+                {
+                    name: "System Design Concepts",
+                    content: `
                             <ul class="kb-list">
                                 <li><strong>CAP Theorem:</strong> Consistency, Availability, Partition Tolerance (Pick 2)</li>
                                 <li><strong>ACID:</strong> Atomicity, Consistency, Isolation, Durability</li>
@@ -7213,10 +7225,10 @@ const knowledgeBaseData = {
                                 <li><strong>State Machines:</strong> Modeling systems as states and transitions</li>
                             </ul>
                         `
-            },
-            {
-                name: "Common Ports",
-                content: `
+                },
+                {
+                    name: "Common Ports",
+                    content: `
                             <table class="kb-table">
                                 <tr><td><span class="kb-code">22</span></td><td>SSH</td></tr>
                                 <tr><td><span class="kb-code">53</span></td><td>DNS</td></tr>
@@ -7227,15 +7239,15 @@ const knowledgeBaseData = {
                                 <tr><td><span class="kb-code">27017</span></td><td>MongoDB</td></tr>
                             </table>
                         `
-            }
-        ]
-    },
-    medical: {
-        title: "⚕️ Medical & Dental Reference",
-        categories: [
-            {
-                name: "Normal Lab Values (Adult)",
-                content: `
+                }
+            ]
+        },
+        medical: {
+            title: "⚕️ Medical & Dental Reference",
+            categories: [
+                {
+                    name: "Normal Lab Values (Adult)",
+                    content: `
                             <div class="kb-section-header">CBC (Complete Blood Count)</div>
                             <ul class="kb-list">
                                 <li>WBC: 4,500 - 11,000 /µL</li>
@@ -7256,10 +7268,10 @@ const knowledgeBaseData = {
                                 <li>Glucose: 70 - 100 mg/dL (Fasting)</li>
                             </ul>
                         `
-            },
-            {
-                name: "Vital Signs (Resting Adult)",
-                content: `
+                },
+                {
+                    name: "Vital Signs (Resting Adult)",
+                    content: `
                             <ul class="kb-list">
                                 <li><strong>Heart Rate:</strong> 60 - 100 bpm</li>
                                 <li><strong>Blood Pressure:</strong> &lt; 120/80 mmHg</li>
@@ -7268,10 +7280,10 @@ const knowledgeBaseData = {
                                 <li><strong>SpO2:</strong> 95% - 100%</li>
                             </ul>
                         `
-            },
-            {
-                name: "Cranial Nerves",
-                content: `
+                },
+                {
+                    name: "Cranial Nerves",
+                    content: `
                             <table class="kb-table">
                                 <tr><th>#</th><th>Name</th><th>Type</th><th>Function</th></tr>
                                 <tr><td>I</td><td>Olfactory</td><td>S</td><td>Smell</td></tr>
@@ -7289,15 +7301,15 @@ const knowledgeBaseData = {
                             </table>
                             <div style="margin-top:5px; font-size:0.65rem; opacity:0.7;">S=Sensory, M=Motor, B=Both</div>
                         `
-            }
-        ]
-    },
-    engineering: {
-        title: "⚙️ Engineering Reference",
-        categories: [
-            {
-                name: "Material Properties",
-                content: `
+                }
+            ]
+        },
+        engineering: {
+            title: "⚙️ Engineering Reference",
+            categories: [
+                {
+                    name: "Material Properties",
+                    content: `
                             <div class="kb-section-header">Structural Steel</div>
                             <ul class="kb-list">
                                 <li>Density: 7,850 kg/m³</li>
@@ -7323,10 +7335,10 @@ const knowledgeBaseData = {
                                 <li>Density: 1,000 kg/m³</li>
                             </ul>
                         `
-            },
-            {
-                name: "Fundamental Constants",
-                content: `
+                },
+                {
+                    name: "Fundamental Constants",
+                    content: `
                             <ul class="kb-list">
                                 <li><strong>g</strong> (Gravity): 9.81 m/s²</li>
                                 <li><strong>c</strong> (Speed of Light): 3.00 × 10⁸ m/s</li>
@@ -7338,10 +7350,10 @@ const knowledgeBaseData = {
                                 <li><strong>Atm. Pressure:</strong> 101,325 Pa</li>
                             </ul>
                         `
-            },
-            {
-                name: "Common Unit Conversions",
-                content: `
+                },
+                {
+                    name: "Common Unit Conversions",
+                    content: `
                             <table class="kb-table">
                                 <tr><th>Category</th><th>Conversion</th></tr>
                                 <tr><td>Length</td><td>1 in = 2.54 cm | 1 ft = 0.3048 m</td></tr>
@@ -7352,10 +7364,10 @@ const knowledgeBaseData = {
                                 <tr><td>Power</td><td>1 hp ≈ 746 W</td></tr>
                             </table>
                         `
-            },
-            {
-                name: "Periodic Table (Key Elements)",
-                content: `
+                },
+                {
+                    name: "Periodic Table (Key Elements)",
+                    content: `
                             <table class="kb-table">
                                 <tr><th>Symbol</th><th>Element</th><th>Atomic #</th><th>Mass</th></tr>
                                 <tr><td>H</td><td>Hydrogen</td><td>1</td><td>1.008</td></tr>
@@ -7370,36 +7382,36 @@ const knowledgeBaseData = {
                                 <tr><td>Pb</td><td>Lead</td><td>82</td><td>207.2</td></tr>
                             </table>
                         `
-            }
-        ]
-    }
-};
+                }
+            ]
+        }
+    };
 
-function updateKnowledgeBase(discipline) {
-    const container = document.getElementById('knowledgeBaseContainer');
-    if (!container) return;
+    function updateKnowledgeBase(discipline) {
+        const container = document.getElementById('knowledgeBaseContainer');
+        if (!container) return;
 
-    // Determine which knowledge base to show
-    let kbData = null;
-    if (discipline === 'cs') {
-        kbData = knowledgeBaseData.cs;
-    } else if (discipline === 'medical') {
-        kbData = knowledgeBaseData.medical;
-    } else if (discipline === 'engineering') {
-        kbData = knowledgeBaseData.engineering;
-    }
+        // Determine which knowledge base to show
+        let kbData = null;
+        if (discipline === 'cs') {
+            kbData = knowledgeBaseData.cs;
+        } else if (discipline === 'medical') {
+            kbData = knowledgeBaseData.medical;
+        } else if (discipline === 'engineering') {
+            kbData = knowledgeBaseData.engineering;
+        }
 
-    if (!kbData) {
-        container.innerHTML = `<div style="font-size: 0.75rem; opacity: 0.7; text-align: center; padding: 10px;">Select a CS, Medical, or Engineering page to view references</div>`;
-        return;
-    }
+        if (!kbData) {
+            container.innerHTML = `<div style="font-size: 0.75rem; opacity: 0.7; text-align: center; padding: 10px;">Select a CS, Medical, or Engineering page to view references</div>`;
+            return;
+        }
 
-    // Build the knowledge base UI
-    let html = `<div style="font-size: 0.85rem; font-weight: bold; margin-bottom: 10px; color: var(--accent-color);">${kbData.title}</div>`;
+        // Build the knowledge base UI
+        let html = `<div style="font-size: 0.85rem; font-weight: bold; margin-bottom: 10px; color: var(--accent-color);">${kbData.title}</div>`;
 
-    kbData.categories.forEach((category, index) => {
-        const categoryId = `kb-cat-${discipline}-${index}`;
-        html += `
+        kbData.categories.forEach((category, index) => {
+            const categoryId = `kb-cat-${discipline}-${index}`;
+            html += `
                     <div class="kb-category">
                         <div class="kb-category-title" onclick="toggleKbCategory('${categoryId}')">
                             <span>${category.name}</span>
@@ -7410,347 +7422,347 @@ function updateKnowledgeBase(discipline) {
                         </div>
                     </div>
                 `;
-    });
+        });
 
-    container.innerHTML = html;
-}
-
-function toggleKbCategory(categoryId) {
-    const content = document.getElementById(categoryId);
-    const arrow = document.getElementById(categoryId + '-arrow');
-
-    if (content && arrow) {
-        content.classList.toggle('collapsed');
-        arrow.classList.toggle('collapsed');
+        container.innerHTML = html;
     }
-}
 
-// Make function globally accessible
-window.toggleKbCategory = toggleKbCategory;
-window.updateKnowledgeBase = updateKnowledgeBase;
+    function toggleKbCategory(categoryId) {
+        const content = document.getElementById(categoryId);
+        const arrow = document.getElementById(categoryId + '-arrow');
 
-// ==================== ENHANCED LOGIC GATES WITH WIRING ====================
-let wiringMode = false;
-let wiringStart = null;
+        if (content && arrow) {
+            content.classList.toggle('collapsed');
+            arrow.classList.toggle('collapsed');
+        }
+    }
 
-// Enhanced render with connection points
-function renderLogicCanvas() {
-    if (!logicSimulator.canvas) return;
+    // Make function globally accessible
+    window.toggleKbCategory = toggleKbCategory;
+    window.updateKnowledgeBase = updateKnowledgeBase;
 
-    // Clear and add SVG for wires
-    logicSimulator.canvas.innerHTML = '<svg class="logic-wire-svg" id="logicWireSvg"></svg>';
+    // ==================== ENHANCED LOGIC GATES WITH WIRING ====================
+    let wiringMode = false;
+    let wiringStart = null;
 
-    // Render wires first (behind components)
-    renderLogicWires();
+    // Enhanced render with connection points
+    function renderLogicCanvas() {
+        if (!logicSimulator.canvas) return;
 
-    // Render inputs with connection points
-    logicSimulator.inputs.forEach(input => {
-        const el = document.createElement('div');
-        el.className = `logic-input ${input.state ? 'on' : 'off'}`;
-        el.style.left = input.x + 'px';
-        el.style.top = input.y + 'px';
-        el.innerHTML = input.state ? '1' : '0';
-        el.dataset.id = input.id;
-        el.title = `${input.label}: Click to toggle`;
-        el.onclick = (e) => {
-            e.stopPropagation();
-            input.state = !input.state;
-            renderLogicCanvas();
-            evaluateLogicCircuit();
-        };
-        makeDraggable(el, input);
+        // Clear and add SVG for wires
+        logicSimulator.canvas.innerHTML = '<svg class="logic-wire-svg" id="logicWireSvg"></svg>';
 
-        // Add output connection point
-        const outPoint = document.createElement('div');
-        outPoint.className = 'logic-connection-point output';
-        outPoint.style.top = '14px';
-        outPoint.dataset.componentId = input.id;
-        outPoint.dataset.pointType = 'output';
-        outPoint.onclick = (e) => {
-            e.stopPropagation();
-            handleConnectionClick(input.id, 'output');
-        };
-        el.appendChild(outPoint);
+        // Render wires first (behind components)
+        renderLogicWires();
 
-        logicSimulator.canvas.appendChild(el);
-
-        const label = document.createElement('div');
-        label.className = 'logic-gate-label';
-        label.style.left = input.x + 'px';
-        label.style.top = (input.y + 45) + 'px';
-        label.style.position = 'absolute';
-        label.textContent = input.label;
-        logicSimulator.canvas.appendChild(label);
-    });
-
-    // Render gates with input/output connection points
-    logicSimulator.gates.forEach(gate => {
-        const el = document.createElement('div');
-        el.className = 'logic-gate';
-        el.style.left = gate.x + 'px';
-        el.style.top = gate.y + 'px';
-        el.textContent = gate.gateType;
-        el.dataset.id = gate.id;
-        makeDraggable(el, gate);
-
-        // Add input connection points
-        const numInputs = gate.gateType === 'NOT' ? 1 : 2;
-        for (let i = 0; i < numInputs; i++) {
-            const inPoint = document.createElement('div');
-            inPoint.className = 'logic-connection-point input';
-            inPoint.style.top = (15 + i * 20) + 'px';
-            inPoint.dataset.componentId = gate.id;
-            inPoint.dataset.pointType = 'input';
-            inPoint.dataset.inputIndex = i;
-            inPoint.onclick = (e) => {
+        // Render inputs with connection points
+        logicSimulator.inputs.forEach(input => {
+            const el = document.createElement('div');
+            el.className = `logic-input ${input.state ? 'on' : 'off'}`;
+            el.style.left = input.x + 'px';
+            el.style.top = input.y + 'px';
+            el.innerHTML = input.state ? '1' : '0';
+            el.dataset.id = input.id;
+            el.title = `${input.label}: Click to toggle`;
+            el.onclick = (e) => {
                 e.stopPropagation();
-                handleConnectionClick(gate.id, 'input', i);
-            };
-            el.appendChild(inPoint);
-        }
-
-        // Add output connection point
-        const outPoint = document.createElement('div');
-        outPoint.className = 'logic-connection-point output';
-        outPoint.style.top = '24px';
-        outPoint.dataset.componentId = gate.id;
-        outPoint.dataset.pointType = 'output';
-        outPoint.onclick = (e) => {
-            e.stopPropagation();
-            handleConnectionClick(gate.id, 'output');
-        };
-        el.appendChild(outPoint);
-
-        logicSimulator.canvas.appendChild(el);
-    });
-
-    // Render outputs with connection points
-    logicSimulator.outputs.forEach(output => {
-        const el = document.createElement('div');
-        el.className = `logic-output ${output.state ? 'on' : ''}`;
-        el.style.left = output.x + 'px';
-        el.style.top = output.y + 'px';
-        el.innerHTML = output.state ? '1' : '0';
-        el.dataset.id = output.id;
-        makeDraggable(el, output);
-
-        // Add input connection point
-        const inPoint = document.createElement('div');
-        inPoint.className = 'logic-connection-point input';
-        inPoint.style.top = '19px';
-        inPoint.dataset.componentId = output.id;
-        inPoint.dataset.pointType = 'input';
-        inPoint.onclick = (e) => {
-            e.stopPropagation();
-            handleConnectionClick(output.id, 'input');
-        };
-        el.appendChild(inPoint);
-
-        logicSimulator.canvas.appendChild(el);
-
-        const label = document.createElement('div');
-        label.className = 'logic-gate-label';
-        label.style.left = output.x + 'px';
-        label.style.top = (output.y + 55) + 'px';
-        label.style.position = 'absolute';
-        label.textContent = output.label;
-        logicSimulator.canvas.appendChild(label);
-    });
-}
-
-// Handle connection clicks for wiring
-function handleConnectionClick(componentId, pointType, inputIndex = 0) {
-    if (!wiringMode) {
-        wiringMode = true;
-        wiringStart = { componentId, pointType, inputIndex };
-        showToast('🔌 Click destination to complete wire');
-    } else {
-        // Complete the wire
-        const wireEnd = { componentId, pointType, inputIndex };
-
-        // Validate connection (output to input)
-        if (wiringStart.pointType === 'output' && wireEnd.pointType === 'input') {
-            logicSimulator.wires.push({
-                from: wiringStart.componentId,
-                to: wireEnd.componentId,
-                toInputIndex: wireEnd.inputIndex
-            });
-            showToast('✓ Wire connected');
-        } else if (wiringStart.pointType === 'input' && wireEnd.pointType === 'output') {
-            logicSimulator.wires.push({
-                from: wireEnd.componentId,
-                to: wiringStart.componentId,
-                toInputIndex: wiringStart.inputIndex
-            });
-            showToast('✓ Wire connected');
-        } else {
-            showToast('⚠️ Connect output to input');
-        }
-
-        wiringMode = false;
-        wiringStart = null;
-        renderLogicCanvas();
-        evaluateLogicCircuit();
-    }
-}
-
-// Render wires as SVG paths
-function renderLogicWires() {
-    const svg = document.getElementById('logicWireSvg');
-    if (!svg) return;
-
-    svg.innerHTML = '';
-
-    logicSimulator.wires.forEach((wire, index) => {
-        const fromComp = findComponent(wire.from);
-        const toComp = findComponent(wire.to);
-
-        if (!fromComp || !toComp) return;
-
-        // Calculate connection points
-        const x1 = fromComp.x + 80; // Output point
-        const y1 = fromComp.y + 25;
-        const x2 = toComp.x; // Input point
-        const y2 = toComp.y + 25 + (wire.toInputIndex * 20);
-
-        // Create curved wire path
-        const midX = (x1 + x2) / 2;
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
-        path.setAttribute('class', 'logic-wire-path');
-        path.setAttribute('data-wire-index', index);
-        path.onclick = () => {
-            if (confirm('Delete this wire?')) {
-                logicSimulator.wires.splice(index, 1);
+                input.state = !input.state;
                 renderLogicCanvas();
                 evaluateLogicCircuit();
-            }
-        };
-        path.style.pointerEvents = 'auto';
+            };
+            makeDraggable(el, input);
 
-        svg.appendChild(path);
-    });
-}
+            // Add output connection point
+            const outPoint = document.createElement('div');
+            outPoint.className = 'logic-connection-point output';
+            outPoint.style.top = '14px';
+            outPoint.dataset.componentId = input.id;
+            outPoint.dataset.pointType = 'output';
+            outPoint.onclick = (e) => {
+                e.stopPropagation();
+                handleConnectionClick(input.id, 'output');
+            };
+            el.appendChild(outPoint);
 
-// Find component by ID
-function findComponent(id) {
-    return logicSimulator.inputs.find(i => i.id === id) ||
-        logicSimulator.gates.find(g => g.id === id) ||
-        logicSimulator.outputs.find(o => o.id === id);
-}
+            logicSimulator.canvas.appendChild(el);
 
-// Enhanced circuit evaluation with wire connections
-function evaluateLogicCircuit() {
-    // Reset all gate and output states
-    logicSimulator.gates.forEach(gate => gate.output = null);
-    logicSimulator.outputs.forEach(output => output.state = false);
+            const label = document.createElement('div');
+            label.className = 'logic-gate-label';
+            label.style.left = input.x + 'px';
+            label.style.top = (input.y + 45) + 'px';
+            label.style.position = 'absolute';
+            label.textContent = input.label;
+            logicSimulator.canvas.appendChild(label);
+        });
 
-    // Evaluate gates based on wire connections
-    let changed = true;
-    let iterations = 0;
-    while (changed && iterations < 100) {
-        changed = false;
-        iterations++;
-
+        // Render gates with input/output connection points
         logicSimulator.gates.forEach(gate => {
-            const inputWires = logicSimulator.wires.filter(w => w.to === gate.id);
-            if (inputWires.length === 0) return;
+            const el = document.createElement('div');
+            el.className = 'logic-gate';
+            el.style.left = gate.x + 'px';
+            el.style.top = gate.y + 'px';
+            el.textContent = gate.gateType;
+            el.dataset.id = gate.id;
+            makeDraggable(el, gate);
 
-            const inputValues = inputWires.map(wire => {
-                const fromComp = findComponent(wire.from);
-                if (fromComp.type === 'input') return fromComp.state;
-                if (fromComp.type === 'gate') return fromComp.output;
-                return false;
-            });
-
-            let newOutput = null;
-            switch (gate.gateType) {
-                case 'AND':
-                    newOutput = inputValues.length >= 2 ? inputValues[0] && inputValues[1] : false;
-                    break;
-                case 'OR':
-                    newOutput = inputValues.length >= 2 ? inputValues[0] || inputValues[1] : false;
-                    break;
-                case 'NOT':
-                    newOutput = inputValues.length >= 1 ? !inputValues[0] : false;
-                    break;
-                case 'NAND':
-                    newOutput = inputValues.length >= 2 ? !(inputValues[0] && inputValues[1]) : true;
-                    break;
-                case 'NOR':
-                    newOutput = inputValues.length >= 2 ? !(inputValues[0] || inputValues[1]) : true;
-                    break;
-                case 'XOR':
-                    newOutput = inputValues.length >= 2 ? inputValues[0] !== inputValues[1] : false;
-                    break;
+            // Add input connection points
+            const numInputs = gate.gateType === 'NOT' ? 1 : 2;
+            for (let i = 0; i < numInputs; i++) {
+                const inPoint = document.createElement('div');
+                inPoint.className = 'logic-connection-point input';
+                inPoint.style.top = (15 + i * 20) + 'px';
+                inPoint.dataset.componentId = gate.id;
+                inPoint.dataset.pointType = 'input';
+                inPoint.dataset.inputIndex = i;
+                inPoint.onclick = (e) => {
+                    e.stopPropagation();
+                    handleConnectionClick(gate.id, 'input', i);
+                };
+                el.appendChild(inPoint);
             }
 
-            if (gate.output !== newOutput) {
-                gate.output = newOutput;
-                changed = true;
-            }
+            // Add output connection point
+            const outPoint = document.createElement('div');
+            outPoint.className = 'logic-connection-point output';
+            outPoint.style.top = '24px';
+            outPoint.dataset.componentId = gate.id;
+            outPoint.dataset.pointType = 'output';
+            outPoint.onclick = (e) => {
+                e.stopPropagation();
+                handleConnectionClick(gate.id, 'output');
+            };
+            el.appendChild(outPoint);
+
+            logicSimulator.canvas.appendChild(el);
+        });
+
+        // Render outputs with connection points
+        logicSimulator.outputs.forEach(output => {
+            const el = document.createElement('div');
+            el.className = `logic-output ${output.state ? 'on' : ''}`;
+            el.style.left = output.x + 'px';
+            el.style.top = output.y + 'px';
+            el.innerHTML = output.state ? '1' : '0';
+            el.dataset.id = output.id;
+            makeDraggable(el, output);
+
+            // Add input connection point
+            const inPoint = document.createElement('div');
+            inPoint.className = 'logic-connection-point input';
+            inPoint.style.top = '19px';
+            inPoint.dataset.componentId = output.id;
+            inPoint.dataset.pointType = 'input';
+            inPoint.onclick = (e) => {
+                e.stopPropagation();
+                handleConnectionClick(output.id, 'input');
+            };
+            el.appendChild(inPoint);
+
+            logicSimulator.canvas.appendChild(el);
+
+            const label = document.createElement('div');
+            label.className = 'logic-gate-label';
+            label.style.left = output.x + 'px';
+            label.style.top = (output.y + 55) + 'px';
+            label.style.position = 'absolute';
+            label.textContent = output.label;
+            logicSimulator.canvas.appendChild(label);
         });
     }
 
-    // Update outputs
-    logicSimulator.outputs.forEach(output => {
-        const inputWire = logicSimulator.wires.find(w => w.to === output.id);
-        if (inputWire) {
-            const fromComp = findComponent(inputWire.from);
-            if (fromComp.type === 'input') {
-                output.state = fromComp.state;
-            } else if (fromComp.type === 'gate') {
-                output.state = fromComp.output || false;
+    // Handle connection clicks for wiring
+    function handleConnectionClick(componentId, pointType, inputIndex = 0) {
+        if (!wiringMode) {
+            wiringMode = true;
+            wiringStart = { componentId, pointType, inputIndex };
+            showToast('🔌 Click destination to complete wire');
+        } else {
+            // Complete the wire
+            const wireEnd = { componentId, pointType, inputIndex };
+
+            // Validate connection (output to input)
+            if (wiringStart.pointType === 'output' && wireEnd.pointType === 'input') {
+                logicSimulator.wires.push({
+                    from: wiringStart.componentId,
+                    to: wireEnd.componentId,
+                    toInputIndex: wireEnd.inputIndex
+                });
+                showToast('✓ Wire connected');
+            } else if (wiringStart.pointType === 'input' && wireEnd.pointType === 'output') {
+                logicSimulator.wires.push({
+                    from: wireEnd.componentId,
+                    to: wiringStart.componentId,
+                    toInputIndex: wiringStart.inputIndex
+                });
+                showToast('✓ Wire connected');
+            } else {
+                showToast('⚠️ Connect output to input');
             }
+
+            wiringMode = false;
+            wiringStart = null;
+            renderLogicCanvas();
+            evaluateLogicCircuit();
         }
-    });
+    }
 
-    renderLogicCanvas();
-}
+    // Render wires as SVG paths
+    function renderLogicWires() {
+        const svg = document.getElementById('logicWireSvg');
+        if (!svg) return;
 
-window.evaluateCircuit = evaluateLogicCircuit;
+        svg.innerHTML = '';
 
-// ==================== CIRCUIT SYMBOLS TRAY ====================
-const circuitSymbols = [
-    { name: 'Resistor', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><rect x="15" y="15" width="10" height="10" fill="none" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Capacitor', svg: '<line x1="5" y1="20" x2="17" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="17" y1="10" x2="17" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="23" y1="10" x2="23" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="23" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Inductor', svg: '<path d="M 5 20 Q 10 10, 15 20 T 25 20 T 35 20" fill="none" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Battery', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="15" y1="12" x2="15" y2="28" stroke="#2c3e50" stroke-width="3"/><line x1="25" y1="15" x2="25" y2="25" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Ground', svg: '<line x1="20" y1="5" x2="20" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="10" y1="20" x2="30" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="13" y1="25" x2="27" y2="25" stroke="#2c3e50" stroke-width="2"/><line x1="16" y1="30" x2="24" y2="30" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Diode', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><polygon points="15,10 15,30 25,20" fill="#2c3e50"/><line x1="25" y1="10" x2="25" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'LED', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><polygon points="15,10 15,30 25,20" fill="#e74c3c"/><line x1="25" y1="10" x2="25" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Switch', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="15" y1="20" x2="30" y2="10" stroke="#2c3e50" stroke-width="2"/><circle cx="15" cy="20" r="2" fill="#2c3e50"/><circle cx="30" cy="20" r="2" fill="#2c3e50"/><line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Bulb', svg: '<line x1="5" y1="20" x2="12" y2="20" stroke="#2c3e50" stroke-width="2"/><circle cx="20" cy="20" r="8" fill="none" stroke="#2c3e50" stroke-width="2"/><line x1="14" y1="14" x2="26" y2="26" stroke="#2c3e50" stroke-width="1.5"/><line x1="26" y1="14" x2="14" y2="26" stroke="#2c3e50" stroke-width="1.5"/><line x1="28" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Voltmeter', svg: '<circle cx="20" cy="20" r="10" fill="none" stroke="#2c3e50" stroke-width="2"/><text x="20" y="24" text-anchor="middle" font-size="12" font-weight="bold" fill="#2c3e50">V</text><line x1="5" y1="20" x2="10" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
-    { name: 'Ammeter', svg: '<circle cx="20" cy="20" r="10" fill="none" stroke="#2c3e50" stroke-width="2"/><text x="20" y="24" text-anchor="middle" font-size="12" font-weight="bold" fill="#2c3e50">A</text><line x1="5" y1="20" x2="10" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' }
-];
+        logicSimulator.wires.forEach((wire, index) => {
+            const fromComp = findComponent(wire.from);
+            const toComp = findComponent(wire.to);
 
-// Default electrical properties for each component type
-const COMPONENT_DEFAULTS = {
-    resistor: { resistance: 100, unit: 'Ω' },
-    capacitor: { resistance: 1000000, unit: 'F', capacitance: 0.000001 },
-    inductor: { resistance: 0.1, unit: 'H', inductance: 0.01 },
-    battery: { voltage: 9, resistance: 0.01, unit: 'V' },
-    ground: { resistance: 0, unit: '' },
-    diode: { resistance: 5, forwardDrop: 0.7, unit: '' },
-    led: { resistance: 20, forwardDrop: 2.0, unit: '' },
-    switch: { closed: false, resistance: Infinity, unit: '' },
-    bulb: { resistance: 50, unit: 'Ω', ratedCurrent: 0.18 },
-    voltmeter: { resistance: 10000000, unit: 'V', reading: 0 },
-    ammeter: { resistance: 0.001, unit: 'A', reading: 0 }
-};
+            if (!fromComp || !toComp) return;
 
-let circuitComponents = [];
-let circuitNextId = 1;
+            // Calculate connection points
+            const x1 = fromComp.x + 80; // Output point
+            const y1 = fromComp.y + 25;
+            const x2 = toComp.x; // Input point
+            const y2 = toComp.y + 25 + (wire.toInputIndex * 20);
 
-function initCircuitSymbolsTray() {
-    const canvas = document.getElementById('circuitDiagramCanvas');
-    if (!canvas) return;
+            // Create curved wire path
+            const midX = (x1 + x2) / 2;
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+            path.setAttribute('class', 'logic-wire-path');
+            path.setAttribute('data-wire-index', index);
+            path.onclick = () => {
+                if (confirm('Delete this wire?')) {
+                    logicSimulator.wires.splice(index, 1);
+                    renderLogicCanvas();
+                    evaluateLogicCircuit();
+                }
+            };
+            path.style.pointerEvents = 'auto';
 
-    // Add symbols tray
-    const tray = document.createElement('div');
-    tray.className = 'circuit-symbols-tray';
-    tray.innerHTML = `
+            svg.appendChild(path);
+        });
+    }
+
+    // Find component by ID
+    function findComponent(id) {
+        return logicSimulator.inputs.find(i => i.id === id) ||
+            logicSimulator.gates.find(g => g.id === id) ||
+            logicSimulator.outputs.find(o => o.id === id);
+    }
+
+    // Enhanced circuit evaluation with wire connections
+    function evaluateLogicCircuit() {
+        // Reset all gate and output states
+        logicSimulator.gates.forEach(gate => gate.output = null);
+        logicSimulator.outputs.forEach(output => output.state = false);
+
+        // Evaluate gates based on wire connections
+        let changed = true;
+        let iterations = 0;
+        while (changed && iterations < 100) {
+            changed = false;
+            iterations++;
+
+            logicSimulator.gates.forEach(gate => {
+                const inputWires = logicSimulator.wires.filter(w => w.to === gate.id);
+                if (inputWires.length === 0) return;
+
+                const inputValues = inputWires.map(wire => {
+                    const fromComp = findComponent(wire.from);
+                    if (fromComp.type === 'input') return fromComp.state;
+                    if (fromComp.type === 'gate') return fromComp.output;
+                    return false;
+                });
+
+                let newOutput = null;
+                switch (gate.gateType) {
+                    case 'AND':
+                        newOutput = inputValues.length >= 2 ? inputValues[0] && inputValues[1] : false;
+                        break;
+                    case 'OR':
+                        newOutput = inputValues.length >= 2 ? inputValues[0] || inputValues[1] : false;
+                        break;
+                    case 'NOT':
+                        newOutput = inputValues.length >= 1 ? !inputValues[0] : false;
+                        break;
+                    case 'NAND':
+                        newOutput = inputValues.length >= 2 ? !(inputValues[0] && inputValues[1]) : true;
+                        break;
+                    case 'NOR':
+                        newOutput = inputValues.length >= 2 ? !(inputValues[0] || inputValues[1]) : true;
+                        break;
+                    case 'XOR':
+                        newOutput = inputValues.length >= 2 ? inputValues[0] !== inputValues[1] : false;
+                        break;
+                }
+
+                if (gate.output !== newOutput) {
+                    gate.output = newOutput;
+                    changed = true;
+                }
+            });
+        }
+
+        // Update outputs
+        logicSimulator.outputs.forEach(output => {
+            const inputWire = logicSimulator.wires.find(w => w.to === output.id);
+            if (inputWire) {
+                const fromComp = findComponent(inputWire.from);
+                if (fromComp.type === 'input') {
+                    output.state = fromComp.state;
+                } else if (fromComp.type === 'gate') {
+                    output.state = fromComp.output || false;
+                }
+            }
+        });
+
+        renderLogicCanvas();
+    }
+
+    window.evaluateCircuit = evaluateLogicCircuit;
+
+    // ==================== CIRCUIT SYMBOLS TRAY ====================
+    const circuitSymbols = [
+        { name: 'Resistor', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><rect x="15" y="15" width="10" height="10" fill="none" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Capacitor', svg: '<line x1="5" y1="20" x2="17" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="17" y1="10" x2="17" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="23" y1="10" x2="23" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="23" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Inductor', svg: '<path d="M 5 20 Q 10 10, 15 20 T 25 20 T 35 20" fill="none" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Battery', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="15" y1="12" x2="15" y2="28" stroke="#2c3e50" stroke-width="3"/><line x1="25" y1="15" x2="25" y2="25" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Ground', svg: '<line x1="20" y1="5" x2="20" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="10" y1="20" x2="30" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="13" y1="25" x2="27" y2="25" stroke="#2c3e50" stroke-width="2"/><line x1="16" y1="30" x2="24" y2="30" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Diode', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><polygon points="15,10 15,30 25,20" fill="#2c3e50"/><line x1="25" y1="10" x2="25" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'LED', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><polygon points="15,10 15,30 25,20" fill="#e74c3c"/><line x1="25" y1="10" x2="25" y2="30" stroke="#2c3e50" stroke-width="2"/><line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Switch', svg: '<line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="15" y1="20" x2="30" y2="10" stroke="#2c3e50" stroke-width="2"/><circle cx="15" cy="20" r="2" fill="#2c3e50"/><circle cx="30" cy="20" r="2" fill="#2c3e50"/><line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Bulb', svg: '<line x1="5" y1="20" x2="12" y2="20" stroke="#2c3e50" stroke-width="2"/><circle cx="20" cy="20" r="8" fill="none" stroke="#2c3e50" stroke-width="2"/><line x1="14" y1="14" x2="26" y2="26" stroke="#2c3e50" stroke-width="1.5"/><line x1="26" y1="14" x2="14" y2="26" stroke="#2c3e50" stroke-width="1.5"/><line x1="28" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Voltmeter', svg: '<circle cx="20" cy="20" r="10" fill="none" stroke="#2c3e50" stroke-width="2"/><text x="20" y="24" text-anchor="middle" font-size="12" font-weight="bold" fill="#2c3e50">V</text><line x1="5" y1="20" x2="10" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' },
+        { name: 'Ammeter', svg: '<circle cx="20" cy="20" r="10" fill="none" stroke="#2c3e50" stroke-width="2"/><text x="20" y="24" text-anchor="middle" font-size="12" font-weight="bold" fill="#2c3e50">A</text><line x1="5" y1="20" x2="10" y2="20" stroke="#2c3e50" stroke-width="2"/><line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>' }
+    ];
+
+    // Default electrical properties for each component type
+    const COMPONENT_DEFAULTS = {
+        resistor: { resistance: 100, unit: 'Ω' },
+        capacitor: { resistance: 1000000, unit: 'F', capacitance: 0.000001 },
+        inductor: { resistance: 0.1, unit: 'H', inductance: 0.01 },
+        battery: { voltage: 9, resistance: 0.01, unit: 'V' },
+        ground: { resistance: 0, unit: '' },
+        diode: { resistance: 5, forwardDrop: 0.7, unit: '' },
+        led: { resistance: 20, forwardDrop: 2.0, unit: '' },
+        switch: { closed: false, resistance: Infinity, unit: '' },
+        bulb: { resistance: 50, unit: 'Ω', ratedCurrent: 0.18 },
+        voltmeter: { resistance: 10000000, unit: 'V', reading: 0 },
+        ammeter: { resistance: 0.001, unit: 'A', reading: 0 }
+    };
+
+    let circuitComponents = [];
+    let circuitNextId = 1;
+
+    function initCircuitSymbolsTray() {
+        const canvas = document.getElementById('circuitDiagramCanvas');
+        if (!canvas) return;
+
+        // Add symbols tray
+        const tray = document.createElement('div');
+        tray.className = 'circuit-symbols-tray';
+        tray.innerHTML = `
                 <div class="circuit-symbols-title">⚡ Components</div>
                 ${circuitSymbols.map(symbol => `
                     <div class="circuit-symbol-item" draggable="true" data-symbol="${symbol.name}">
@@ -7761,540 +7773,540 @@ function initCircuitSymbolsTray() {
                     </div>
                 `).join('')}
             `;
-    canvas.appendChild(tray);
+        canvas.appendChild(tray);
 
-    // Setup drag and drop
-    tray.querySelectorAll('.circuit-symbol-item').forEach(item => {
-        item.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('symbolName', item.dataset.symbol);
+        // Setup drag and drop
+        tray.querySelectorAll('.circuit-symbol-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('symbolName', item.dataset.symbol);
+            });
         });
-    });
 
-    const componentsLayer = document.getElementById('circuitComponentsLayer');
-    componentsLayer.addEventListener('dragover', (e) => e.preventDefault());
-    componentsLayer.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const symbolName = e.dataTransfer.getData('symbolName');
-        const symbol = circuitSymbols.find(s => s.name === symbolName);
-        if (symbol) {
-            const rect = componentsLayer.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            addCircuitComponent(symbol, x, y);
-        }
-    });
-}
+        const componentsLayer = document.getElementById('circuitComponentsLayer');
+        componentsLayer.addEventListener('dragover', (e) => e.preventDefault());
+        componentsLayer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const symbolName = e.dataTransfer.getData('symbolName');
+            const symbol = circuitSymbols.find(s => s.name === symbolName);
+            if (symbol) {
+                const rect = componentsLayer.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                addCircuitComponent(symbol, x, y);
+            }
+        });
+    }
 
-function addCircuitComponent(symbol, x, y) {
-    const component = {
-        id: circuitNextId++,
-        symbol: symbol,
-        x: x,
-        y: y
-    };
-    circuitComponents.push(component);
-    renderCircuitComponent(component);
-}
+    function addCircuitComponent(symbol, x, y) {
+        const component = {
+            id: circuitNextId++,
+            symbol: symbol,
+            x: x,
+            y: y
+        };
+        circuitComponents.push(component);
+        renderCircuitComponent(component);
+    }
 
-function renderCircuitComponent(component) {
-    const layer = document.getElementById('circuitComponentsLayer');
-    if (!layer) return;
+    function renderCircuitComponent(component) {
+        const layer = document.getElementById('circuitComponentsLayer');
+        if (!layer) return;
 
-    const div = document.createElement('div');
-    div.className = 'circuit-component';
-    div.style.left = component.x + 'px';
-    div.style.top = component.y + 'px';
-    div.dataset.componentId = component.id;
-    div.innerHTML = `
+        const div = document.createElement('div');
+        div.className = 'circuit-component';
+        div.style.left = component.x + 'px';
+        div.style.top = component.y + 'px';
+        div.dataset.componentId = component.id;
+        div.innerHTML = `
                 <svg viewBox="0 0 40 40" width="60" height="60">
                     ${component.symbol.svg}
                 </svg>
                 <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; white-space: nowrap; color: #2c3e50; font-weight: 600;">${component.symbol.name}</div>
             `;
 
-    // Double-click to delete
-    div.ondblclick = (e) => {
-        e.stopPropagation();
-        if (confirm(`Delete ${component.symbol.name}?`)) {
-            const index = circuitComponents.findIndex(c => c.id === component.id);
-            if (index > -1) {
-                circuitComponents.splice(index, 1);
-                div.remove();
-                showToast('✓ Component removed');
-            }
-        }
-    };
-
-    // Click to select
-    div.onclick = (e) => {
-        e.stopPropagation();
-        // Deselect all others
-        document.querySelectorAll('.circuit-component.selected').forEach(el => {
-            if (el !== div) el.classList.remove('selected');
-        });
-        div.classList.toggle('selected');
-    };
-
-    makeComponentDraggable(div, component);
-    layer.appendChild(div);
-}
-
-function makeComponentDraggable(element, component) {
-    let isDragging = false;
-    let startX, startY;
-
-    element.addEventListener('mousedown', (e) => {
-        if (e.target.closest('svg')) { // Only drag by the SVG
-            isDragging = true;
-            startX = e.clientX - component.x;
-            startY = e.clientY - component.y;
-            element.style.cursor = 'grabbing';
-            element.classList.add('selected');
-        }
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-        component.x = e.clientX - startX;
-        component.y = e.clientY - startY;
-        element.style.left = component.x + 'px';
-        element.style.top = component.y + 'px';
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            element.style.cursor = 'move';
-        }
-    });
-}
-
-window.initCircuitSymbolsTray = initCircuitSymbolsTray;
-
-// Keyboard shortcuts for circuit components
-document.addEventListener('keydown', (e) => {
-    // Delete selected components with Delete or Backspace
-    if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input, textarea, [contenteditable="true"]')) {
-        const selected = document.querySelectorAll('.circuit-component.selected');
-        if (selected.length > 0) {
-            e.preventDefault();
-            selected.forEach(el => {
-                const componentId = parseInt(el.dataset.componentId);
-                const index = circuitComponents.findIndex(c => c.id === componentId);
+        // Double-click to delete
+        div.ondblclick = (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete ${component.symbol.name}?`)) {
+                const index = circuitComponents.findIndex(c => c.id === component.id);
                 if (index > -1) {
                     circuitComponents.splice(index, 1);
-                    el.remove();
+                    div.remove();
+                    showToast('✓ Component removed');
                 }
+            }
+        };
+
+        // Click to select
+        div.onclick = (e) => {
+            e.stopPropagation();
+            // Deselect all others
+            document.querySelectorAll('.circuit-component.selected').forEach(el => {
+                if (el !== div) el.classList.remove('selected');
             });
-            showToast(`✓ ${selected.length} component(s) deleted`);
-        }
+            div.classList.toggle('selected');
+        };
+
+        makeComponentDraggable(div, component);
+        layer.appendChild(div);
     }
 
-    // Clear all components with Ctrl/Cmd + Shift + C
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
-        const layer = document.getElementById('circuitComponentsLayer');
-        if (layer && circuitComponents.length > 0) {
+    function makeComponentDraggable(element, component) {
+        let isDragging = false;
+        let startX, startY;
+
+        element.addEventListener('mousedown', (e) => {
+            if (e.target.closest('svg')) { // Only drag by the SVG
+                isDragging = true;
+                startX = e.clientX - component.x;
+                startY = e.clientY - component.y;
+                element.style.cursor = 'grabbing';
+                element.classList.add('selected');
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
             e.preventDefault();
-            if (confirm('Clear all circuit components?')) {
-                circuitComponents = [];
-                layer.innerHTML = '';
-                showToast('✓ All components cleared');
+            component.x = e.clientX - startX;
+            component.y = e.clientY - startY;
+            element.style.left = component.x + 'px';
+            element.style.top = component.y + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                element.style.cursor = 'move';
+            }
+        });
+    }
+
+    window.initCircuitSymbolsTray = initCircuitSymbolsTray;
+
+    // Keyboard shortcuts for circuit components
+    document.addEventListener('keydown', (e) => {
+        // Delete selected components with Delete or Backspace
+        if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input, textarea, [contenteditable="true"]')) {
+            const selected = document.querySelectorAll('.circuit-component.selected');
+            if (selected.length > 0) {
+                e.preventDefault();
+                selected.forEach(el => {
+                    const componentId = parseInt(el.dataset.componentId);
+                    const index = circuitComponents.findIndex(c => c.id === componentId);
+                    if (index > -1) {
+                        circuitComponents.splice(index, 1);
+                        el.remove();
+                    }
+                });
+                showToast(`✓ ${selected.length} component(s) deleted`);
+            }
+        }
+
+        // Clear all components with Ctrl/Cmd + Shift + C
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
+            const layer = document.getElementById('circuitComponentsLayer');
+            if (layer && circuitComponents.length > 0) {
+                e.preventDefault();
+                if (confirm('Clear all circuit components?')) {
+                    circuitComponents = [];
+                    layer.innerHTML = '';
+                    showToast('✓ All components cleared');
+                }
+            }
+        }
+    });
+
+    // ==================== ADVANCED TEMPLATES FUNCTIONS ====================
+
+    // CORNELL NOTES FUNCTIONS
+    let cornellStudyMode = false;
+
+    // Highlight selected text in Cornell Notes with a <mark> tag
+    window.highlightCornellText = function () {
+        const cornellNotes = document.getElementById('cornellNotes');
+        if (!cornellNotes) {
+            showToast('⚠️ Cornell Notes area not found');
+            return;
+        }
+
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+
+        if (!selectedText) {
+            showToast('⚠️ Select text in Notes first, then click Highlight');
+            return;
+        }
+
+        // Verify the selection is inside the Cornell notes area
+        if (!selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        if (!cornellNotes.contains(range.commonAncestorContainer)) {
+            showToast('⚠️ Select text inside the Notes area');
+            return;
+        }
+
+        // Wrap selected text in a <mark> tag
+        const mark = document.createElement('mark');
+        mark.className = 'cornell-highlight';
+        try {
+            range.surroundContents(mark);
+        } catch (e) {
+            // If selection spans multiple elements, use extractContents approach
+            const fragment = range.extractContents();
+            mark.appendChild(fragment);
+            range.insertNode(mark);
+        }
+
+        selection.removeAllRanges();
+        showToast('🖌️ Text highlighted! Click "Extract Cue" to add as cue');
+    };
+
+    window.extractCornellCue = function () {
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+        const cuesContainer = document.getElementById('cornellCues');
+        if (!cuesContainer) return;
+
+        // Helper to add a single cue item
+        function addCueItem(text, fromHighlight) {
+            const cueItem = document.createElement('div');
+            cueItem.className = 'cornell-cue-item' + (fromHighlight ? ' from-highlight' : '');
+            cueItem.contentEditable = true;
+            cueItem.textContent = text.length > 50 ? text.substring(0, 50) + '...' : text;
+            cuesContainer.appendChild(cueItem);
+        }
+
+        // MODE 1: If user has text selected, extract that as a cue
+        if (selectedText) {
+            addCueItem(selectedText, false);
+            showToast('✓ Cue extracted from selection');
+            return;
+        }
+
+        // MODE 2: Extract from all un-extracted highlighted <mark> elements
+        const cornellNotes = document.getElementById('cornellNotes');
+        if (!cornellNotes) {
+            showToast('⚠️ Select text or highlight text first');
+            return;
+        }
+
+        const marks = cornellNotes.querySelectorAll('mark.cornell-highlight:not([data-cue-extracted])');
+        if (marks.length === 0) {
+            showToast('⚠️ Select text or use 🖌️ Highlight first');
+            return;
+        }
+
+        let count = 0;
+        marks.forEach(mark => {
+            const text = mark.textContent.trim();
+            if (text) {
+                addCueItem(text, true);
+                mark.setAttribute('data-cue-extracted', 'true');
+                mark.classList.add('cornell-highlight-extracted');
+                count++;
+            }
+        });
+
+        if (count > 0) {
+            showToast(`✓ ${count} cue${count > 1 ? 's' : ''} extracted from highlights`);
+        }
+    };
+
+    window.toggleCornellStudyMode = function () {
+        const container = document.querySelector('.cornell-container');
+        if (!container) return;
+
+        cornellStudyMode = !cornellStudyMode;
+        container.classList.toggle('cornell-study-mode');
+
+        if (cornellStudyMode) {
+            showToast("👁️ Study Mode: Notes hidden. Test yourself!");
+        } else {
+            showToast("📝 Normal Mode: Notes visible");
+        }
+    };
+
+    // Enable Cornell summary when notes have enough content
+    function checkCornellNotesLength() {
+        const notes = document.getElementById('cornellNotes');
+        const summary = document.getElementById('cornellSummary');
+
+        if (notes && summary) {
+            const notesText = notes.innerText || '';
+            if (notesText.length > 100) {
+                summary.contentEditable = 'true';
+                summary.style.opacity = '1';
+                summary.style.cursor = 'text';
+                summary.innerHTML = '<div class="cornell-summary-title">📝 Summary</div><div contenteditable="true">Summarize your notes in 2-3 sentences...</div>';
             }
         }
     }
-});
 
-// ==================== ADVANCED TEMPLATES FUNCTIONS ====================
+    // ZETTELKASTEN FUNCTIONS
+    let zettelTags = [];
 
-// CORNELL NOTES FUNCTIONS
-let cornellStudyMode = false;
+    window.checkZettelWordCount = function () {
+        const content = document.getElementById('zettelContent');
+        const counter = document.getElementById('zettelWordcount');
 
-// Highlight selected text in Cornell Notes with a <mark> tag
-window.highlightCornellText = function () {
-    const cornellNotes = document.getElementById('cornellNotes');
-    if (!cornellNotes) {
-        showToast('⚠️ Cornell Notes area not found');
-        return;
-    }
+        if (content && counter) {
+            const text = content.innerText || '';
+            const wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
 
-    const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
+            counter.textContent = `${wordCount} words`;
+            counter.className = 'zettel-wordcount';
 
-    if (!selectedText) {
-        showToast('⚠️ Select text in Notes first, then click Highlight');
-        return;
-    }
-
-    // Verify the selection is inside the Cornell notes area
-    if (!selection.rangeCount) return;
-    const range = selection.getRangeAt(0);
-    if (!cornellNotes.contains(range.commonAncestorContainer)) {
-        showToast('⚠️ Select text inside the Notes area');
-        return;
-    }
-
-    // Wrap selected text in a <mark> tag
-    const mark = document.createElement('mark');
-    mark.className = 'cornell-highlight';
-    try {
-        range.surroundContents(mark);
-    } catch (e) {
-        // If selection spans multiple elements, use extractContents approach
-        const fragment = range.extractContents();
-        mark.appendChild(fragment);
-        range.insertNode(mark);
-    }
-
-    selection.removeAllRanges();
-    showToast('🖌️ Text highlighted! Click "Extract Cue" to add as cue');
-};
-
-window.extractCornellCue = function () {
-    const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
-    const cuesContainer = document.getElementById('cornellCues');
-    if (!cuesContainer) return;
-
-    // Helper to add a single cue item
-    function addCueItem(text, fromHighlight) {
-        const cueItem = document.createElement('div');
-        cueItem.className = 'cornell-cue-item' + (fromHighlight ? ' from-highlight' : '');
-        cueItem.contentEditable = true;
-        cueItem.textContent = text.length > 50 ? text.substring(0, 50) + '...' : text;
-        cuesContainer.appendChild(cueItem);
-    }
-
-    // MODE 1: If user has text selected, extract that as a cue
-    if (selectedText) {
-        addCueItem(selectedText, false);
-        showToast('✓ Cue extracted from selection');
-        return;
-    }
-
-    // MODE 2: Extract from all un-extracted highlighted <mark> elements
-    const cornellNotes = document.getElementById('cornellNotes');
-    if (!cornellNotes) {
-        showToast('⚠️ Select text or highlight text first');
-        return;
-    }
-
-    const marks = cornellNotes.querySelectorAll('mark.cornell-highlight:not([data-cue-extracted])');
-    if (marks.length === 0) {
-        showToast('⚠️ Select text or use 🖌️ Highlight first');
-        return;
-    }
-
-    let count = 0;
-    marks.forEach(mark => {
-        const text = mark.textContent.trim();
-        if (text) {
-            addCueItem(text, true);
-            mark.setAttribute('data-cue-extracted', 'true');
-            mark.classList.add('cornell-highlight-extracted');
-            count++;
+            if (wordCount > 300 && wordCount <= 500) {
+                counter.classList.add('warning');
+                counter.textContent += ' (good range)';
+            } else if (wordCount > 500) {
+                counter.classList.add('error');
+                counter.textContent += ' ⚠️ Consider splitting this note';
+            }
         }
-    });
+    };
 
-    if (count > 0) {
-        showToast(`✓ ${count} cue${count > 1 ? 's' : ''} extracted from highlights`);
+    window.addZettelTag = function (tagText) {
+        if (!tagText || tagText.trim() === '') return;
+
+        const tagsContainer = document.getElementById('zettelTags');
+        const tag = document.createElement('span');
+        tag.className = 'zettel-tag';
+        tag.innerHTML = `${tagText} <span class="zettel-tag-remove" onclick="this.parentElement.remove()">×</span>`;
+
+        tagsContainer.insertBefore(tag, tagsContainer.lastElementChild);
+        zettelTags.push(tagText);
+
+        showToast("✓ Tag added");
+    };
+
+
+    // MINDMAP FUNCTIONS
+    let mindmapNodes = [];
+    let mindmapConnections = [];
+    let selectedNode = null;
+
+    window.addMindmapNode = function () {
+        const canvas = document.getElementById('mindmapCanvas');
+        if (!canvas) return;
+
+        const node = document.createElement('div');
+        node.className = 'mindmap-node';
+        node.style.left = (200 + Math.random() * 400) + 'px';
+        node.style.top = (100 + Math.random() * 300) + 'px';
+        node.innerHTML = '<input type="text" placeholder="New idea..." maxlength="100" />';
+
+        makeMindmapNodeDraggable(node);
+        canvas.appendChild(node);
+
+        showToast("+ Node added");
+    };
+
+    function makeMindmapNodeDraggable(node) {
+        let isDragging = false;
+        let currentX, currentY, initialX, initialY;
+
+        node.addEventListener('mousedown', function (e) {
+            if (e.target.tagName === 'INPUT') return;
+            isDragging = true;
+            initialX = e.clientX - node.offsetLeft;
+            initialY = e.clientY - node.offsetTop;
+            node.classList.add('selected');
+            selectedNode = node;
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (isDragging) {
+                e.preventDefault();
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+                node.style.left = currentX + 'px';
+                node.style.top = currentY + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', function () {
+            isDragging = false;
+        });
     }
-};
 
-window.toggleCornellStudyMode = function () {
-    const container = document.querySelector('.cornell-container');
-    if (!container) return;
+    window.addMindmapLink = function () {
+        showToast("💡 Click two nodes to link them");
+    };
 
-    cornellStudyMode = !cornellStudyMode;
-    container.classList.toggle('cornell-study-mode');
+    window.autoLayoutMindmap = function () {
+        showToast("🎨 Auto-layout applied");
+    };
 
-    if (cornellStudyMode) {
-        showToast("👁️ Study Mode: Notes hidden. Test yourself!");
-    } else {
-        showToast("📝 Normal Mode: Notes visible");
-    }
-};
+    // SQ3R FUNCTIONS
+    let sq3rCurrentStep = 1;
 
-// Enable Cornell summary when notes have enough content
-function checkCornellNotesLength() {
-    const notes = document.getElementById('cornellNotes');
-    const summary = document.getElementById('cornellSummary');
+    window.compareSQ3RAnswers = function () {
+        showToast("📊 Comparing answers with notes...");
+    };
 
-    if (notes && summary) {
-        const notesText = notes.innerText || '';
-        if (notesText.length > 100) {
-            summary.contentEditable = 'true';
-            summary.style.opacity = '1';
-            summary.style.cursor = 'text';
-            summary.innerHTML = '<div class="cornell-summary-title">📝 Summary</div><div contenteditable="true">Summarize your notes in 2-3 sentences...</div>';
+    window.rateSQ3RConfidence = function (event) {
+        const stars = event.currentTarget;
+        const rect = stars.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const starWidth = rect.width / 5;
+        const rating = Math.ceil(x / starWidth);
+
+        let starHTML = '';
+        for (let i = 1; i <= 5; i++) {
+            starHTML += i <= rating ? '★' : '☆';
         }
-    }
-}
+        stars.innerHTML = starHTML;
 
-// ZETTELKASTEN FUNCTIONS
-let zettelTags = [];
+        showToast(`Confidence: ${rating}/5`);
+    };
 
-window.checkZettelWordCount = function () {
-    const content = document.getElementById('zettelContent');
-    const counter = document.getElementById('zettelWordcount');
+    // FEYNMAN FUNCTIONS
+    let feynmanIterations = 1;
 
-    if (content && counter) {
+    window.checkFeynmanReadability = function () {
+        const content = document.getElementById('feynmanSimple');
+        const readabilityDiv = document.getElementById('feynmanReadability');
+        const scoreSpan = document.getElementById('feynmanScore');
+
+        if (!content || !readabilityDiv || !scoreSpan) return;
+
         const text = content.innerText || '';
-        const wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+        const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+        const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
 
-        counter.textContent = `${wordCount} words`;
-        counter.className = 'zettel-wordcount';
+        if (words.length < 10) {
+            scoreSpan.textContent = '-';
+            return;
+        }
 
-        if (wordCount > 300 && wordCount <= 500) {
-            counter.classList.add('warning');
-            counter.textContent += ' (good range)';
-        } else if (wordCount > 500) {
-            counter.classList.add('error');
-            counter.textContent += ' ⚠️ Consider splitting this note';
+        // Simple readability approximation (Flesch-Kincaid inspired)
+        const avgWordsPerSentence = words.length / Math.max(sentences.length, 1);
+        const avgSyllablesPerWord = words.reduce((sum, word) => sum + estimateSyllables(word), 0) / words.length;
+
+        const score = 0.39 * avgWordsPerSentence + 11.8 * avgSyllablesPerWord - 15.59;
+        const grade = Math.round(score);
+
+        scoreSpan.textContent = `Grade ${grade}`;
+
+        readabilityDiv.className = 'feynman-readability';
+        if (grade >= 6 && grade <= 8) {
+            readabilityDiv.classList.add('good');
+        } else if (grade > 12) {
+            readabilityDiv.classList.add('bad');
+        }
+
+        // Highlight potential jargon (words > 12 chars)
+        highlightJargon(content);
+    };
+
+    function estimateSyllables(word) {
+        word = word.toLowerCase();
+        if (word.length <= 3) return 1;
+        word = word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '');
+        word = word.replace(/^y/, '');
+        const syllables = word.match(/[aeiouy]{1,2}/g);
+        return syllables ? syllables.length : 1;
+    }
+
+    function highlightJargon(element) {
+        const text = element.innerText || '';
+        const words = text.split(/\s+/);
+        let hasJargon = false;
+
+        words.forEach(word => {
+            if (word.length > 12 && /^[a-zA-Z]+$/.test(word)) {
+                hasJargon = true;
+            }
+        });
+
+        if (hasJargon) {
+            showToast("⚠️ Potential jargon detected - try simpler words");
         }
     }
-};
 
-window.addZettelTag = function (tagText) {
-    if (!tagText || tagText.trim() === '') return;
-
-    const tagsContainer = document.getElementById('zettelTags');
-    const tag = document.createElement('span');
-    tag.className = 'zettel-tag';
-    tag.innerHTML = `${tagText} <span class="zettel-tag-remove" onclick="this.parentElement.remove()">×</span>`;
-
-    tagsContainer.insertBefore(tag, tagsContainer.lastElementChild);
-    zettelTags.push(tagText);
-
-    showToast("✓ Tag added");
-};
-
-
-// MINDMAP FUNCTIONS
-let mindmapNodes = [];
-let mindmapConnections = [];
-let selectedNode = null;
-
-window.addMindmapNode = function () {
-    const canvas = document.getElementById('mindmapCanvas');
-    if (!canvas) return;
-
-    const node = document.createElement('div');
-    node.className = 'mindmap-node';
-    node.style.left = (200 + Math.random() * 400) + 'px';
-    node.style.top = (100 + Math.random() * 300) + 'px';
-    node.innerHTML = '<input type="text" placeholder="New idea..." maxlength="100" />';
-
-    makeMindmapNodeDraggable(node);
-    canvas.appendChild(node);
-
-    showToast("+ Node added");
-};
-
-function makeMindmapNodeDraggable(node) {
-    let isDragging = false;
-    let currentX, currentY, initialX, initialY;
-
-    node.addEventListener('mousedown', function (e) {
-        if (e.target.tagName === 'INPUT') return;
-        isDragging = true;
-        initialX = e.clientX - node.offsetLeft;
-        initialY = e.clientY - node.offsetTop;
-        node.classList.add('selected');
-        selectedNode = node;
-    });
-
-    document.addEventListener('mousemove', function (e) {
-        if (isDragging) {
-            e.preventDefault();
-            currentX = e.clientX - initialX;
-            currentY = e.clientY - initialY;
-            node.style.left = currentX + 'px';
-            node.style.top = currentY + 'px';
+    // Initialize advanced template event listeners
+    document.addEventListener('DOMContentLoaded', function () {
+        // Cornell notes listener
+        const cornellNotes = document.getElementById('cornellNotes');
+        if (cornellNotes) {
+            cornellNotes.addEventListener('input', checkCornellNotesLength);
         }
-    });
 
-    document.addEventListener('mouseup', function () {
-        isDragging = false;
-    });
-}
+        // Zettelkasten listener
+        const zettelContent = document.getElementById('zettelContent');
+        if (zettelContent) {
+            zettelContent.addEventListener('input', checkZettelWordCount);
+        }
 
-window.addMindmapLink = function () {
-    showToast("💡 Click two nodes to link them");
-};
-
-window.autoLayoutMindmap = function () {
-    showToast("🎨 Auto-layout applied");
-};
-
-// SQ3R FUNCTIONS
-let sq3rCurrentStep = 1;
-
-window.compareSQ3RAnswers = function () {
-    showToast("📊 Comparing answers with notes...");
-};
-
-window.rateSQ3RConfidence = function (event) {
-    const stars = event.currentTarget;
-    const rect = stars.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const starWidth = rect.width / 5;
-    const rating = Math.ceil(x / starWidth);
-
-    let starHTML = '';
-    for (let i = 1; i <= 5; i++) {
-        starHTML += i <= rating ? '★' : '☆';
-    }
-    stars.innerHTML = starHTML;
-
-    showToast(`Confidence: ${rating}/5`);
-};
-
-// FEYNMAN FUNCTIONS
-let feynmanIterations = 1;
-
-window.checkFeynmanReadability = function () {
-    const content = document.getElementById('feynmanSimple');
-    const readabilityDiv = document.getElementById('feynmanReadability');
-    const scoreSpan = document.getElementById('feynmanScore');
-
-    if (!content || !readabilityDiv || !scoreSpan) return;
-
-    const text = content.innerText || '';
-    const words = text.trim().split(/\s+/).filter(w => w.length > 0);
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-
-    if (words.length < 10) {
-        scoreSpan.textContent = '-';
-        return;
-    }
-
-    // Simple readability approximation (Flesch-Kincaid inspired)
-    const avgWordsPerSentence = words.length / Math.max(sentences.length, 1);
-    const avgSyllablesPerWord = words.reduce((sum, word) => sum + estimateSyllables(word), 0) / words.length;
-
-    const score = 0.39 * avgWordsPerSentence + 11.8 * avgSyllablesPerWord - 15.59;
-    const grade = Math.round(score);
-
-    scoreSpan.textContent = `Grade ${grade}`;
-
-    readabilityDiv.className = 'feynman-readability';
-    if (grade >= 6 && grade <= 8) {
-        readabilityDiv.classList.add('good');
-    } else if (grade > 12) {
-        readabilityDiv.classList.add('bad');
-    }
-
-    // Highlight potential jargon (words > 12 chars)
-    highlightJargon(content);
-};
-
-function estimateSyllables(word) {
-    word = word.toLowerCase();
-    if (word.length <= 3) return 1;
-    word = word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '');
-    word = word.replace(/^y/, '');
-    const syllables = word.match(/[aeiouy]{1,2}/g);
-    return syllables ? syllables.length : 1;
-}
-
-function highlightJargon(element) {
-    const text = element.innerText || '';
-    const words = text.split(/\s+/);
-    let hasJargon = false;
-
-    words.forEach(word => {
-        if (word.length > 12 && /^[a-zA-Z]+$/.test(word)) {
-            hasJargon = true;
+        // Feynman listener
+        const feynmanSimple = document.getElementById('feynmanSimple');
+        if (feynmanSimple) {
+            feynmanSimple.addEventListener('input', checkFeynmanReadability);
         }
     });
 
-    if (hasJargon) {
-        showToast("⚠️ Potential jargon detected - try simpler words");
+    // ==================== MY REFERENCES SYSTEM ====================
+    let myReferences = [];
+    let currentEditingRef = null;
+    const MAX_PINS = 5;
+
+    // Reference type icons
+    const REF_ICONS = {
+        definition: '📖',
+        formula: '📐',
+        table: '📊',
+        checklist: '✅',
+        code: '💻',
+        fact: '🎯'
+    };
+
+    // Initialize My References
+    async function initMyReferences() {
+        await loadMyReferences();
+        renderMyReferences();
     }
-}
 
-// Initialize advanced template event listeners
-document.addEventListener('DOMContentLoaded', function () {
-    // Cornell notes listener
-    const cornellNotes = document.getElementById('cornellNotes');
-    if (cornellNotes) {
-        cornellNotes.addEventListener('input', checkCornellNotesLength);
+    // Load from localStorage
+    async function loadMyReferences() {
+        try {
+            const key = window.api && window.api.auth.isLoggedIn() ? 'nb_myReferences_' + window.api.auth.getCurrentUser()._id : 'nb_myReferences';
+            const raw = localStorage.getItem(key);
+            myReferences = raw ? JSON.parse(raw) : [];
+            renderMyReferences();
+        } catch (e) {
+            myReferences = [];
+            renderMyReferences();
+        }
     }
 
-    // Zettelkasten listener
-    const zettelContent = document.getElementById('zettelContent');
-    if (zettelContent) {
-        zettelContent.addEventListener('input', checkZettelWordCount);
-    }
-
-    // Feynman listener
-    const feynmanSimple = document.getElementById('feynmanSimple');
-    if (feynmanSimple) {
-        feynmanSimple.addEventListener('input', checkFeynmanReadability);
-    }
-});
-
-// ==================== MY REFERENCES SYSTEM ====================
-let myReferences = [];
-let currentEditingRef = null;
-const MAX_PINS = 5;
-
-// Reference type icons
-const REF_ICONS = {
-    definition: '📖',
-    formula: '📐',
-    table: '📊',
-    checklist: '✅',
-    code: '💻',
-    fact: '🎯'
-};
-
-// Initialize My References
-async function initMyReferences() {
-    await loadMyReferences();
-    renderMyReferences();
-}
-
-// Load from localStorage
-async function loadMyReferences() {
-    try {
+    // Save reference to localStorage
+    async function saveMyReference(reference) {
         const key = window.api && window.api.auth.isLoggedIn() ? 'nb_myReferences_' + window.api.auth.getCurrentUser()._id : 'nb_myReferences';
-        const raw = localStorage.getItem(key);
-        myReferences = raw ? JSON.parse(raw) : [];
-        renderMyReferences();
-    } catch (e) {
-        myReferences = [];
+        const idx = myReferences.findIndex(r => r.id === reference.id);
+        if (idx !== -1) myReferences[idx] = reference;
+        else myReferences.push(reference);
+
+        localStorage.setItem(key, JSON.stringify(myReferences));
         renderMyReferences();
     }
-}
 
-// Save reference to localStorage
-async function saveMyReference(reference) {
-    const key = window.api && window.api.auth.isLoggedIn() ? 'nb_myReferences_' + window.api.auth.getCurrentUser()._id : 'nb_myReferences';
-    const idx = myReferences.findIndex(r => r.id === reference.id);
-    if (idx !== -1) myReferences[idx] = reference;
-    else myReferences.push(reference);
+    // Delete reference from localStorage
+    async function deleteMyReference(id) {
+        const key = window.api && window.api.auth.isLoggedIn() ? 'nb_myReferences_' + window.api.auth.getCurrentUser()._id : 'nb_myReferences';
+        myReferences = myReferences.filter(r => r.id !== id);
+        localStorage.setItem(key, JSON.stringify(myReferences));
+        renderMyReferences();
+    }
 
-    localStorage.setItem(key, JSON.stringify(myReferences));
-    renderMyReferences();
-}
+    // Render My References in sidebar
+    function renderMyReferences() {
+        const container = document.getElementById('myReferencesContainer');
+        if (!container) return;
 
-// Delete reference from localStorage
-async function deleteMyReference(id) {
-    const key = window.api && window.api.auth.isLoggedIn() ? 'nb_myReferences_' + window.api.auth.getCurrentUser()._id : 'nb_myReferences';
-    myReferences = myReferences.filter(r => r.id !== id);
-    localStorage.setItem(key, JSON.stringify(myReferences));
-    renderMyReferences();
-}
-
-// Render My References in sidebar
-function renderMyReferences() {
-    const container = document.getElementById('myReferencesContainer');
-    if (!container) return;
-
-    if (myReferences.length === 0) {
-        container.innerHTML = `
+        if (myReferences.length === 0) {
+            container.innerHTML = `
                     <div class="my-refs-empty">
                         <div class="my-refs-empty-icon">💡</div>
                         <div class="my-refs-empty-title">Build Your Personal Cheat Sheet</div>
@@ -8309,80 +8321,80 @@ function renderMyReferences() {
                         </div>
                     </div>
                 `;
-        return;
-    }
+            return;
+        }
 
-    // Separate pinned and unpinned
-    const pinned = myReferences.filter(r => r.pinned);
-    const unpinned = myReferences.filter(r => !r.pinned);
+        // Separate pinned and unpinned
+        const pinned = myReferences.filter(r => r.pinned);
+        const unpinned = myReferences.filter(r => !r.pinned);
 
-    // Group by discipline
-    const byDiscipline = {
-        cs: unpinned.filter(r => r.discipline === 'cs'),
-        medical: unpinned.filter(r => r.discipline === 'medical'),
-        engineering: unpinned.filter(r => r.discipline === 'engineering'),
-        custom: unpinned.filter(r => r.discipline === 'custom')
-    };
+        // Group by discipline
+        const byDiscipline = {
+            cs: unpinned.filter(r => r.discipline === 'cs'),
+            medical: unpinned.filter(r => r.discipline === 'medical'),
+            engineering: unpinned.filter(r => r.discipline === 'engineering'),
+            custom: unpinned.filter(r => r.discipline === 'custom')
+        };
 
-    let html = `
+        let html = `
                 <button class="my-refs-create-btn" onclick="openRefModal('create')" style="width: 100%; margin-bottom: 15px;">
                     + New Reference
                 </button>
             `;
 
-    // Pinned section
-    if (pinned.length > 0) {
-        html += `
+        // Pinned section
+        if (pinned.length > 0) {
+            html += `
                     <div class="my-refs-section-title">
                         📌 Pinned <span class="my-refs-count">(${pinned.length})</span>
                     </div>
                 `;
-        pinned.forEach(ref => {
-            html += renderRefItem(ref);
-        });
+            pinned.forEach(ref => {
+                html += renderRefItem(ref);
+            });
+        }
+
+        // By Discipline
+        if (unpinned.length > 0) {
+            html += `<div class="my-refs-section-title" style="margin-top: 20px;">🏷️ By Discipline</div>`;
+
+            if (byDiscipline.cs.length > 0) {
+                html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">💻 Computer Science (${byDiscipline.cs.length})</div>`;
+                byDiscipline.cs.forEach(ref => html += renderRefItem(ref));
+            }
+
+            if (byDiscipline.medical.length > 0) {
+                html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">⚕️ Medical (${byDiscipline.medical.length})</div>`;
+                byDiscipline.medical.forEach(ref => html += renderRefItem(ref));
+            }
+
+            if (byDiscipline.engineering.length > 0) {
+                html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">⚙️ Engineering (${byDiscipline.engineering.length})</div>`;
+                byDiscipline.engineering.forEach(ref => html += renderRefItem(ref));
+            }
+
+            if (byDiscipline.custom.length > 0) {
+                html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">📝 Custom (${byDiscipline.custom.length})</div>`;
+                byDiscipline.custom.forEach(ref => html += renderRefItem(ref));
+            }
+        }
+
+        container.innerHTML = html;
     }
 
-    // By Discipline
-    if (unpinned.length > 0) {
-        html += `<div class="my-refs-section-title" style="margin-top: 20px;">🏷️ By Discipline</div>`;
+    // Render individual reference item
+    function renderRefItem(ref) {
+        const icon = REF_ICONS[ref.type] || '📄';
+        const preview = getRefPreview(ref);
+        const pinnedClass = ref.pinned ? 'pinned' : '';
+        const pinIcon = ref.pinned ? '📌' : '📍';
+        const pinActive = ref.pinned ? 'active' : '';
 
-        if (byDiscipline.cs.length > 0) {
-            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">💻 Computer Science (${byDiscipline.cs.length})</div>`;
-            byDiscipline.cs.forEach(ref => html += renderRefItem(ref));
-        }
+        const tagsHtml = ref.tags && ref.tags.length > 0
+            ? `<div class="ref-item-tags">${ref.tags.map(t => `<span class="ref-tag">#${t}</span>`).join('')}</div>`
+            : '';
 
-        if (byDiscipline.medical.length > 0) {
-            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">⚕️ Medical (${byDiscipline.medical.length})</div>`;
-            byDiscipline.medical.forEach(ref => html += renderRefItem(ref));
-        }
-
-        if (byDiscipline.engineering.length > 0) {
-            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">⚙️ Engineering (${byDiscipline.engineering.length})</div>`;
-            byDiscipline.engineering.forEach(ref => html += renderRefItem(ref));
-        }
-
-        if (byDiscipline.custom.length > 0) {
-            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">📝 Custom (${byDiscipline.custom.length})</div>`;
-            byDiscipline.custom.forEach(ref => html += renderRefItem(ref));
-        }
-    }
-
-    container.innerHTML = html;
-}
-
-// Render individual reference item
-function renderRefItem(ref) {
-    const icon = REF_ICONS[ref.type] || '📄';
-    const preview = getRefPreview(ref);
-    const pinnedClass = ref.pinned ? 'pinned' : '';
-    const pinIcon = ref.pinned ? '📌' : '📍';
-    const pinActive = ref.pinned ? 'active' : '';
-
-    const tagsHtml = ref.tags && ref.tags.length > 0
-        ? `<div class="ref-item-tags">${ref.tags.map(t => `<span class="ref-tag">#${t}</span>`).join('')}</div>`
-        : '';
-
-    return `
+        return `
                 <div class="ref-item ${pinnedClass}" onclick="viewRef('${ref.id}')">
                     <div class="ref-item-header">
                         <span class="ref-item-icon">${icon}</span>
@@ -8393,92 +8405,92 @@ function renderRefItem(ref) {
                     ${tagsHtml}
                 </div>
             `;
-}
-
-// Get preview text from reference
-function getRefPreview(ref) {
-    switch (ref.type) {
-        case 'definition':
-            return ref.content.definition?.substring(0, 80) + '...';
-        case 'formula':
-            return ref.content.latex || ref.content.when_to_use || '';
-        case 'fact':
-            return ref.content.fact?.substring(0, 80) + '...';
-        case 'code':
-            return ref.content.language + ': ' + ref.content.code?.substring(0, 50) + '...';
-        case 'table':
-            return `${ref.content.rows?.length || 0} rows`;
-        case 'checklist':
-            return `${ref.content.items?.length || 0} items`;
-        default:
-            return '';
-    }
-}
-
-// Toggle pin
-async function togglePin(id) {
-    const ref = myReferences.find(r => r.id === id);
-    if (!ref) return;
-
-    const pinnedCount = myReferences.filter(r => r.pinned).length;
-
-    if (!ref.pinned && pinnedCount >= MAX_PINS) {
-        showToast(`⚠️ Maximum ${MAX_PINS} pinned items. Unpin others first.`);
-        return;
     }
 
-    ref.pinned = !ref.pinned;
-    ref.metadata.lastModified = new Date().toISOString();
+    // Get preview text from reference
+    function getRefPreview(ref) {
+        switch (ref.type) {
+            case 'definition':
+                return ref.content.definition?.substring(0, 80) + '...';
+            case 'formula':
+                return ref.content.latex || ref.content.when_to_use || '';
+            case 'fact':
+                return ref.content.fact?.substring(0, 80) + '...';
+            case 'code':
+                return ref.content.language + ': ' + ref.content.code?.substring(0, 50) + '...';
+            case 'table':
+                return `${ref.content.rows?.length || 0} rows`;
+            case 'checklist':
+                return `${ref.content.items?.length || 0} items`;
+            default:
+                return '';
+        }
+    }
 
-    await saveMyReference(ref);
-    renderMyReferences();
-    showToast(ref.pinned ? '📌 Pinned' : '📍 Unpinned');
-}
+    // Toggle pin
+    async function togglePin(id) {
+        const ref = myReferences.find(r => r.id === id);
+        if (!ref) return;
 
-// Open modal for create/edit/view
-window.openRefModal = function (mode, refId = null) {
-    const overlay = document.getElementById('refModalOverlay');
-    const title = document.getElementById('refModalTitle');
-    const body = document.getElementById('refModalBody');
-    const footer = document.getElementById('refModalFooter');
+        const pinnedCount = myReferences.filter(r => r.pinned).length;
 
-    currentEditingRef = refId ? myReferences.find(r => r.id === refId) : null;
+        if (!ref.pinned && pinnedCount >= MAX_PINS) {
+            showToast(`⚠️ Maximum ${MAX_PINS} pinned items. Unpin others first.`);
+            return;
+        }
 
-    if (mode === 'create' || mode === 'edit') {
-        title.textContent = mode === 'create' ? 'New Reference' : 'Edit Reference';
-        body.innerHTML = renderRefForm(currentEditingRef);
-        footer.innerHTML = `
+        ref.pinned = !ref.pinned;
+        ref.metadata.lastModified = new Date().toISOString();
+
+        await saveMyReference(ref);
+        renderMyReferences();
+        showToast(ref.pinned ? '📌 Pinned' : '📍 Unpinned');
+    }
+
+    // Open modal for create/edit/view
+    window.openRefModal = function (mode, refId = null) {
+        const overlay = document.getElementById('refModalOverlay');
+        const title = document.getElementById('refModalTitle');
+        const body = document.getElementById('refModalBody');
+        const footer = document.getElementById('refModalFooter');
+
+        currentEditingRef = refId ? myReferences.find(r => r.id === refId) : null;
+
+        if (mode === 'create' || mode === 'edit') {
+            title.textContent = mode === 'create' ? 'New Reference' : 'Edit Reference';
+            body.innerHTML = renderRefForm(currentEditingRef);
+            footer.innerHTML = `
                     <button class="ref-btn ref-btn-secondary" onclick="closeRefModal()">Cancel</button>
                     <button class="ref-btn ref-btn-primary" onclick="saveRef()">Save Reference</button>
                 `;
-    } else if (mode === 'view') {
-        const ref = myReferences.find(r => r.id === refId);
-        if (!ref) return;
+        } else if (mode === 'view') {
+            const ref = myReferences.find(r => r.id === refId);
+            if (!ref) return;
 
-        title.textContent = ref.title;
-        body.innerHTML = renderRefDetail(ref);
-        footer.innerHTML = `
+            title.textContent = ref.title;
+            body.innerHTML = renderRefDetail(ref);
+            footer.innerHTML = `
                     <button class="ref-btn ref-btn-danger" onclick="deleteRef('${ref.id}')">Delete</button>
                     <div style="display: flex; gap: 10px;">
                         <button class="ref-btn ref-btn-secondary" onclick="closeRefModal()">Close</button>
                         <button class="ref-btn ref-btn-primary" onclick="openRefModal('edit', '${ref.id}')">Edit</button>
                     </div>
                 `;
-    }
+        }
 
-    overlay.classList.add('active');
-};
+        overlay.classList.add('active');
+    };
 
-window.closeRefModal = function () {
-    document.getElementById('refModalOverlay').classList.remove('active');
-    currentEditingRef = null;
-};
+    window.closeRefModal = function () {
+        document.getElementById('refModalOverlay').classList.remove('active');
+        currentEditingRef = null;
+    };
 
-// Render reference form
-function renderRefForm(ref) {
-    const selectedType = ref?.type || 'definition';
+    // Render reference form
+    function renderRefForm(ref) {
+        const selectedType = ref?.type || 'definition';
 
-    return `
+        return `
                 <div class="ref-form-group">
                     <label class="ref-form-label">Type</label>
                     <div class="ref-type-selector">
@@ -8532,13 +8544,13 @@ function renderRefForm(ref) {
                     </label>
                 </div>
             `;
-}
+    }
 
-// Render content fields based on type
-function renderContentFields(type, ref) {
-    switch (type) {
-        case 'definition':
-            return `
+    // Render content fields based on type
+    function renderContentFields(type, ref) {
+        switch (type) {
+            case 'definition':
+                return `
                         <div class="ref-form-group">
                             <label class="ref-form-label">Term *</label>
                             <input type="text" class="ref-form-input" id="refTerm" value="${ref?.content?.term || ''}" />
@@ -8549,8 +8561,8 @@ function renderContentFields(type, ref) {
                         </div>
                     `;
 
-        case 'formula':
-            return `
+            case 'formula':
+                return `
                         <div class="ref-form-group">
                             <label class="ref-form-label">Formula *</label>
                             <input type="text" class="ref-form-input" id="refFormula" value="${ref?.content?.latex || ''}" placeholder="e.g., F = ma" />
@@ -8561,8 +8573,8 @@ function renderContentFields(type, ref) {
                         </div>
                     `;
 
-        case 'fact':
-            return `
+            case 'fact':
+                return `
                         <div class="ref-form-group">
                             <label class="ref-form-label">Fact *</label>
                             <textarea class="ref-form-textarea" id="refFact">${ref?.content?.fact || ''}</textarea>
@@ -8577,8 +8589,8 @@ function renderContentFields(type, ref) {
                         </div>
                     `;
 
-        case 'code':
-            return `
+            case 'code':
+                return `
                         <div class="ref-form-group">
                             <label class="ref-form-label">Language *</label>
                             <select class="ref-form-select" id="refLanguage">
@@ -8599,8 +8611,8 @@ function renderContentFields(type, ref) {
                         </div>
                     `;
 
-        case 'table':
-            return `
+            case 'table':
+                return `
                         <div class="ref-form-group">
                             <label class="ref-form-label">Table Data</label>
                             <textarea class="ref-form-textarea" id="refTableData" placeholder="Paste table data (CSV format)" style="min-height: 200px;">${ref?.content ? JSON.stringify(ref.content) : ''}</textarea>
@@ -8608,8 +8620,8 @@ function renderContentFields(type, ref) {
                         </div>
                     `;
 
-        case 'checklist':
-            return `
+            case 'checklist':
+                return `
                         <div class="ref-form-group">
                             <label class="ref-form-label">Checklist Items *</label>
                             <textarea class="ref-form-textarea" id="refChecklistItems" placeholder="One item per line">${ref?.content?.items?.map(i => i.text).join('\n') || ''}</textarea>
@@ -8617,188 +8629,188 @@ function renderContentFields(type, ref) {
                         </div>
                     `;
 
-        default:
-            return '';
-    }
-}
-
-// Select reference type
-window.selectRefType = function (type) {
-    document.querySelectorAll('.ref-type-option').forEach(el => el.classList.remove('selected'));
-    const selectedOption = document.querySelector(`[data-type="${type}"]`);
-    if (selectedOption) selectedOption.classList.add('selected');
-
-    const contentFields = document.getElementById('refContentFields');
-    if (contentFields) {
-        contentFields.innerHTML = renderContentFields(type, null);
-    }
-};
-
-// Add tag
-window.addTag = function () {
-    const input = document.getElementById('refTagInput');
-    const tag = input.value.trim().toLowerCase().replace(/^#/, '');
-
-    if (!tag) return;
-
-    const container = document.getElementById('refTagContainer');
-    const existingTags = Array.from(container.querySelectorAll('.ref-tag-chip')).map(el => el.textContent.replace('×', '').trim());
-
-    if (existingTags.includes(tag)) {
-        showToast('⚠️ Tag already added');
-        return;
+            default:
+                return '';
+        }
     }
 
-    if (existingTags.length >= 10) {
-        showToast('⚠️ Maximum 10 tags per reference');
-        return;
-    }
+    // Select reference type
+    window.selectRefType = function (type) {
+        document.querySelectorAll('.ref-type-option').forEach(el => el.classList.remove('selected'));
+        const selectedOption = document.querySelector(`[data-type="${type}"]`);
+        if (selectedOption) selectedOption.classList.add('selected');
 
-    const chip = document.createElement('span');
-    chip.className = 'ref-tag-chip';
-    chip.innerHTML = `${tag} <span class="ref-tag-remove" onclick="this.parentElement.remove()">×</span>`;
-
-    container.insertBefore(chip, input);
-    input.value = '';
-};
-
-// Save reference
-window.saveRef = async function () {
-    const selectedType = document.querySelector('.ref-type-option.selected')?.querySelector('.ref-type-name')?.textContent.toLowerCase() || 'definition';
-    const title = document.getElementById('refTitle').value.trim();
-
-    if (!title) {
-        showToast('⚠️ Title is required');
-        return;
-    }
-
-    // Build content based on type
-    let content = {};
-    switch (selectedType) {
-        case 'definition':
-            content = {
-                term: document.getElementById('refTerm')?.value || '',
-                definition: document.getElementById('refDefinition')?.value || ''
-            };
-            break;
-        case 'formula':
-            content = {
-                latex: document.getElementById('refFormula')?.value || '',
-                when_to_use: document.getElementById('refWhenToUse')?.value || ''
-            };
-            break;
-        case 'fact':
-            content = {
-                fact: document.getElementById('refFact')?.value || '',
-                mnemonic: document.getElementById('refMnemonic')?.value || '',
-                exam_tip: document.getElementById('refExamTip')?.value || ''
-            };
-            break;
-        case 'code':
-            content = {
-                language: document.getElementById('refLanguage')?.value || 'javascript',
-                code: document.getElementById('refCode')?.value || '',
-                when_to_use: document.getElementById('refCodeWhen')?.value || ''
-            };
-            break;
-        case 'checklist':
-            const items = document.getElementById('refChecklistItems')?.value.split('\n').filter(i => i.trim());
-            content = {
-                items: items.map(text => ({ text: text.trim(), checked: false }))
-            };
-            break;
-        case 'table':
-            try {
-                content = JSON.parse(document.getElementById('refTableData')?.value || '{}');
-            } catch (e) {
-                content = { headers: [], rows: [] };
-            }
-            break;
-    }
-
-    const tags = Array.from(document.querySelectorAll('.ref-tag-chip')).map(el =>
-        el.textContent.replace('×', '').trim()
-    );
-
-    const reference = {
-        id: currentEditingRef?.id || Date.now().toString(),
-        type: selectedType,
-        title: title,
-        content: content,
-        discipline: document.getElementById('refDiscipline').value,
-        tags: tags,
-        pinned: document.getElementById('refPinned').checked,
-        metadata: {
-            created: currentEditingRef?.metadata?.created || new Date().toISOString(),
-            lastModified: new Date().toISOString(),
-            accessCount: currentEditingRef?.metadata?.accessCount || 0,
-            lastAccessed: currentEditingRef?.metadata?.lastAccessed || new Date().toISOString()
+        const contentFields = document.getElementById('refContentFields');
+        if (contentFields) {
+            contentFields.innerHTML = renderContentFields(type, null);
         }
     };
 
-    // Update or add
-    const index = myReferences.findIndex(r => r.id === reference.id);
-    if (index >= 0) {
-        myReferences[index] = reference;
-    } else {
-        myReferences.push(reference);
-    }
+    // Add tag
+    window.addTag = function () {
+        const input = document.getElementById('refTagInput');
+        const tag = input.value.trim().toLowerCase().replace(/^#/, '');
 
-    await saveMyReference(reference);
-    renderMyReferences();
-    closeRefModal();
-    showToast('✓ Reference saved');
-};
+        if (!tag) return;
 
-// View reference
-window.viewRef = function (id) {
-    const ref = myReferences.find(r => r.id === id);
-    if (!ref) return;
+        const container = document.getElementById('refTagContainer');
+        const existingTags = Array.from(container.querySelectorAll('.ref-tag-chip')).map(el => el.textContent.replace('×', '').trim());
 
-    // Update access count
-    ref.metadata.accessCount++;
-    ref.metadata.lastAccessed = new Date().toISOString();
-    saveMyReference(ref);
+        if (existingTags.includes(tag)) {
+            showToast('⚠️ Tag already added');
+            return;
+        }
 
-    openRefModal('view', id);
-};
+        if (existingTags.length >= 10) {
+            showToast('⚠️ Maximum 10 tags per reference');
+            return;
+        }
 
-// Render reference detail view
-function renderRefDetail(ref) {
-    const icon = REF_ICONS[ref.type];
+        const chip = document.createElement('span');
+        chip.className = 'ref-tag-chip';
+        chip.innerHTML = `${tag} <span class="ref-tag-remove" onclick="this.parentElement.remove()">×</span>`;
 
-    let contentHtml = '';
-    switch (ref.type) {
-        case 'definition':
-            contentHtml = `
+        container.insertBefore(chip, input);
+        input.value = '';
+    };
+
+    // Save reference
+    window.saveRef = async function () {
+        const selectedType = document.querySelector('.ref-type-option.selected')?.querySelector('.ref-type-name')?.textContent.toLowerCase() || 'definition';
+        const title = document.getElementById('refTitle').value.trim();
+
+        if (!title) {
+            showToast('⚠️ Title is required');
+            return;
+        }
+
+        // Build content based on type
+        let content = {};
+        switch (selectedType) {
+            case 'definition':
+                content = {
+                    term: document.getElementById('refTerm')?.value || '',
+                    definition: document.getElementById('refDefinition')?.value || ''
+                };
+                break;
+            case 'formula':
+                content = {
+                    latex: document.getElementById('refFormula')?.value || '',
+                    when_to_use: document.getElementById('refWhenToUse')?.value || ''
+                };
+                break;
+            case 'fact':
+                content = {
+                    fact: document.getElementById('refFact')?.value || '',
+                    mnemonic: document.getElementById('refMnemonic')?.value || '',
+                    exam_tip: document.getElementById('refExamTip')?.value || ''
+                };
+                break;
+            case 'code':
+                content = {
+                    language: document.getElementById('refLanguage')?.value || 'javascript',
+                    code: document.getElementById('refCode')?.value || '',
+                    when_to_use: document.getElementById('refCodeWhen')?.value || ''
+                };
+                break;
+            case 'checklist':
+                const items = document.getElementById('refChecklistItems')?.value.split('\n').filter(i => i.trim());
+                content = {
+                    items: items.map(text => ({ text: text.trim(), checked: false }))
+                };
+                break;
+            case 'table':
+                try {
+                    content = JSON.parse(document.getElementById('refTableData')?.value || '{}');
+                } catch (e) {
+                    content = { headers: [], rows: [] };
+                }
+                break;
+        }
+
+        const tags = Array.from(document.querySelectorAll('.ref-tag-chip')).map(el =>
+            el.textContent.replace('×', '').trim()
+        );
+
+        const reference = {
+            id: currentEditingRef?.id || Date.now().toString(),
+            type: selectedType,
+            title: title,
+            content: content,
+            discipline: document.getElementById('refDiscipline').value,
+            tags: tags,
+            pinned: document.getElementById('refPinned').checked,
+            metadata: {
+                created: currentEditingRef?.metadata?.created || new Date().toISOString(),
+                lastModified: new Date().toISOString(),
+                accessCount: currentEditingRef?.metadata?.accessCount || 0,
+                lastAccessed: currentEditingRef?.metadata?.lastAccessed || new Date().toISOString()
+            }
+        };
+
+        // Update or add
+        const index = myReferences.findIndex(r => r.id === reference.id);
+        if (index >= 0) {
+            myReferences[index] = reference;
+        } else {
+            myReferences.push(reference);
+        }
+
+        await saveMyReference(reference);
+        renderMyReferences();
+        closeRefModal();
+        showToast('✓ Reference saved');
+    };
+
+    // View reference
+    window.viewRef = function (id) {
+        const ref = myReferences.find(r => r.id === id);
+        if (!ref) return;
+
+        // Update access count
+        ref.metadata.accessCount++;
+        ref.metadata.lastAccessed = new Date().toISOString();
+        saveMyReference(ref);
+
+        openRefModal('view', id);
+    };
+
+    // Render reference detail view
+    function renderRefDetail(ref) {
+        const icon = REF_ICONS[ref.type];
+
+        let contentHtml = '';
+        switch (ref.type) {
+            case 'definition':
+                contentHtml = `
                         <div><strong>${ref.content.term}</strong></div>
                         <div style="margin-top: 10px;">${ref.content.definition}</div>
                     `;
-            break;
-        case 'formula':
-            contentHtml = `
+                break;
+            case 'formula':
+                contentHtml = `
                         <div style="font-size: 1.5rem; font-weight: bold; text-align: center; padding: 20px;">
                             ${ref.content.latex}
                         </div>
                         ${ref.content.when_to_use ? `<div><strong>Use:</strong> ${ref.content.when_to_use}</div>` : ''}
                     `;
-            break;
-        case 'fact':
-            contentHtml = `
+                break;
+            case 'fact':
+                contentHtml = `
                         <div>${ref.content.fact}</div>
                         ${ref.content.mnemonic ? `<div style="margin-top: 10px;">💡 <strong>Mnemonic:</strong> ${ref.content.mnemonic}</div>` : ''}
                         ${ref.content.exam_tip ? `<div style="margin-top: 10px;">📝 <strong>Exam Tip:</strong> ${ref.content.exam_tip}</div>` : ''}
                     `;
-            break;
-        case 'code':
-            contentHtml = `
+                break;
+            case 'code':
+                contentHtml = `
                         <div><strong>Language:</strong> ${ref.content.language}</div>
                         <pre style="background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 6px; margin-top: 10px; overflow-x: auto;"><code>${ref.content.code}</code></pre>
                         ${ref.content.when_to_use ? `<div style="margin-top: 10px;"><strong>Use:</strong> ${ref.content.when_to_use}</div>` : ''}
                     `;
-            break;
-        case 'checklist':
-            contentHtml = `
+                break;
+            case 'checklist':
+                contentHtml = `
                         <ul style="list-style: none; padding: 0;">
                             ${ref.content.items.map(item => `
                                 <li style="padding: 8px; background: rgba(52,152,219,0.05); margin-bottom: 5px; border-radius: 4px;">
@@ -8807,10 +8819,10 @@ function renderRefDetail(ref) {
                             `).join('')}
                         </ul>
                     `;
-            break;
-        case 'table':
-            if (ref.content.headers && ref.content.rows) {
-                contentHtml = `
+                break;
+            case 'table':
+                if (ref.content.headers && ref.content.rows) {
+                    contentHtml = `
                             <table style="width: 100%; border-collapse: collapse;">
                                 <tr>
                                     ${ref.content.headers.map(h => `<th style="background: var(--cs-accent); color: white; padding: 10px; text-align: left;">${h}</th>`).join('')}
@@ -8822,15 +8834,15 @@ function renderRefDetail(ref) {
                                 `).join('')}
                             </table>
                         `;
-            }
-            break;
-    }
+                }
+                break;
+        }
 
-    const tagsHtml = ref.tags && ref.tags.length > 0
-        ? `<div class="ref-detail-tags">${ref.tags.map(t => `<span class="ref-detail-tag">#${t}</span>`).join('')}</div>`
-        : '';
+        const tagsHtml = ref.tags && ref.tags.length > 0
+            ? `<div class="ref-detail-tags">${ref.tags.map(t => `<span class="ref-detail-tag">#${t}</span>`).join('')}</div>`
+            : '';
 
-    return `
+        return `
                 <div class="ref-detail">
                     <div class="ref-detail-header">
                         <span class="ref-detail-icon">${icon}</span>
@@ -8847,276 +8859,276 @@ function renderRefDetail(ref) {
                     ${tagsHtml}
                 </div>
             `;
-}
-
-// Delete reference
-window.deleteRef = async function (id) {
-    if (!confirm('Delete this reference? This cannot be undone.')) return;
-
-    await deleteMyReference(id);
-    myReferences = myReferences.filter(r => r.id !== id);
-    renderMyReferences();
-    closeRefModal();
-    showToast('✓ Reference deleted');
-};
-
-// Save from highlighted text in notes
-window.saveToMyReferences = function () {
-    const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
-
-    if (!selectedText) {
-        showToast('⚠️ Select text first');
-        return;
     }
 
-    // Open modal with pre-filled content
-    currentEditingRef = null;
-    const overlay = document.getElementById('refModalOverlay');
-    const title = document.getElementById('refModalTitle');
-    const body = document.getElementById('refModalBody');
-    const footer = document.getElementById('refModalFooter');
+    // Delete reference
+    window.deleteRef = async function (id) {
+        if (!confirm('Delete this reference? This cannot be undone.')) return;
 
-    title.textContent = 'Save to My References';
+        await deleteMyReference(id);
+        myReferences = myReferences.filter(r => r.id !== id);
+        renderMyReferences();
+        closeRefModal();
+        showToast('✓ Reference deleted');
+    };
 
-    // Pre-fill form with selected text
-    body.innerHTML = renderRefForm(null);
+    // Save from highlighted text in notes
+    window.saveToMyReferences = function () {
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
 
-    // Set default values
-    setTimeout(() => {
-        document.getElementById('refTitle').value = selectedText.substring(0, 60);
-
-        // Auto-detect type
-        if (selectedText.match(/[=+\-*/^]/)) {
-            // Likely a formula
-            document.querySelector('[data-type="formula"]')?.click();
-            if (document.getElementById('refFormula')) {
-                document.getElementById('refFormula').value = selectedText;
-            }
-        } else if (selectedText.length < 200) {
-            // Short text = definition or fact
-            document.querySelector('[data-type="definition"]')?.click();
-            if (document.getElementById('refDefinition')) {
-                document.getElementById('refDefinition').value = selectedText;
-            }
-        } else {
-            // Longer text = fact
-            document.querySelector('[data-type="fact"]')?.click();
-            if (document.getElementById('refFact')) {
-                document.getElementById('refFact').value = selectedText;
-            }
+        if (!selectedText) {
+            showToast('⚠️ Select text first');
+            return;
         }
 
-        // Auto-set discipline
-        const chapter = chapters.find(c => c.id === currentId);
-        if (chapter && document.getElementById('refDiscipline')) {
-            document.getElementById('refDiscipline').value = chapter.metadata?.discipline || 'custom';
-        }
-    }, 50);
+        // Open modal with pre-filled content
+        currentEditingRef = null;
+        const overlay = document.getElementById('refModalOverlay');
+        const title = document.getElementById('refModalTitle');
+        const body = document.getElementById('refModalBody');
+        const footer = document.getElementById('refModalFooter');
 
-    footer.innerHTML = `
+        title.textContent = 'Save to My References';
+
+        // Pre-fill form with selected text
+        body.innerHTML = renderRefForm(null);
+
+        // Set default values
+        setTimeout(() => {
+            document.getElementById('refTitle').value = selectedText.substring(0, 60);
+
+            // Auto-detect type
+            if (selectedText.match(/[=+\-*/^]/)) {
+                // Likely a formula
+                document.querySelector('[data-type="formula"]')?.click();
+                if (document.getElementById('refFormula')) {
+                    document.getElementById('refFormula').value = selectedText;
+                }
+            } else if (selectedText.length < 200) {
+                // Short text = definition or fact
+                document.querySelector('[data-type="definition"]')?.click();
+                if (document.getElementById('refDefinition')) {
+                    document.getElementById('refDefinition').value = selectedText;
+                }
+            } else {
+                // Longer text = fact
+                document.querySelector('[data-type="fact"]')?.click();
+                if (document.getElementById('refFact')) {
+                    document.getElementById('refFact').value = selectedText;
+                }
+            }
+
+            // Auto-set discipline
+            const chapter = chapters.find(c => c.id === currentId);
+            if (chapter && document.getElementById('refDiscipline')) {
+                document.getElementById('refDiscipline').value = chapter.metadata?.discipline || 'custom';
+            }
+        }, 50);
+
+        footer.innerHTML = `
                 <button class="ref-btn ref-btn-secondary" onclick="closeRefModal()">Cancel</button>
                 <button class="ref-btn ref-btn-primary" onclick="saveRef()">Save Reference</button>
             `;
 
-    overlay.classList.add('active');
+        overlay.classList.add('active');
 
-    // Hide text bubble
-    const textBubble = document.getElementById('textBubble');
-    if (textBubble) textBubble.classList.remove('visible');
-};
-
-// ========== CIRCUIT COMPONENTS FUNCTIONALITY ==========
-// Variables already declared earlier in the code
-circuitComponentCounter = 0;
-selectedComponent = null;
-connectionStart = null;
-isDrawingWire = false;
-let circuitWires = [];
-
-// Toggle circuit components overlay
-window.toggleCircuitComponents = () => {
-    const overlay = document.getElementById('circuitComponentsOverlay');
-    overlay.classList.toggle('active');
-
-    if (overlay.classList.contains('active')) {
-        // Call the fix script's initialization
-        if (typeof window.reinitCircuitComponents === 'function') {
-            window.reinitCircuitComponents();
-        }
-        initCircuitDragDrop();
-    }
-};
-
-// Initialize drag and drop for circuit components
-let circuitDragDropInitialized = false;
-function initCircuitDragDrop() {
-    if (circuitDragDropInitialized) return;
-    circuitDragDropInitialized = true;
-
-    const cards = document.querySelectorAll('.circuit-component-card');
-
-    cards.forEach(card => {
-        // Drag support
-        card.addEventListener('dragstart', (e) => {
-            const componentType = card.dataset.component;
-            e.dataTransfer.setData('componentType', componentType);
-            e.dataTransfer.setData('componentName', card.querySelector('.circuit-component-name').textContent);
-
-            // Get SVG from circuitSymbols array
-            const symbol = circuitSymbols.find(s => s.name.toLowerCase() === componentType.toLowerCase());
-            if (symbol) {
-                e.dataTransfer.setData('componentSvg', symbol.svg);
-            }
-        });
-
-        // Click-to-add support
-        card.addEventListener('click', (e) => {
-            // Don't trigger click if this was a drag
-            if (e.detail === 0) return;
-
-            const componentType = card.dataset.component;
-            const componentName = card.querySelector('.circuit-component-name').textContent;
-            const symbol = circuitSymbols.find(s => s.name.toLowerCase() === componentType.toLowerCase());
-            const svgContent = symbol ? symbol.svg : '';
-
-            const circuitCanvas = document.getElementById('circuitDiagramCanvas');
-            if (!circuitCanvas) return;
-
-            // Place at center of canvas
-            const rect = circuitCanvas.getBoundingClientRect();
-            const x = rect.width / 2 + (Math.random() * 80 - 40);
-            const y = rect.height / 2 + (Math.random() * 80 - 40);
-
-            addCircuitComponent(componentType, svgContent, componentName, x, y);
-            toggleCircuitComponents(); // Close the overlay
-        });
-    });
-
-    // Set up drop zone on circuit canvas
-    const circuitCanvas = document.getElementById('circuitDiagramCanvas');
-    if (!circuitCanvas) return;
-
-    circuitCanvas.addEventListener('dragover', (e) => {
-        e.preventDefault();
-    });
-
-    circuitCanvas.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const componentType = e.dataTransfer.getData('componentType');
-        const componentName = e.dataTransfer.getData('componentName');
-        const componentSvg = e.dataTransfer.getData('componentSvg');
-
-        if (componentType) {
-            const rect = circuitCanvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            addCircuitComponent(componentType, componentSvg || '', componentName, x, y);
-            toggleCircuitComponents(); // Close the overlay
-        }
-    });
-}
-
-// Add circuit component to canvas
-function addCircuitComponent(type, svgContent, name, x, y) {
-    const circuitCanvas = document.getElementById('circuitDiagramCanvas');
-    if (!circuitCanvas) return;
-
-    const componentId = `circuit-comp-${circuitComponentCounter++}`;
-    const typeLower = type.toLowerCase();
-    const defaults = COMPONENT_DEFAULTS[typeLower] || { resistance: 100 };
-
-    // Build component data with electrical properties
-    const compData = {
-        id: componentId,
-        type: typeLower,
-        name: name,
-        x: x - 40,
-        y: y - 40,
-        svgContent: svgContent,
-        // Electrical properties
-        resistance: defaults.resistance,
-        voltage: defaults.voltage || 0,
-        current: 0,
-        voltageDrop: 0,
-        powered: false
+        // Hide text bubble
+        const textBubble = document.getElementById('textBubble');
+        if (textBubble) textBubble.classList.remove('visible');
     };
 
-    // Type-specific properties
-    if (typeLower === 'switch') compData.closed = false;
-    if (typeLower === 'battery') compData.voltage = defaults.voltage;
-    if (typeLower === 'bulb') compData.ratedCurrent = defaults.ratedCurrent;
-    if (typeLower === 'led') compData.forwardDrop = defaults.forwardDrop;
-    if (typeLower === 'voltmeter' || typeLower === 'ammeter') compData.reading = 0;
+    // ========== CIRCUIT COMPONENTS FUNCTIONALITY ==========
+    // Variables already declared earlier in the code
+    circuitComponentCounter = 0;
+    selectedComponent = null;
+    connectionStart = null;
+    isDrawingWire = false;
+    let circuitWires = [];
 
-    circuitComponents.push(compData);
+    // Toggle circuit components overlay
+    window.toggleCircuitComponents = () => {
+        const overlay = document.getElementById('circuitComponentsOverlay');
+        overlay.classList.toggle('active');
 
-    // Render the element
-    renderCircuitElement(compData);
-    showToast(`${name} added to circuit`);
-}
+        if (overlay.classList.contains('active')) {
+            // Call the fix script's initialization
+            if (typeof window.reinitCircuitComponents === 'function') {
+                window.reinitCircuitComponents();
+            }
+            initCircuitDragDrop();
+        }
+    };
 
-// Render a circuit element to the DOM
-function renderCircuitElement(compData) {
-    const circuitCanvas = document.getElementById('circuitDiagramCanvas');
-    if (!circuitCanvas) return;
+    // Initialize drag and drop for circuit components
+    let circuitDragDropInitialized = false;
+    function initCircuitDragDrop() {
+        if (circuitDragDropInitialized) return;
+        circuitDragDropInitialized = true;
 
-    const element = document.createElement('div');
-    element.className = 'circuit-element';
-    element.id = compData.id;
-    element.style.left = `${compData.x}px`;
-    element.style.top = `${compData.y}px`;
-    element.dataset.type = compData.type;
+        const cards = document.querySelectorAll('.circuit-component-card');
 
-    updateCircuitElementHTML(element, compData);
+        cards.forEach(card => {
+            // Drag support
+            card.addEventListener('dragstart', (e) => {
+                const componentType = card.dataset.component;
+                e.dataTransfer.setData('componentType', componentType);
+                e.dataTransfer.setData('componentName', card.querySelector('.circuit-component-name').textContent);
 
-    // Make component draggable
-    makeCircuitElementDraggable(element);
+                // Get SVG from circuitSymbols array
+                const symbol = circuitSymbols.find(s => s.name.toLowerCase() === componentType.toLowerCase());
+                if (symbol) {
+                    e.dataTransfer.setData('componentSvg', symbol.svg);
+                }
+            });
 
-    // Add interactive behaviors
-    addComponentInteraction(element, compData);
+            // Click-to-add support
+            card.addEventListener('click', (e) => {
+                // Don't trigger click if this was a drag
+                if (e.detail === 0) return;
 
-    const layer = circuitCanvas.querySelector('#circuitComponentsLayer');
-    if (layer) {
-        layer.appendChild(element);
-    } else {
-        circuitCanvas.appendChild(element);
+                const componentType = card.dataset.component;
+                const componentName = card.querySelector('.circuit-component-name').textContent;
+                const symbol = circuitSymbols.find(s => s.name.toLowerCase() === componentType.toLowerCase());
+                const svgContent = symbol ? symbol.svg : '';
+
+                const circuitCanvas = document.getElementById('circuitDiagramCanvas');
+                if (!circuitCanvas) return;
+
+                // Place at center of canvas
+                const rect = circuitCanvas.getBoundingClientRect();
+                const x = rect.width / 2 + (Math.random() * 80 - 40);
+                const y = rect.height / 2 + (Math.random() * 80 - 40);
+
+                addCircuitComponent(componentType, svgContent, componentName, x, y);
+                toggleCircuitComponents(); // Close the overlay
+            });
+        });
+
+        // Set up drop zone on circuit canvas
+        const circuitCanvas = document.getElementById('circuitDiagramCanvas');
+        if (!circuitCanvas) return;
+
+        circuitCanvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        circuitCanvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const componentType = e.dataTransfer.getData('componentType');
+            const componentName = e.dataTransfer.getData('componentName');
+            const componentSvg = e.dataTransfer.getData('componentSvg');
+
+            if (componentType) {
+                const rect = circuitCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                addCircuitComponent(componentType, componentSvg || '', componentName, x, y);
+                toggleCircuitComponents(); // Close the overlay
+            }
+        });
     }
-}
 
-// Update the HTML content of a circuit element
-function updateCircuitElementHTML(element, compData) {
-    let svgHtml = '';
-    const type = compData.type;
+    // Add circuit component to canvas
+    function addCircuitComponent(type, svgContent, name, x, y) {
+        const circuitCanvas = document.getElementById('circuitDiagramCanvas');
+        if (!circuitCanvas) return;
 
-    if (type === 'switch') {
-        // Dynamic switch SVG - open or closed
-        if (compData.closed) {
-            svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
+        const componentId = `circuit-comp-${circuitComponentCounter++}`;
+        const typeLower = type.toLowerCase();
+        const defaults = COMPONENT_DEFAULTS[typeLower] || { resistance: 100 };
+
+        // Build component data with electrical properties
+        const compData = {
+            id: componentId,
+            type: typeLower,
+            name: name,
+            x: x - 40,
+            y: y - 40,
+            svgContent: svgContent,
+            // Electrical properties
+            resistance: defaults.resistance,
+            voltage: defaults.voltage || 0,
+            current: 0,
+            voltageDrop: 0,
+            powered: false
+        };
+
+        // Type-specific properties
+        if (typeLower === 'switch') compData.closed = false;
+        if (typeLower === 'battery') compData.voltage = defaults.voltage;
+        if (typeLower === 'bulb') compData.ratedCurrent = defaults.ratedCurrent;
+        if (typeLower === 'led') compData.forwardDrop = defaults.forwardDrop;
+        if (typeLower === 'voltmeter' || typeLower === 'ammeter') compData.reading = 0;
+
+        circuitComponents.push(compData);
+
+        // Render the element
+        renderCircuitElement(compData);
+        showToast(`${name} added to circuit`);
+    }
+
+    // Render a circuit element to the DOM
+    function renderCircuitElement(compData) {
+        const circuitCanvas = document.getElementById('circuitDiagramCanvas');
+        if (!circuitCanvas) return;
+
+        const element = document.createElement('div');
+        element.className = 'circuit-element';
+        element.id = compData.id;
+        element.style.left = `${compData.x}px`;
+        element.style.top = `${compData.y}px`;
+        element.dataset.type = compData.type;
+
+        updateCircuitElementHTML(element, compData);
+
+        // Make component draggable
+        makeCircuitElementDraggable(element);
+
+        // Add interactive behaviors
+        addComponentInteraction(element, compData);
+
+        const layer = circuitCanvas.querySelector('#circuitComponentsLayer');
+        if (layer) {
+            layer.appendChild(element);
+        } else {
+            circuitCanvas.appendChild(element);
+        }
+    }
+
+    // Update the HTML content of a circuit element
+    function updateCircuitElementHTML(element, compData) {
+        let svgHtml = '';
+        const type = compData.type;
+
+        if (type === 'switch') {
+            // Dynamic switch SVG - open or closed
+            if (compData.closed) {
+                svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
                 <line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/>
                 <line x1="15" y1="20" x2="30" y2="20" stroke="#27ae60" stroke-width="2"/>
                 <circle cx="15" cy="20" r="2" fill="#27ae60"/>
                 <circle cx="30" cy="20" r="2" fill="#27ae60"/>
                 <line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>
             </svg>`;
-        } else {
-            svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
+            } else {
+                svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
                 <line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/>
                 <line x1="15" y1="20" x2="30" y2="10" stroke="#e74c3c" stroke-width="2"/>
                 <circle cx="15" cy="20" r="2" fill="#e74c3c"/>
                 <circle cx="30" cy="20" r="2" fill="#2c3e50"/>
                 <line x1="30" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>
             </svg>`;
-        }
-    } else if (type === 'bulb') {
-        if (compData.powered && compData.voltageDrop > 0) {
-            // Glowing bulb — intensity based on voltage across the bulb
-            const maxVoltage = (compData.resistance || 50) * (compData.ratedCurrent || 0.18);
-            const intensity = Math.min(compData.voltageDrop / maxVoltage, 1);
-            const glowColor = `rgba(255, 235, 59, ${0.2 + intensity * 0.8})`;
-            const glowRadius = 2 + intensity * 9;
-            svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
+            }
+        } else if (type === 'bulb') {
+            if (compData.powered && compData.voltageDrop > 0) {
+                // Glowing bulb — intensity based on voltage across the bulb
+                const maxVoltage = (compData.resistance || 50) * (compData.ratedCurrent || 0.18);
+                const intensity = Math.min(compData.voltageDrop / maxVoltage, 1);
+                const glowColor = `rgba(255, 235, 59, ${0.2 + intensity * 0.8})`;
+                const glowRadius = 2 + intensity * 9;
+                svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
                 <defs><filter id="bulbGlow-${compData.id}"><feGaussianBlur stdDeviation="${glowRadius}" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
                 <circle cx="20" cy="20" r="8" fill="${glowColor}" stroke="#f39c12" stroke-width="2" filter="url(#bulbGlow-${compData.id})"/>
                 <line x1="14" y1="14" x2="26" y2="26" stroke="#f39c12" stroke-width="1.5"/>
@@ -9124,47 +9136,47 @@ function updateCircuitElementHTML(element, compData) {
                 <line x1="5" y1="20" x2="12" y2="20" stroke="#2c3e50" stroke-width="2"/>
                 <line x1="28" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>
             </svg>`;
-        } else {
-            // Bulb OFF — dark, no glow
-            svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
+            } else {
+                // Bulb OFF — dark, no glow
+                svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
                 <circle cx="20" cy="20" r="8" fill="#e0e0e0" stroke="#999" stroke-width="2"/>
                 <line x1="14" y1="14" x2="26" y2="26" stroke="#999" stroke-width="1.5"/>
                 <line x1="26" y1="14" x2="14" y2="26" stroke="#999" stroke-width="1.5"/>
                 <line x1="5" y1="20" x2="12" y2="20" stroke="#2c3e50" stroke-width="2"/>
                 <line x1="28" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>
             </svg>`;
-        }
-    } else if (type === 'led' && compData.powered) {
-        const intensity = Math.min(compData.current / 0.02, 1);
-        const r = Math.round(231 * intensity);
-        const glowRadius = 2 + intensity * 5;
-        svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
+            }
+        } else if (type === 'led' && compData.powered) {
+            const intensity = Math.min(compData.current / 0.02, 1);
+            const r = Math.round(231 * intensity);
+            const glowRadius = 2 + intensity * 5;
+            svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
             <defs><filter id="ledGlow-${compData.id}"><feGaussianBlur stdDeviation="${glowRadius}" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
             <line x1="5" y1="20" x2="15" y2="20" stroke="#2c3e50" stroke-width="2"/>
             <polygon points="15,10 15,30 25,20" fill="rgb(${r},76,60)" filter="url(#ledGlow-${compData.id})"/>
             <line x1="25" y1="10" x2="25" y2="30" stroke="#2c3e50" stroke-width="2"/>
             <line x1="25" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>
         </svg>`;
-    } else if (compData.svgContent) {
-        svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">${compData.svgContent}</svg>`;
-    } else {
-        svgHtml = `<div class="circuit-element-icon">${compData.name}</div>`;
-    }
+        } else if (compData.svgContent) {
+            svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">${compData.svgContent}</svg>`;
+        } else {
+            svgHtml = `<div class="circuit-element-icon">${compData.name}</div>`;
+        }
 
-    // Build value label
-    let valueLabel = '';
-    if (type === 'resistor') valueLabel = `${compData.resistance}Ω`;
-    else if (type === 'battery') valueLabel = `${compData.voltage}V`;
-    else if (type === 'bulb') valueLabel = `${compData.resistance}Ω`;
-    else if (type === 'switch') valueLabel = compData.closed ? '🟢 Closed' : '🔴 Open';
-    else if (type === 'voltmeter') valueLabel = `${compData.reading.toFixed(2)}V`;
-    else if (type === 'ammeter') valueLabel = `${(compData.reading * 1000).toFixed(1)}mA`;
+        // Build value label
+        let valueLabel = '';
+        if (type === 'resistor') valueLabel = `${compData.resistance}Ω`;
+        else if (type === 'battery') valueLabel = `${compData.voltage}V`;
+        else if (type === 'bulb') valueLabel = `${compData.resistance}Ω`;
+        else if (type === 'switch') valueLabel = compData.closed ? '🟢 Closed' : '🔴 Open';
+        else if (type === 'voltmeter') valueLabel = `${compData.reading.toFixed(2)}V`;
+        else if (type === 'ammeter') valueLabel = `${(compData.reading * 1000).toFixed(1)}mA`;
 
-    // Status indicator for powered state
-    const poweredClass = compData.powered ? ' powered' : '';
-    element.className = `circuit-element${poweredClass}`;
+        // Status indicator for powered state
+        const poweredClass = compData.powered ? ' powered' : '';
+        element.className = `circuit-element${poweredClass}`;
 
-    element.innerHTML = `
+        element.innerHTML = `
         ${svgHtml}
         <div class="circuit-element-label">${compData.name}</div>
         ${valueLabel ? `<div class="circuit-value-label">${valueLabel}</div>` : ''}
@@ -9174,845 +9186,677 @@ function updateCircuitElementHTML(element, compData) {
         <div class="circuit-connection-point left" data-point="left" onclick="startConnection(event, '${compData.id}', 'left')"></div>
         <div class="circuit-connection-point right" data-point="right" onclick="startConnection(event, '${compData.id}', 'right')"></div>
     `;
-}
-
-// Add interactive behaviors to a component
-function addComponentInteraction(element, compData) {
-    const type = compData.type;
-
-    if (type === 'switch') {
-        // Click to toggle switch
-        element.addEventListener('click', (e) => {
-            if (e.target.classList.contains('circuit-connection-point') ||
-                e.target.classList.contains('circuit-element-delete')) return;
-            compData.closed = !compData.closed;
-            compData.resistance = compData.closed ? 0.001 : Infinity;
-            updateCircuitElementHTML(element, compData);
-            // Re-attach interaction since innerHTML was replaced
-            addSwitchClickHandler(element, compData);
-            simulateCircuit();
-            showToast(compData.closed ? '🟢 Switch closed' : '🔴 Switch opened');
-        });
     }
 
-    if (type === 'resistor' || type === 'bulb') {
-        // Double-click to edit resistance
-        element.addEventListener('dblclick', (e) => {
-            if (e.target.classList.contains('circuit-connection-point') ||
-                e.target.classList.contains('circuit-element-delete')) return;
-            e.stopPropagation();
-            const newVal = prompt(`Set resistance (Ω):`, compData.resistance);
-            if (newVal !== null && !isNaN(parseFloat(newVal)) && parseFloat(newVal) > 0) {
-                compData.resistance = parseFloat(newVal);
+    // Add interactive behaviors to a component
+    function addComponentInteraction(element, compData) {
+        const type = compData.type;
+
+        if (type === 'switch') {
+            // Click to toggle switch
+            element.addEventListener('click', (e) => {
+                if (e.target.classList.contains('circuit-connection-point') ||
+                    e.target.classList.contains('circuit-element-delete')) return;
+                compData.closed = !compData.closed;
+                compData.resistance = compData.closed ? 0.001 : Infinity;
                 updateCircuitElementHTML(element, compData);
+                // Re-attach interaction since innerHTML was replaced
+                addSwitchClickHandler(element, compData);
                 simulateCircuit();
-                showToast(`Resistance set to ${compData.resistance}Ω`);
-            }
-        });
-    }
-
-    if (type === 'battery') {
-        // Double-click to edit voltage
-        element.addEventListener('dblclick', (e) => {
-            if (e.target.classList.contains('circuit-connection-point') ||
-                e.target.classList.contains('circuit-element-delete')) return;
-            e.stopPropagation();
-            const newVal = prompt(`Set voltage (V):`, compData.voltage);
-            if (newVal !== null && !isNaN(parseFloat(newVal)) && parseFloat(newVal) > 0) {
-                compData.voltage = parseFloat(newVal);
-                updateCircuitElementHTML(element, compData);
-                simulateCircuit();
-                showToast(`Voltage set to ${compData.voltage}V`);
-            }
-        });
-    }
-}
-
-// Re-attach switch click handler after innerHTML replacement
-function addSwitchClickHandler(element, compData) {
-    // The main click handler is on the element itself, no need to re-add
-    // But we need the connection points and delete button to work
-    // They use inline onclick attributes so they're automatically re-attached
-}
-
-// ==================== CIRCUIT SIMULATION ENGINE ====================
-function simulateCircuit() {
-    // Reset all components
-    circuitComponents.forEach(comp => {
-        comp.current = 0;
-        comp.voltageDrop = 0;
-        comp.powered = false;
-        if (comp.type === 'voltmeter') comp.reading = 0;
-        if (comp.type === 'ammeter') comp.reading = 0;
-    });
-
-    // Build adjacency map from wires
-    // Open switches break the circuit — exclude their connections
-    const openSwitchIds = new Set(
-        circuitComponents.filter(c => c.type === 'switch' && !c.closed).map(c => c.id)
-    );
-
-    const adjacency = {};
-    circuitComponents.forEach(comp => {
-        adjacency[comp.id] = [];
-    });
-
-    circuitWires.forEach(wire => {
-        // Skip wires connected to an open switch — circuit is broken there
-        if (openSwitchIds.has(wire.comp1) || openSwitchIds.has(wire.comp2)) return;
-
-        if (adjacency[wire.comp1] && adjacency[wire.comp2]) {
-            adjacency[wire.comp1].push(wire.comp2);
-            adjacency[wire.comp2].push(wire.comp1);
+                showToast(compData.closed ? '🟢 Switch closed' : '🔴 Switch opened');
+            });
         }
-    });
 
-    // Find all batteries
-    const batteries = circuitComponents.filter(c => c.type === 'battery');
-    if (batteries.length === 0) {
-        updateAllComponentVisuals();
-        return;
-    }
-
-    // For each battery, find loops (simple DFS-based loop detection)
-    batteries.forEach(battery => {
-        const loops = findLoops(battery.id, adjacency);
-
-        loops.forEach(loop => {
-            // Calculate total resistance and voltage in the loop
-            let totalResistance = 0;
-            let totalVoltage = 0;
-            let hasOpenSwitch = false;
-
-            const loopComponents = loop.map(id => circuitComponents.find(c => c.id === id)).filter(Boolean);
-
-            loopComponents.forEach(comp => {
-                if (comp.type === 'battery') {
-                    totalVoltage += comp.voltage;
-                    totalResistance += comp.resistance || 0.01;
-                } else if (comp.type === 'switch' && !comp.closed) {
-                    hasOpenSwitch = true;
-                } else if (comp.type === 'voltmeter') {
-                    // Voltmeter has very high resistance — don't add for parallel measurement
-                    // but still track it
-                } else {
-                    totalResistance += comp.resistance || 0;
+        if (type === 'resistor' || type === 'bulb') {
+            // Double-click to edit resistance
+            element.addEventListener('dblclick', (e) => {
+                if (e.target.classList.contains('circuit-connection-point') ||
+                    e.target.classList.contains('circuit-element-delete')) return;
+                e.stopPropagation();
+                const newVal = prompt(`Set resistance (Ω):`, compData.resistance);
+                if (newVal !== null && !isNaN(parseFloat(newVal)) && parseFloat(newVal) > 0) {
+                    compData.resistance = parseFloat(newVal);
+                    updateCircuitElementHTML(element, compData);
+                    simulateCircuit();
+                    showToast(`Resistance set to ${compData.resistance}Ω`);
                 }
             });
+        }
 
-            if (hasOpenSwitch || totalResistance <= 0) {
-                // Open circuit or short circuit protection
-                if (totalResistance <= 0) totalResistance = 0.01;
-                if (hasOpenSwitch) return;
-            }
-
-            // Calculate current: I = V / R
-            const current = totalVoltage / totalResistance;
-
-            // Apply current and voltage drops to each component in the loop
-            loopComponents.forEach(comp => {
-                if (comp.type === 'battery') {
-                    comp.current = current;
-                    comp.powered = true;
-                } else if (comp.type === 'voltmeter') {
-                    // Voltmeter measures voltage across adjacent component
-                    // Find what it's connected to and measure voltage
-                    const neighbors = adjacency[comp.id] || [];
-                    let measuredVoltage = 0;
-                    neighbors.forEach(nId => {
-                        const neighbor = circuitComponents.find(c => c.id === nId);
-                        if (neighbor && neighbor.type !== 'voltmeter') {
-                            measuredVoltage = Math.max(measuredVoltage, Math.abs(neighbor.voltageDrop || (current * (neighbor.resistance || 0))));
-                        }
-                    });
-                    comp.reading = measuredVoltage || (totalVoltage > 0 ? totalVoltage : 0);
-                    comp.powered = current > 0.0001;
-                } else {
-                    comp.current = current;
-                    comp.voltageDrop = current * (comp.resistance || 0);
-                    comp.powered = current > 0.0001;
-
-                    if (comp.type === 'ammeter') {
-                        comp.reading = current;
-                    }
+        if (type === 'battery') {
+            // Double-click to edit voltage
+            element.addEventListener('dblclick', (e) => {
+                if (e.target.classList.contains('circuit-connection-point') ||
+                    e.target.classList.contains('circuit-element-delete')) return;
+                e.stopPropagation();
+                const newVal = prompt(`Set voltage (V):`, compData.voltage);
+                if (newVal !== null && !isNaN(parseFloat(newVal)) && parseFloat(newVal) > 0) {
+                    compData.voltage = parseFloat(newVal);
+                    updateCircuitElementHTML(element, compData);
+                    simulateCircuit();
+                    showToast(`Voltage set to ${compData.voltage}V`);
                 }
             });
-        });
-    });
-
-    // Update all component visuals
-    updateAllComponentVisuals();
-
-    // Update wire styles
-    updateWireStyles();
-}
-
-// Find loops starting from a given component using DFS
-function findLoops(startId, adjacency) {
-    const loops = [];
-    const maxDepth = circuitComponents.length + 1;
-
-    function dfs(currentId, visited, path) {
-        if (path.length > maxDepth) return;
-
-        const neighbors = adjacency[currentId] || [];
-        for (const neighborId of neighbors) {
-            if (neighborId === startId && path.length >= 2) {
-                // Found a loop back to start
-                loops.push([...path]);
-                return;
-            }
-            if (!visited.has(neighborId)) {
-                visited.add(neighborId);
-                path.push(neighborId);
-                dfs(neighborId, visited, path);
-                path.pop();
-                visited.delete(neighborId);
-            }
         }
     }
 
-    const visited = new Set([startId]);
-    dfs(startId, visited, [startId]);
+    // Re-attach switch click handler after innerHTML replacement
+    function addSwitchClickHandler(element, compData) {
+        // The main click handler is on the element itself, no need to re-add
+        // But we need the connection points and delete button to work
+        // They use inline onclick attributes so they're automatically re-attached
+    }
 
-    return loops;
-}
+    // ==================== CIRCUIT SIMULATION ENGINE ====================
+    function simulateCircuit() {
+        // Reset all components
+        circuitComponents.forEach(comp => {
+            comp.current = 0;
+            comp.voltageDrop = 0;
+            comp.powered = false;
+            if (comp.type === 'voltmeter') comp.reading = 0;
+            if (comp.type === 'ammeter') comp.reading = 0;
+        });
 
-// Update all component visuals after simulation
-function updateAllComponentVisuals() {
-    circuitComponents.forEach(comp => {
-        const element = document.getElementById(comp.id);
-        if (element) {
-            // Save current position
-            const currentLeft = element.style.left;
-            const currentTop = element.style.top;
+        // Build adjacency map from wires
+        // Open switches break the circuit — exclude their connections
+        const openSwitchIds = new Set(
+            circuitComponents.filter(c => c.type === 'switch' && !c.closed).map(c => c.id)
+        );
 
-            updateCircuitElementHTML(element, comp);
+        const adjacency = {};
+        circuitComponents.forEach(comp => {
+            adjacency[comp.id] = [];
+        });
 
-            // Restore position (innerHTML replacement may not affect style, but be safe)
-            element.style.left = currentLeft;
-            element.style.top = currentTop;
-            element.dataset.type = comp.type;
-        }
-    });
-}
+        circuitWires.forEach(wire => {
+            // Skip wires connected to an open switch — circuit is broken there
+            if (openSwitchIds.has(wire.comp1) || openSwitchIds.has(wire.comp2)) return;
 
-// Update wire styles based on current flow
-function updateWireStyles() {
-    circuitWires.forEach(wire => {
-        const path = document.getElementById(wire.id);
-        if (!path) return;
+            if (adjacency[wire.comp1] && adjacency[wire.comp2]) {
+                adjacency[wire.comp1].push(wire.comp2);
+                adjacency[wire.comp2].push(wire.comp1);
+            }
+        });
 
-        const comp1 = circuitComponents.find(c => c.id === wire.comp1);
-        const comp2 = circuitComponents.find(c => c.id === wire.comp2);
-
-        const hasCurrent = (comp1 && comp1.powered) || (comp2 && comp2.powered);
-        if (hasCurrent) {
-            path.classList.add('active');
-        } else {
-            path.classList.remove('active');
-        }
-    });
-}
-
-// Make circuit element draggable
-function makeCircuitElementDraggable(element) {
-    let isDragging = false;
-    let startMouseX, startMouseY;
-    let startLeft, startTop;
-
-    element.addEventListener('mousedown', dragStart);
-    document.addEventListener('mousemove', drag);
-    document.addEventListener('mouseup', dragEnd);
-
-    function dragStart(e) {
-        if (e.target.classList.contains('circuit-connection-point') ||
-            e.target.classList.contains('circuit-element-delete')) {
+        // Find all batteries
+        const batteries = circuitComponents.filter(c => c.type === 'battery');
+        if (batteries.length === 0) {
+            updateAllComponentVisuals();
             return;
         }
 
-        if (e.target === element || element.contains(e.target)) {
-            isDragging = true;
-            startMouseX = e.clientX;
-            startMouseY = e.clientY;
-            startLeft = parseInt(element.style.left) || 0;
-            startTop = parseInt(element.style.top) || 0;
-            element.classList.add('selected');
-            e.preventDefault();
-        }
-    }
+        // For each battery, find loops (simple DFS-based loop detection)
+        batteries.forEach(battery => {
+            const loops = findLoops(battery.id, adjacency);
 
-    function drag(e) {
-        if (!isDragging) return;
-        e.preventDefault();
+            loops.forEach(loop => {
+                // Calculate total resistance and voltage in the loop
+                let totalResistance = 0;
+                let totalVoltage = 0;
+                let hasOpenSwitch = false;
 
-        const dx = e.clientX - startMouseX;
-        const dy = e.clientY - startMouseY;
+                const loopComponents = loop.map(id => circuitComponents.find(c => c.id === id)).filter(Boolean);
 
-        element.style.left = (startLeft + dx) + 'px';
-        element.style.top = (startTop + dy) + 'px';
+                loopComponents.forEach(comp => {
+                    if (comp.type === 'battery') {
+                        totalVoltage += comp.voltage;
+                        totalResistance += comp.resistance || 0.01;
+                    } else if (comp.type === 'switch' && !comp.closed) {
+                        hasOpenSwitch = true;
+                    } else if (comp.type === 'voltmeter') {
+                        // Voltmeter has very high resistance — don't add for parallel measurement
+                        // but still track it
+                    } else {
+                        totalResistance += comp.resistance || 0;
+                    }
+                });
 
-        updateWires(element.id);
-    }
+                if (hasOpenSwitch || totalResistance <= 0) {
+                    // Open circuit or short circuit protection
+                    if (totalResistance <= 0) totalResistance = 0.01;
+                    if (hasOpenSwitch) return;
+                }
 
-    function dragEnd(e) {
-        if (isDragging) {
-            isDragging = false;
+                // Calculate current: I = V / R
+                const current = totalVoltage / totalResistance;
 
-            // Update component position in array
-            const comp = circuitComponents.find(c => c.id === element.id);
-            if (comp) {
-                comp.x = parseInt(element.style.left) || 0;
-                comp.y = parseInt(element.style.top) || 0;
-            }
-        }
-    }
-}
+                // Apply current and voltage drops to each component in the loop
+                loopComponents.forEach(comp => {
+                    if (comp.type === 'battery') {
+                        comp.current = current;
+                        comp.powered = true;
+                    } else if (comp.type === 'voltmeter') {
+                        // Voltmeter measures voltage across adjacent component
+                        // Find what it's connected to and measure voltage
+                        const neighbors = adjacency[comp.id] || [];
+                        let measuredVoltage = 0;
+                        neighbors.forEach(nId => {
+                            const neighbor = circuitComponents.find(c => c.id === nId);
+                            if (neighbor && neighbor.type !== 'voltmeter') {
+                                measuredVoltage = Math.max(measuredVoltage, Math.abs(neighbor.voltageDrop || (current * (neighbor.resistance || 0))));
+                            }
+                        });
+                        comp.reading = measuredVoltage || (totalVoltage > 0 ? totalVoltage : 0);
+                        comp.powered = current > 0.0001;
+                    } else {
+                        comp.current = current;
+                        comp.voltageDrop = current * (comp.resistance || 0);
+                        comp.powered = current > 0.0001;
 
-// Start wire connection
-window.startConnection = (event, componentId, point) => {
-    event.stopPropagation();
-
-    if (!connectionStart) {
-        connectionStart = { componentId, point };
-        showToast('Click another connection point to complete wire');
-    } else {
-        // Complete the connection
-        if (connectionStart.componentId !== componentId) {
-            createWire(connectionStart.componentId, connectionStart.point, componentId, point);
-            connectionStart = null;
-        } else {
-            showToast('Cannot connect component to itself');
-            connectionStart = null;
-        }
-    }
-};
-
-// Create wire between two components
-function createWire(comp1Id, point1, comp2Id, point2) {
-    const svg = document.getElementById('circuitSvg');
-    if (!svg) return;
-
-    const comp1 = document.getElementById(comp1Id);
-    const comp2 = document.getElementById(comp2Id);
-
-    if (!comp1 || !comp2) return;
-
-    const wireId = `wire-${Date.now()}`;
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('class', 'circuit-wire');
-    path.setAttribute('id', wireId);
-    path.setAttribute('data-comp1', comp1Id);
-    path.setAttribute('data-point1', point1);
-    path.setAttribute('data-comp2', comp2Id);
-    path.setAttribute('data-point2', point2);
-
-    updateWirePath(path, comp1, point1, comp2, point2);
-
-    path.addEventListener('click', () => {
-        if (confirm('Delete this wire?')) {
-            path.remove();
-            circuitWires = circuitWires.filter(w => w.id !== wireId);
-            simulateCircuit();
-        }
-    });
-
-    svg.appendChild(path);
-
-    circuitWires.push({
-        id: wireId,
-        comp1: comp1Id,
-        point1: point1,
-        comp2: comp2Id,
-        point2: point2
-    });
-
-    showToast('Wire connected');
-    simulateCircuit();
-}
-
-// Update wire path
-function updateWirePath(path, comp1, point1, comp2, point2) {
-    const svg = document.getElementById('circuitSvg');
-    const svgRect = svg.getBoundingClientRect();
-
-    const comp1Rect = comp1.getBoundingClientRect();
-    const comp2Rect = comp2.getBoundingClientRect();
-
-    const pos1 = getConnectionPointPosition(comp1Rect, point1, svgRect);
-    const pos2 = getConnectionPointPosition(comp2Rect, point2, svgRect);
-
-    const d = `M ${pos1.x} ${pos1.y} L ${pos2.x} ${pos2.y}`;
-    path.setAttribute('d', d);
-}
-
-// Get connection point position
-function getConnectionPointPosition(compRect, point, svgRect) {
-    let x, y;
-
-    switch (point) {
-        case 'top':
-            x = compRect.left + compRect.width / 2 - svgRect.left;
-            y = compRect.top - svgRect.top;
-            break;
-        case 'bottom':
-            x = compRect.left + compRect.width / 2 - svgRect.left;
-            y = compRect.bottom - svgRect.top;
-            break;
-        case 'left':
-            x = compRect.left - svgRect.left;
-            y = compRect.top + compRect.height / 2 - svgRect.top;
-            break;
-        case 'right':
-            x = compRect.right - svgRect.left;
-            y = compRect.top + compRect.height / 2 - svgRect.top;
-            break;
-    }
-
-    return { x, y };
-}
-
-// Update all wires connected to a component
-function updateWires(componentId) {
-    const svg = document.getElementById('circuitSvg');
-    if (!svg) return;
-
-    circuitWires.forEach(wire => {
-        if (wire.comp1 === componentId || wire.comp2 === componentId) {
-            const path = document.getElementById(wire.id);
-            const comp1 = document.getElementById(wire.comp1);
-            const comp2 = document.getElementById(wire.comp2);
-
-            if (path && comp1 && comp2) {
-                updateWirePath(path, comp1, wire.point1, comp2, wire.point2);
-            }
-        }
-    });
-}
-
-// Delete circuit component
-window.deleteCircuitComponent = (componentId) => {
-    const element = document.getElementById(componentId);
-    if (!element) return;
-
-    // Remove all wires connected to this component
-    const wiresToRemove = circuitWires.filter(w => w.comp1 === componentId || w.comp2 === componentId);
-    wiresToRemove.forEach(wire => {
-        const wirePath = document.getElementById(wire.id);
-        if (wirePath) wirePath.remove();
-    });
-
-    circuitWires = circuitWires.filter(w => w.comp1 !== componentId && w.comp2 !== componentId);
-    circuitComponents = circuitComponents.filter(c => c.id !== componentId);
-
-    element.remove();
-    showToast('Component deleted');
-    simulateCircuit();
-};
-
-// Create a new chapter/page (OPTIMIZED)
-window.createNewChapter = async () => {
-    const newChapter = {
-        id: Date.now().toString(),
-        title: 'New Page',
-        content: '<p>Start typing...</p>',
-        tags: [],
-        metadata: {
-            discipline: 'general',
-            type: 'note',
-            createdAt: new Date().toISOString(),
-            lastEdited: new Date().toISOString()
-        },
-        lastEdited: new Date().toISOString(),
-        isWhiteboard: false,
-        sketchData: null
-    };
-
-    // Add to beginning of chapters array
-    chapters.unshift(newChapter);
-    currentId = newChapter.id;
-
-    // Batch DOM updates for better performance
-    const stream = document.getElementById('sequentialStream');
-    const titleInput = document.getElementById('pageTitle');
-
-    // Use DocumentFragment for efficient DOM manipulation
-    const fragment = document.createDocumentFragment();
-    const block = document.createElement('div');
-    block.className = 'sequence-editor-block active-focus';
-    block.id = `page-block-${newChapter.id}`;
-
-    const contentArea = document.createElement('div');
-    contentArea.className = 'content-area';
-    contentArea.contentEditable = 'true';
-    contentArea.innerHTML = newChapter.content;
-    contentArea.oninput = () => {
-        markUnsaved();
-        saveCurrentToCloud();
-    };
-
-    block.appendChild(contentArea);
-    fragment.appendChild(block);
-
-    // Single DOM update
-    stream.innerHTML = '';
-    stream.appendChild(fragment);
-    titleInput.value = newChapter.title;
-
-    // Focus immediately for better UX
-    contentArea.focus();
-
-    // Defer non-critical operations
-    requestAnimationFrame(() => {
-        renderSidebar();
-        updateToolVisibility(newChapter);
-    });
-
-    // Save to IndexedDB asynchronously (don't block UI)
-    saveChapterToDB(newChapter).catch(err => console.error('Save failed:', err));
-
-    showToast('✓ New page created');
-};
-
-// Add a new page to the stream with the same tag (MULTI-PAGE STREAM)
-window.addPageToStream = async () => {
-    const currentChapter = chapters.find(c => c.id === currentId);
-    if (!currentChapter) return;
-
-    // Create new page with same tag as current page
-    const newChapter = {
-        id: Date.now().toString(),
-        title: 'New Page',
-        content: '<p>Start typing...</p>',
-        tags: currentChapter.tags ? [...currentChapter.tags] : [], // Inherit tags
-        metadata: {
-            discipline: currentChapter.metadata?.discipline || 'general',
-            type: currentChapter.metadata?.type || 'note',
-            createdAt: new Date().toISOString(),
-            lastEdited: new Date().toISOString()
-        },
-        lastEdited: new Date().toISOString(),
-        isWhiteboard: false,
-        sketchData: null
-    };
-
-    // Add to chapters array
-    chapters.push(newChapter);
-
-    // Save to IndexedDB asynchronously
-    saveChapterToDB(newChapter).catch(err => console.error('Save failed:', err));
-
-    // Reload the stream to show all pages with the same tag
-    loadStreamByTag(currentChapter.tags && currentChapter.tags.length > 0 ? currentChapter.tags[0] : null);
-
-    // Update sidebar
-    requestAnimationFrame(() => renderSidebar());
-
-    showToast('✓ Page added to stream');
-};
-
-// ===== VIRTUAL SCROLLING MANAGER =====
-// Manages efficient rendering of large page streams by only rendering visible pages
-class VirtualScrollManager {
-    constructor(container, chapters, currentId) {
-        this.container = container;
-        this.chapters = chapters;
-        this.currentId = currentId;
-        this.renderedPages = new Map();
-        this.placeholders = new Map();
-        this.observer = null;
-        this.bufferSize = 3; // Number of pages to render before/after viewport
-        this.estimatedPageHeight = 800; // Estimated height per page in pixels
-    }
-
-    init() {
-        // Clear container
-        this.container.innerHTML = '';
-
-        // Create placeholders for all pages
-        this.chapters.forEach((chapter, index) => {
-            const placeholder = this.createPlaceholder(chapter, index);
-            this.placeholders.set(chapter.id, placeholder);
-            this.container.appendChild(placeholder);
+                        if (comp.type === 'ammeter') {
+                            comp.reading = current;
+                        }
+                    }
+                });
+            });
         });
 
-        // Set up Intersection Observer
-        this.setupObserver();
+        // Update all component visuals
+        updateAllComponentVisuals();
 
-        // Render initial visible pages (first 5-7 pages)
-        const initialRenderCount = Math.min(5, this.chapters.length);
-        for (let i = 0; i < initialRenderCount; i++) {
-            this.renderPage(i);
+        // Update wire styles
+        updateWireStyles();
+    }
+
+    // Find loops starting from a given component using DFS
+    function findLoops(startId, adjacency) {
+        const loops = [];
+        const maxDepth = circuitComponents.length + 1;
+
+        function dfs(currentId, visited, path) {
+            if (path.length > maxDepth) return;
+
+            const neighbors = adjacency[currentId] || [];
+            for (const neighborId of neighbors) {
+                if (neighborId === startId && path.length >= 2) {
+                    // Found a loop back to start
+                    loops.push([...path]);
+                    return;
+                }
+                if (!visited.has(neighborId)) {
+                    visited.add(neighborId);
+                    path.push(neighborId);
+                    dfs(neighborId, visited, path);
+                    path.pop();
+                    visited.delete(neighborId);
+                }
+            }
+        }
+
+        const visited = new Set([startId]);
+        dfs(startId, visited, [startId]);
+
+        return loops;
+    }
+
+    // Update all component visuals after simulation
+    function updateAllComponentVisuals() {
+        circuitComponents.forEach(comp => {
+            const element = document.getElementById(comp.id);
+            if (element) {
+                // Save current position
+                const currentLeft = element.style.left;
+                const currentTop = element.style.top;
+
+                updateCircuitElementHTML(element, comp);
+
+                // Restore position (innerHTML replacement may not affect style, but be safe)
+                element.style.left = currentLeft;
+                element.style.top = currentTop;
+                element.dataset.type = comp.type;
+            }
+        });
+    }
+
+    // Update wire styles based on current flow
+    function updateWireStyles() {
+        circuitWires.forEach(wire => {
+            const path = document.getElementById(wire.id);
+            if (!path) return;
+
+            const comp1 = circuitComponents.find(c => c.id === wire.comp1);
+            const comp2 = circuitComponents.find(c => c.id === wire.comp2);
+
+            const hasCurrent = (comp1 && comp1.powered) || (comp2 && comp2.powered);
+            if (hasCurrent) {
+                path.classList.add('active');
+            } else {
+                path.classList.remove('active');
+            }
+        });
+    }
+
+    // Make circuit element draggable
+    function makeCircuitElementDraggable(element) {
+        let isDragging = false;
+        let startMouseX, startMouseY;
+        let startLeft, startTop;
+
+        element.addEventListener('mousedown', dragStart);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', dragEnd);
+
+        function dragStart(e) {
+            if (e.target.classList.contains('circuit-connection-point') ||
+                e.target.classList.contains('circuit-element-delete')) {
+                return;
+            }
+
+            if (e.target === element || element.contains(e.target)) {
+                isDragging = true;
+                startMouseX = e.clientX;
+                startMouseY = e.clientY;
+                startLeft = parseInt(element.style.left) || 0;
+                startTop = parseInt(element.style.top) || 0;
+                element.classList.add('selected');
+                e.preventDefault();
+            }
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+
+            const dx = e.clientX - startMouseX;
+            const dy = e.clientY - startMouseY;
+
+            element.style.left = (startLeft + dx) + 'px';
+            element.style.top = (startTop + dy) + 'px';
+
+            updateWires(element.id);
+        }
+
+        function dragEnd(e) {
+            if (isDragging) {
+                isDragging = false;
+
+                // Update component position in array
+                const comp = circuitComponents.find(c => c.id === element.id);
+                if (comp) {
+                    comp.x = parseInt(element.style.left) || 0;
+                    comp.y = parseInt(element.style.top) || 0;
+                }
+            }
         }
     }
 
-    createPlaceholder(chapter, index) {
-        const placeholder = document.createElement('div');
-        placeholder.className = 'page-placeholder';
-        placeholder.dataset.chapterId = chapter.id;
-        placeholder.dataset.index = index;
-        placeholder.style.minHeight = `${this.estimatedPageHeight}px`;
-        placeholder.style.background = 'transparent';
-        return placeholder;
+    // Start wire connection
+    window.startConnection = (event, componentId, point) => {
+        event.stopPropagation();
+
+        if (!connectionStart) {
+            connectionStart = { componentId, point };
+            showToast('Click another connection point to complete wire');
+        } else {
+            // Complete the connection
+            if (connectionStart.componentId !== componentId) {
+                createWire(connectionStart.componentId, connectionStart.point, componentId, point);
+                connectionStart = null;
+            } else {
+                showToast('Cannot connect component to itself');
+                connectionStart = null;
+            }
+        }
+    };
+
+    // Create wire between two components
+    function createWire(comp1Id, point1, comp2Id, point2) {
+        const svg = document.getElementById('circuitSvg');
+        if (!svg) return;
+
+        const comp1 = document.getElementById(comp1Id);
+        const comp2 = document.getElementById(comp2Id);
+
+        if (!comp1 || !comp2) return;
+
+        const wireId = `wire-${Date.now()}`;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'circuit-wire');
+        path.setAttribute('id', wireId);
+        path.setAttribute('data-comp1', comp1Id);
+        path.setAttribute('data-point1', point1);
+        path.setAttribute('data-comp2', comp2Id);
+        path.setAttribute('data-point2', point2);
+
+        updateWirePath(path, comp1, point1, comp2, point2);
+
+        path.addEventListener('click', () => {
+            if (confirm('Delete this wire?')) {
+                path.remove();
+                circuitWires = circuitWires.filter(w => w.id !== wireId);
+                simulateCircuit();
+            }
+        });
+
+        svg.appendChild(path);
+
+        circuitWires.push({
+            id: wireId,
+            comp1: comp1Id,
+            point1: point1,
+            comp2: comp2Id,
+            point2: point2
+        });
+
+        showToast('Wire connected');
+        simulateCircuit();
     }
 
-    setupObserver() {
-        const options = {
-            root: null, // Use viewport
-            rootMargin: `${this.estimatedPageHeight * this.bufferSize}px`, // Buffer zone
-            threshold: 0
+    // Update wire path
+    function updateWirePath(path, comp1, point1, comp2, point2) {
+        const svg = document.getElementById('circuitSvg');
+        const svgRect = svg.getBoundingClientRect();
+
+        const comp1Rect = comp1.getBoundingClientRect();
+        const comp2Rect = comp2.getBoundingClientRect();
+
+        const pos1 = getConnectionPointPosition(comp1Rect, point1, svgRect);
+        const pos2 = getConnectionPointPosition(comp2Rect, point2, svgRect);
+
+        const d = `M ${pos1.x} ${pos1.y} L ${pos2.x} ${pos2.y}`;
+        path.setAttribute('d', d);
+    }
+
+    // Get connection point position
+    function getConnectionPointPosition(compRect, point, svgRect) {
+        let x, y;
+
+        switch (point) {
+            case 'top':
+                x = compRect.left + compRect.width / 2 - svgRect.left;
+                y = compRect.top - svgRect.top;
+                break;
+            case 'bottom':
+                x = compRect.left + compRect.width / 2 - svgRect.left;
+                y = compRect.bottom - svgRect.top;
+                break;
+            case 'left':
+                x = compRect.left - svgRect.left;
+                y = compRect.top + compRect.height / 2 - svgRect.top;
+                break;
+            case 'right':
+                x = compRect.right - svgRect.left;
+                y = compRect.top + compRect.height / 2 - svgRect.top;
+                break;
+        }
+
+        return { x, y };
+    }
+
+    // Update all wires connected to a component
+    function updateWires(componentId) {
+        const svg = document.getElementById('circuitSvg');
+        if (!svg) return;
+
+        circuitWires.forEach(wire => {
+            if (wire.comp1 === componentId || wire.comp2 === componentId) {
+                const path = document.getElementById(wire.id);
+                const comp1 = document.getElementById(wire.comp1);
+                const comp2 = document.getElementById(wire.comp2);
+
+                if (path && comp1 && comp2) {
+                    updateWirePath(path, comp1, wire.point1, comp2, wire.point2);
+                }
+            }
+        });
+    }
+
+    // Delete circuit component
+    window.deleteCircuitComponent = (componentId) => {
+        const element = document.getElementById(componentId);
+        if (!element) return;
+
+        // Remove all wires connected to this component
+        const wiresToRemove = circuitWires.filter(w => w.comp1 === componentId || w.comp2 === componentId);
+        wiresToRemove.forEach(wire => {
+            const wirePath = document.getElementById(wire.id);
+            if (wirePath) wirePath.remove();
+        });
+
+        circuitWires = circuitWires.filter(w => w.comp1 !== componentId && w.comp2 !== componentId);
+        circuitComponents = circuitComponents.filter(c => c.id !== componentId);
+
+        element.remove();
+        showToast('Component deleted');
+        simulateCircuit();
+    };
+
+    // Create a new chapter/page (OPTIMIZED)
+    window.createNewChapter = async () => {
+        const newChapter = {
+            id: Date.now().toString(),
+            title: 'New Page',
+            content: '<p>Start typing...</p>',
+            tags: [],
+            metadata: {
+                discipline: 'general',
+                type: 'note',
+                createdAt: new Date().toISOString(),
+                lastEdited: new Date().toISOString()
+            },
+            lastEdited: new Date().toISOString(),
+            isWhiteboard: false,
+            sketchData: null
         };
 
-        this.observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                const index = parseInt(entry.target.dataset.index);
+        // Add to beginning of chapters array
+        chapters.unshift(newChapter);
+        currentId = newChapter.id;
 
-                if (entry.isIntersecting) {
-                    // Page placeholder is entering viewport - render it
-                    this.renderPage(index);
-                } else {
-                    // Page is far from viewport - can unrender to save memory
-                    // Only unrender if it's far enough (not just slightly out of view)
-                    const rect = entry.target.getBoundingClientRect();
-                    const viewportHeight = window.innerHeight;
-                    const distanceFromViewport = Math.min(
-                        Math.abs(rect.top),
-                        Math.abs(rect.bottom - viewportHeight)
-                    );
+        // Batch DOM updates for better performance
+        const stream = document.getElementById('sequentialStream');
+        const titleInput = document.getElementById('pageTitle');
 
-                    // Only unrender if more than 3 viewport heights away
-                    if (distanceFromViewport > viewportHeight * 3) {
-                        this.unrenderPage(index);
-                    }
-                }
-            });
-        }, options);
-
-        // Observe all placeholders
-        this.placeholders.forEach(placeholder => {
-            this.observer.observe(placeholder);
-        });
-    }
-
-    renderPage(index) {
-        const chapter = this.chapters[index];
-        if (!chapter || this.renderedPages.has(chapter.id)) return;
-
-        const placeholder = this.placeholders.get(chapter.id);
-        if (!placeholder) return;
-
-        // Create the actual page block
-        const block = this.createPageBlock(chapter, index);
-
-        // Replace placeholder with actual content
-        placeholder.replaceWith(block);
-        this.placeholders.set(chapter.id, block);
-        this.renderedPages.set(chapter.id, block);
-
-        // Continue observing the actual block
-        this.observer.observe(block);
-    }
-
-    unrenderPage(index) {
-        const chapter = this.chapters[index];
-        if (!chapter || !this.renderedPages.has(chapter.id)) return;
-
-        const renderedBlock = this.renderedPages.get(chapter.id);
-
-        // Create placeholder based on actual rendered height
-        const actualHeight = renderedBlock.offsetHeight;
-        const placeholder = this.createPlaceholder(chapter, index);
-        placeholder.style.minHeight = `${actualHeight}px`;
-
-        // Replace rendered content with placeholder
-        renderedBlock.replaceWith(placeholder);
-        this.placeholders.set(chapter.id, placeholder);
-        this.renderedPages.delete(chapter.id);
-
-        // Observe the placeholder again
-        this.observer.observe(placeholder);
-    }
-
-    createPageBlock(chapter, index) {
+        // Use DocumentFragment for efficient DOM manipulation
+        const fragment = document.createDocumentFragment();
         const block = document.createElement('div');
-        block.className = 'sequence-editor-block';
-        if (chapter.id === this.currentId) block.classList.add('active-focus');
-        block.id = `page-block-${chapter.id}`;
-        block.dataset.chapterId = chapter.id;
-        block.dataset.index = index;
+        block.className = 'sequence-editor-block active-focus';
+        block.id = `page-block-${newChapter.id}`;
 
-        // Add title section for subsequent pages (index > 0)
-        if (0 < index) {
-            const titleSection = document.createElement('div');
-            titleSection.className = 'paper-title';
-            titleSection.style.marginTop = '0';
-            titleSection.style.marginBottom = '0';
-            titleSection.style.borderBottom = '2px solid var(--accent-color)';
-            titleSection.style.borderRadius = '4px 4px 0 0';
-            titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
-
-            const titleInput = document.createElement('input');
-            titleInput.type = 'text';
-            titleInput.value = chapter.title || 'Untitled';
-            titleInput.className = 'page-title-input';
-            titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
-            titleInput.placeholder = "Page title...";
-
-            titleInput.oninput = () => {
-                chapter.title = titleInput.value;
-                chapter.lastEdited = new Date().toISOString();
-                markUnsaved();
-                saveChapterContent(chapter.id);
-            };
-
-            titleSection.appendChild(titleInput);
-            block.appendChild(titleSection);
-        }
-
-        // Add content area
         const contentArea = document.createElement('div');
         contentArea.className = 'content-area';
         contentArea.contentEditable = 'true';
-        contentArea.innerHTML = chapter.content || '&lt;p&gt;Start typing...&lt;/p&gt;';
-        contentArea.dataset.chapterId = chapter.id;
-
-        if (index > 0) {
-            contentArea.style.paddingTop = '1rem';
-        }
-
+        contentArea.innerHTML = newChapter.content;
         contentArea.oninput = () => {
             markUnsaved();
-            saveChapterContent(chapter.id);
+            saveCurrentToCloud();
         };
 
-        // Enable auto-checkbox functionality
-        setupAutoCheckbox(contentArea);
-
         block.appendChild(contentArea);
-        return block;
-    }
+        fragment.appendChild(block);
 
-    destroy() {
-        if (this.observer) {
-            this.observer.disconnect();
+        // Single DOM update
+        stream.innerHTML = '';
+        stream.appendChild(fragment);
+        titleInput.value = newChapter.title;
+
+        // Focus immediately for better UX
+        contentArea.focus();
+
+        // Defer non-critical operations
+        requestAnimationFrame(() => {
+            renderSidebar();
+            updateToolVisibility(newChapter);
+        });
+
+        // Save to IndexedDB asynchronously (don't block UI)
+        saveChapterToDB(newChapter).catch(err => console.error('Save failed:', err));
+
+        showToast('✓ New page created');
+    };
+
+    // Add a new page to the stream with the same tag (MULTI-PAGE STREAM)
+    window.addPageToStream = async () => {
+        const currentChapter = chapters.find(c => c.id === currentId);
+        if (!currentChapter) return;
+
+        // Create new page with same tag as current page
+        const newChapter = {
+            id: Date.now().toString(),
+            title: 'New Page',
+            content: '<p>Start typing...</p>',
+            tags: currentChapter.tags ? [...currentChapter.tags] : [], // Inherit tags
+            metadata: {
+                discipline: currentChapter.metadata?.discipline || 'general',
+                type: currentChapter.metadata?.type || 'note',
+                createdAt: new Date().toISOString(),
+                lastEdited: new Date().toISOString()
+            },
+            lastEdited: new Date().toISOString(),
+            isWhiteboard: false,
+            sketchData: null
+        };
+
+        // Add to chapters array
+        chapters.push(newChapter);
+
+        // Save to IndexedDB asynchronously
+        saveChapterToDB(newChapter).catch(err => console.error('Save failed:', err));
+
+        // Reload the stream to show all pages with the same tag
+        loadStreamByTag(currentChapter.tags && currentChapter.tags.length > 0 ? currentChapter.tags[0] : null);
+
+        // Update sidebar
+        requestAnimationFrame(() => renderSidebar());
+
+        showToast('✓ Page added to stream');
+    };
+
+    // ===== VIRTUAL SCROLLING MANAGER =====
+    // Manages efficient rendering of large page streams by only rendering visible pages
+    class VirtualScrollManager {
+        constructor(container, chapters, currentId) {
+            this.container = container;
+            this.chapters = chapters;
+            this.currentId = currentId;
+            this.renderedPages = new Map();
+            this.placeholders = new Map();
             this.observer = null;
+            this.bufferSize = 3; // Number of pages to render before/after viewport
+            this.estimatedPageHeight = 800; // Estimated height per page in pixels
         }
-        this.renderedPages.clear();
-        this.placeholders.clear();
-    }
-}
 
-// Store current virtual scroll manager instance
-let currentVirtualScrollManager = null;
+        init() {
+            // Clear container
+            this.container.innerHTML = '';
 
-// ===== PAGE DETAILS GESTURE =====
-// Ctrl+Click (desktop) or 2-second long-press (touch/iPad) opens the Page Details modal.
-class PageDetailsGesture {
-    constructor() {
-        this.isEnabled = true;
-        this.longPressTimer = null;
-        this.touchMoved = false;
-    }
+            // Create placeholders for all pages
+            this.chapters.forEach((chapter, index) => {
+                const placeholder = this.createPlaceholder(chapter, index);
+                this.placeholders.set(chapter.id, placeholder);
+                this.container.appendChild(placeholder);
+            });
 
-    initialize() {
-        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        if (isTouch) {
-            document.addEventListener('touchstart', (e) => this._onTouchStart(e), { passive: false });
-            document.addEventListener('touchmove', () => this._onTouchMove(), { passive: false });
-            document.addEventListener('touchend', () => this._onTouchEnd());
-            document.addEventListener('touchcancel', () => this._onTouchEnd());
-        } else {
-            document.addEventListener('click', (e) => this._onCtrlClick(e));
-        }
-        console.log('✅ PageDetailsGesture initialized (' + (isTouch ? 'long-press 2s' : 'Ctrl+Click') + ')');
-    }
+            // Set up Intersection Observer
+            this.setupObserver();
 
-    _onTouchStart(e) {
-        if (!this.isEnabled) return;
-        if (e.target.closest('button, input, select, textarea, .sidebar, .tool-tray')) return;
-        this.touchMoved = false;
-        this.longPressTimer = setTimeout(() => {
-            if (!this.touchMoved) {
-                this._open();
-                if (navigator.vibrate) navigator.vibrate(50);
-                e.preventDefault();
+            // Render initial visible pages (first 5-7 pages)
+            const initialRenderCount = Math.min(5, this.chapters.length);
+            for (let i = 0; i < initialRenderCount; i++) {
+                this.renderPage(i);
             }
-        }, 2000);
-    }
-
-    _onTouchMove() {
-        this.touchMoved = true;
-        if (this.longPressTimer) { clearTimeout(this.longPressTimer); this.longPressTimer = null; }
-    }
-
-    _onTouchEnd() {
-        if (this.longPressTimer) { clearTimeout(this.longPressTimer); this.longPressTimer = null; }
-    }
-
-    _onCtrlClick(e) {
-        if (!this.isEnabled) return;
-        if (!e.ctrlKey && !e.metaKey) return;   // Ctrl on Windows/Linux, Cmd on Mac
-        if (e.button !== 0) return;              // left-click only
-        if (e.target.closest('button, input, select, textarea, .sidebar, .tool-tray, a')) return;
-        e.preventDefault();
-        this._open();
-    }
-
-    _open() {
-        if (typeof openMetadataModal === 'function') {
-            openMetadataModal();
-        } else {
-            const btn = Array.from(document.querySelectorAll('.btn, .btn-secondary'))
-                .find(b => b.textContent && b.textContent.includes('Page Details'));
-            if (btn) btn.click();
-            else console.warn('PageDetailsGesture: openMetadataModal not found');
         }
-    }
 
-    destroy() { }
-}
+        createPlaceholder(chapter, index) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'page-placeholder';
+            placeholder.dataset.chapterId = chapter.id;
+            placeholder.dataset.index = index;
+            placeholder.style.minHeight = `${this.estimatedPageHeight}px`;
+            placeholder.style.background = 'transparent';
+            return placeholder;
+        }
 
+        setupObserver() {
+            const options = {
+                root: null, // Use viewport
+                rootMargin: `${this.estimatedPageHeight * this.bufferSize}px`, // Buffer zone
+                threshold: 0
+            };
 
-// Load all pages with the same tag into the stream (MULTI-PAGE VIEW)
-window.loadStreamByTag = (tag) => {
-    const stream = document.getElementById('sequentialStream');
-    const titleInput = document.getElementById('pageTitle');
+            this.observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const index = parseInt(entry.target.dataset.index);
 
-    // Find all chapters with this tag
-    const taggedChapters = tag
-        ? chapters.filter(ch => ch.tags && ch.tags.includes(tag))
-        : [chapters.find(c => c.id === currentId)];
+                    if (entry.isIntersecting) {
+                        // Page placeholder is entering viewport - render it
+                        this.renderPage(index);
+                    } else {
+                        // Page is far from viewport - can unrender to save memory
+                        // Only unrender if it's far enough (not just slightly out of view)
+                        const rect = entry.target.getBoundingClientRect();
+                        const viewportHeight = window.innerHeight;
+                        const distanceFromViewport = Math.min(
+                            Math.abs(rect.top),
+                            Math.abs(rect.bottom - viewportHeight)
+                        );
 
-    if (taggedChapters.length === 0) return;
+                        // Only unrender if more than 3 viewport heights away
+                        if (distanceFromViewport > viewportHeight * 3) {
+                            this.unrenderPage(index);
+                        }
+                    }
+                });
+            }, options);
 
-    // Destroy previous virtual scroll manager if it exists
-    if (currentVirtualScrollManager) {
-        currentVirtualScrollManager.destroy();
-    }
+            // Observe all placeholders
+            this.placeholders.forEach(placeholder => {
+                this.observer.observe(placeholder);
+            });
+        }
 
-    // Use Virtual Scrolling for performance with large page sets
-    if (taggedChapters.length > 10) {
-        // Enable virtual scrolling for streams with more than 10 pages
-        currentVirtualScrollManager = new VirtualScrollManager(stream, taggedChapters, currentId);
-        currentVirtualScrollManager.init();
-    } else {
-        // For small page sets, render normally (no virtual scrolling overhead)
-        currentVirtualScrollManager = null;
+        renderPage(index) {
+            const chapter = this.chapters[index];
+            if (!chapter || this.renderedPages.has(chapter.id)) return;
 
-        // Use DocumentFragment for efficient rendering
-        const fragment = document.createDocumentFragment();
+            const placeholder = this.placeholders.get(chapter.id);
+            if (!placeholder) return;
 
-        taggedChapters.forEach((chapter, index) => {
-            // Create page block
+            // Create the actual page block
+            const block = this.createPageBlock(chapter, index);
+
+            // Replace placeholder with actual content
+            placeholder.replaceWith(block);
+            this.placeholders.set(chapter.id, block);
+            this.renderedPages.set(chapter.id, block);
+
+            // Continue observing the actual block
+            this.observer.observe(block);
+        }
+
+        unrenderPage(index) {
+            const chapter = this.chapters[index];
+            if (!chapter || !this.renderedPages.has(chapter.id)) return;
+
+            const renderedBlock = this.renderedPages.get(chapter.id);
+
+            // Create placeholder based on actual rendered height
+            const actualHeight = renderedBlock.offsetHeight;
+            const placeholder = this.createPlaceholder(chapter, index);
+            placeholder.style.minHeight = `${actualHeight}px`;
+
+            // Replace rendered content with placeholder
+            renderedBlock.replaceWith(placeholder);
+            this.placeholders.set(chapter.id, placeholder);
+            this.renderedPages.delete(chapter.id);
+
+            // Observe the placeholder again
+            this.observer.observe(placeholder);
+        }
+
+        createPageBlock(chapter, index) {
             const block = document.createElement('div');
             block.className = 'sequence-editor-block';
-            if (chapter.id === currentId) block.classList.add('active-focus');
+            if (chapter.id === this.currentId) block.classList.add('active-focus');
             block.id = `page-block-${chapter.id}`;
+            block.dataset.chapterId = chapter.id;
+            block.dataset.index = index;
 
             // Add title section for subsequent pages (index > 0)
             if (0 < index) {
                 const titleSection = document.createElement('div');
-                titleSection.className = 'paper-title'; // Re-use main title class
+                titleSection.className = 'paper-title';
                 titleSection.style.marginTop = '0';
                 titleSection.style.marginBottom = '0';
                 titleSection.style.borderBottom = '2px solid var(--accent-color)';
@@ -10041,11 +9885,10 @@ window.loadStreamByTag = (tag) => {
             const contentArea = document.createElement('div');
             contentArea.className = 'content-area';
             contentArea.contentEditable = 'true';
-            contentArea.innerHTML = chapter.content || '<p>Start typing...</p>';
+            contentArea.innerHTML = chapter.content || '&lt;p&gt;Start typing...&lt;/p&gt;';
             contentArea.dataset.chapterId = chapter.id;
-            // Padding uses CSS default (3rem) now that title is gone
 
-            if (0 < index) {
+            if (index > 0) {
                 contentArea.style.paddingTop = '1rem';
             }
 
@@ -10058,574 +9901,743 @@ window.loadStreamByTag = (tag) => {
             setupAutoCheckbox(contentArea);
 
             block.appendChild(contentArea);
-            fragment.appendChild(block);
+            return block;
+        }
+
+        destroy() {
+            if (this.observer) {
+                this.observer.disconnect();
+                this.observer = null;
+            }
+            this.renderedPages.clear();
+            this.placeholders.clear();
+        }
+    }
+
+    // Store current virtual scroll manager instance
+    let currentVirtualScrollManager = null;
+
+    // ===== PAGE DETAILS GESTURE =====
+    // Ctrl+Click (desktop) or 2-second long-press (touch/iPad) opens the Page Details modal.
+    class PageDetailsGesture {
+        constructor() {
+            this.isEnabled = true;
+            this.longPressTimer = null;
+            this.touchMoved = false;
+        }
+
+        initialize() {
+            const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            if (isTouch) {
+                document.addEventListener('touchstart', (e) => this._onTouchStart(e), { passive: false });
+                document.addEventListener('touchmove', () => this._onTouchMove(), { passive: false });
+                document.addEventListener('touchend', () => this._onTouchEnd());
+                document.addEventListener('touchcancel', () => this._onTouchEnd());
+            } else {
+                document.addEventListener('click', (e) => this._onCtrlClick(e));
+            }
+            console.log('✅ PageDetailsGesture initialized (' + (isTouch ? 'long-press 2s' : 'Ctrl+Click') + ')');
+        }
+
+        _onTouchStart(e) {
+            if (!this.isEnabled) return;
+            if (e.target.closest('button, input, select, textarea, .sidebar, .tool-tray')) return;
+            this.touchMoved = false;
+            this.longPressTimer = setTimeout(() => {
+                if (!this.touchMoved) {
+                    this._open();
+                    if (navigator.vibrate) navigator.vibrate(50);
+                    e.preventDefault();
+                }
+            }, 2000);
+        }
+
+        _onTouchMove() {
+            this.touchMoved = true;
+            if (this.longPressTimer) { clearTimeout(this.longPressTimer); this.longPressTimer = null; }
+        }
+
+        _onTouchEnd() {
+            if (this.longPressTimer) { clearTimeout(this.longPressTimer); this.longPressTimer = null; }
+        }
+
+        _onCtrlClick(e) {
+            if (!this.isEnabled) return;
+            if (!e.ctrlKey && !e.metaKey) return;   // Ctrl on Windows/Linux, Cmd on Mac
+            if (e.button !== 0) return;              // left-click only
+            if (e.target.closest('button, input, select, textarea, .sidebar, .tool-tray, a')) return;
+            e.preventDefault();
+            this._open();
+        }
+
+        _open() {
+            if (typeof openMetadataModal === 'function') {
+                openMetadataModal();
+            } else {
+                const btn = Array.from(document.querySelectorAll('.btn, .btn-secondary'))
+                    .find(b => b.textContent && b.textContent.includes('Page Details'));
+                if (btn) btn.click();
+                else console.warn('PageDetailsGesture: openMetadataModal not found');
+            }
+        }
+
+        destroy() { }
+    }
+
+
+    // Load all pages with the same tag into the stream (MULTI-PAGE VIEW)
+    window.loadStreamByTag = (tag) => {
+        const stream = document.getElementById('sequentialStream');
+        const titleInput = document.getElementById('pageTitle');
+
+        // Find all chapters with this tag
+        const taggedChapters = tag
+            ? chapters.filter(ch => ch.tags && ch.tags.includes(tag))
+            : [chapters.find(c => c.id === currentId)];
+
+        if (taggedChapters.length === 0) return;
+
+        // Destroy previous virtual scroll manager if it exists
+        if (currentVirtualScrollManager) {
+            currentVirtualScrollManager.destroy();
+        }
+
+        // Use Virtual Scrolling for performance with large page sets
+        if (taggedChapters.length > 10) {
+            // Enable virtual scrolling for streams with more than 10 pages
+            currentVirtualScrollManager = new VirtualScrollManager(stream, taggedChapters, currentId);
+            currentVirtualScrollManager.init();
+        } else {
+            // For small page sets, render normally (no virtual scrolling overhead)
+            currentVirtualScrollManager = null;
+
+            // Use DocumentFragment for efficient rendering
+            const fragment = document.createDocumentFragment();
+
+            taggedChapters.forEach((chapter, index) => {
+                // Create page block
+                const block = document.createElement('div');
+                block.className = 'sequence-editor-block';
+                if (chapter.id === currentId) block.classList.add('active-focus');
+                block.id = `page-block-${chapter.id}`;
+
+                // Add title section for subsequent pages (index > 0)
+                if (0 < index) {
+                    const titleSection = document.createElement('div');
+                    titleSection.className = 'paper-title'; // Re-use main title class
+                    titleSection.style.marginTop = '0';
+                    titleSection.style.marginBottom = '0';
+                    titleSection.style.borderBottom = '2px solid var(--accent-color)';
+                    titleSection.style.borderRadius = '4px 4px 0 0';
+                    titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
+
+                    const titleInput = document.createElement('input');
+                    titleInput.type = 'text';
+                    titleInput.value = chapter.title || 'Untitled';
+                    titleInput.className = 'page-title-input';
+                    titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
+                    titleInput.placeholder = "Page title...";
+
+                    titleInput.oninput = () => {
+                        chapter.title = titleInput.value;
+                        chapter.lastEdited = new Date().toISOString();
+                        markUnsaved();
+                        saveChapterContent(chapter.id);
+                    };
+
+                    titleSection.appendChild(titleInput);
+                    block.appendChild(titleSection);
+                }
+
+                // Add content area
+                const contentArea = document.createElement('div');
+                contentArea.className = 'content-area';
+                contentArea.contentEditable = 'true';
+                contentArea.innerHTML = chapter.content || '<p>Start typing...</p>';
+                contentArea.dataset.chapterId = chapter.id;
+                // Padding uses CSS default (3rem) now that title is gone
+
+                if (0 < index) {
+                    contentArea.style.paddingTop = '1rem';
+                }
+
+                contentArea.oninput = () => {
+                    markUnsaved();
+                    saveChapterContent(chapter.id);
+                };
+
+                // Enable auto-checkbox functionality
+                setupAutoCheckbox(contentArea);
+
+                block.appendChild(contentArea);
+                fragment.appendChild(block);
+            });
+
+            // Update DOM
+            stream.innerHTML = '';
+            stream.appendChild(fragment);
+        }
+        titleInput.value = taggedChapters[0].title || 'Untitled';
+
+        // Update current ID to first chapter in stream
+        if (taggedChapters.length > 0) {
+            currentId = taggedChapters[0].id;
+        }
+    };
+
+    // Save specific chapter content
+    function saveChapterContent(chapterId) {
+        const chapter = chapters.find(c => c.id === chapterId);
+        if (!chapter) return;
+
+        const contentArea = document.querySelector(`[data-chapter-id="${chapterId}"]`);
+        if (contentArea) {
+            chapter.content = contentArea.innerHTML;
+            chapter.lastEdited = new Date().toISOString();
+
+            // Debounced save to IndexedDB
+            clearTimeout(window.saveTimeout);
+            window.saveTimeout = setTimeout(() => {
+                saveChapterToDB(chapter).catch(err => console.error('Save failed:', err));
+            }, 1000);
+        }
+    }
+
+
+    // Render tags in sidebar
+    function renderTagCloud() {
+        const tagCloud = document.getElementById('tagCloud');
+        if (!tagCloud) return;
+
+        const tagCounts = {};
+        chapters.forEach(chapter => {
+            if (chapter.tags && Array.isArray(chapter.tags)) {
+                chapter.tags.forEach(tag => {
+                    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                });
+            }
         });
 
-        // Update DOM
-        stream.innerHTML = '';
-        stream.appendChild(fragment);
-    }
-    titleInput.value = taggedChapters[0].title || 'Untitled';
+        const sortedTags = Object.keys(tagCounts).sort();
 
-    // Update current ID to first chapter in stream
-    if (taggedChapters.length > 0) {
-        currentId = taggedChapters[0].id;
-    }
-};
-
-// Save specific chapter content
-function saveChapterContent(chapterId) {
-    const chapter = chapters.find(c => c.id === chapterId);
-    if (!chapter) return;
-
-    const contentArea = document.querySelector(`[data-chapter-id="${chapterId}"]`);
-    if (contentArea) {
-        chapter.content = contentArea.innerHTML;
-        chapter.lastEdited = new Date().toISOString();
-
-        // Debounced save to IndexedDB
-        clearTimeout(window.saveTimeout);
-        window.saveTimeout = setTimeout(() => {
-            saveChapterToDB(chapter).catch(err => console.error('Save failed:', err));
-        }, 1000);
-    }
-}
-
-
-// Render tags in sidebar
-function renderTagCloud() {
-    const tagCloud = document.getElementById('tagCloud');
-    if (!tagCloud) return;
-
-    const tagCounts = {};
-    chapters.forEach(chapter => {
-        if (chapter.tags && Array.isArray(chapter.tags)) {
-            chapter.tags.forEach(tag => {
-                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-            });
+        if (sortedTags.length === 0) {
+            tagCloud.innerHTML = '<div style="opacity:0.5; padding:10px; text-align:center;">No tags yet</div>';
+            return;
         }
-    });
 
-    const sortedTags = Object.keys(tagCounts).sort();
-
-    if (sortedTags.length === 0) {
-        tagCloud.innerHTML = '<div style="opacity:0.5; padding:10px; text-align:center;">No tags yet</div>';
-        return;
-    }
-
-    tagCloud.innerHTML = sortedTags.map(tag => {
-        const count = tagCounts[tag];
-        return `
+        tagCloud.innerHTML = sortedTags.map(tag => {
+            const count = tagCounts[tag];
+            return `
                     <button class="tag-chip" onclick="loadStreamByTag('${tag.replace(/'/g, "\\'")}')" 
                             style="margin:3px; cursor:pointer;" 
                             title="${count} page${count > 1 ? 's' : ''}">
                         ${tag} <span style="opacity:0.7; font-size:0.85em;">(${count})</span>
                     </button>
                 `;
-    }).join('');
-}
+        }).join('');
+    }
 
-// Render the sidebar chapter list
-window.renderSidebar = () => {
-    const list = document.getElementById('chapterList');
-    if (!list) return;
+    // Render the sidebar chapter list
+    window.renderSidebar = () => {
+        const list = document.getElementById('chapterList');
+        if (!list) return;
 
-    const searchStr = (document.getElementById('sidebarSearch')?.value || '').toLowerCase();
-    const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
+        const searchStr = (document.getElementById('sidebarSearch')?.value || '').toLowerCase();
+        const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
 
-    list.innerHTML = '';
+        list.innerHTML = '';
 
-    // Filter chapters
-    const filtered = chapters.filter(ch => {
-        const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
-        const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
-        const matchesSearch = titleMatch || tagMatch;
+        // Filter chapters
+        const filtered = chapters.filter(ch => {
+            const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
+            const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
+            const matchesSearch = titleMatch || tagMatch;
 
-        if (!matchesSearch) return false;
+            if (!matchesSearch) return false;
 
-        if (categoryFilter === 'all') return true;
+            if (categoryFilter === 'all') return true;
 
-        const disc = ch.metadata?.discipline;
-        const branch = ch.metadata?.branch;
+            const disc = ch.metadata?.discipline;
+            const branch = ch.metadata?.branch;
 
-        // Match category filter
-        if (categoryFilter === 'General' && disc === 'general') return true;
-        if (categoryFilter === 'Projects' && ch.metadata?.type === 'project') return true;
-        if (categoryFilter === 'Algorithms' && disc === 'cs') return true;
-        if (categoryFilter === 'Systems' && disc === 'cs') return true;
-        if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter) && disc === 'medical') return true;
-        if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter) && disc === 'medical') return true;
-        if (['Electrical', 'Mechanical', 'Civil', 'Electronics', 'Mechatronics', 'Industrial'].includes(categoryFilter)) {
-            return disc === 'engineering' && (branch === categoryFilter || categoryFilter.includes(branch));
-        }
-
-        return false;
-    });
-
-    // Group chapters by their first tag (for better organization)
-    const grouped = {};
-    const untagged = [];
-
-    filtered.forEach(ch => {
-        if (ch.tags && ch.tags.length > 0) {
-            const primaryTag = ch.tags[0];
-            if (!grouped[primaryTag]) {
-                grouped[primaryTag] = [];
+            // Match category filter
+            if (categoryFilter === 'General' && disc === 'general') return true;
+            if (categoryFilter === 'Projects' && ch.metadata?.type === 'project') return true;
+            if (categoryFilter === 'Algorithms' && disc === 'cs') return true;
+            if (categoryFilter === 'Systems' && disc === 'cs') return true;
+            if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter) && disc === 'medical') return true;
+            if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter) && disc === 'medical') return true;
+            if (['Electrical', 'Mechanical', 'Civil', 'Electronics', 'Mechatronics', 'Industrial'].includes(categoryFilter)) {
+                return disc === 'engineering' && (branch === categoryFilter || categoryFilter.includes(branch));
             }
-            grouped[primaryTag].push(ch);
-        } else {
-            untagged.push(ch);
-        }
-    });
 
-    // Render grouped chapters (by tag) with visual separation
-    const sortedTags = Object.keys(grouped).sort();
-    sortedTags.forEach((tag, index) => {
-        // Add visual separator between tag groups (except before first group)
-        if (index > 0) {
+            return false;
+        });
+
+        // Group chapters by their first tag (for better organization)
+        const grouped = {};
+        const untagged = [];
+
+        filtered.forEach(ch => {
+            if (ch.tags && ch.tags.length > 0) {
+                const primaryTag = ch.tags[0];
+                if (!grouped[primaryTag]) {
+                    grouped[primaryTag] = [];
+                }
+                grouped[primaryTag].push(ch);
+            } else {
+                untagged.push(ch);
+            }
+        });
+
+        // Render grouped chapters (by tag) with visual separation
+        const sortedTags = Object.keys(grouped).sort();
+        sortedTags.forEach((tag, index) => {
+            // Add visual separator between tag groups (except before first group)
+            if (index > 0) {
+                const separator = document.createElement('li');
+                separator.style.cssText = 'height: 15px; list-style: none; pointer-events: none;';
+                list.appendChild(separator);
+            }
+
+            grouped[tag].forEach(ch => {
+                renderChapterItem(ch, list);
+            });
+        });
+
+        // Add separator before untagged if there are tagged items
+        if (sortedTags.length > 0 && untagged.length > 0) {
             const separator = document.createElement('li');
             separator.style.cssText = 'height: 15px; list-style: none; pointer-events: none;';
             list.appendChild(separator);
         }
 
-        grouped[tag].forEach(ch => {
+        // Render untagged chapters at the end
+        untagged.forEach(ch => {
             renderChapterItem(ch, list);
         });
-    });
 
-    // Add separator before untagged if there are tagged items
-    if (sortedTags.length > 0 && untagged.length > 0) {
-        const separator = document.createElement('li');
-        separator.style.cssText = 'height: 15px; list-style: none; pointer-events: none;';
-        list.appendChild(separator);
-    }
+        if (filtered.length === 0) {
+            list.innerHTML = '<li style="opacity: 0.5; text-align: center; padding: 20px;">No pages found</li>';
+        }
 
-    // Render untagged chapters at the end
-    untagged.forEach(ch => {
-        renderChapterItem(ch, list);
-    });
-
-    if (filtered.length === 0) {
-        list.innerHTML = '<li style="opacity: 0.5; text-align: center; padding: 20px;">No pages found</li>';
-    }
-
-    // Update tag cloud
-    renderTagCloud();
-};
-
-// Helper function to render a single chapter item
-function renderChapterItem(ch, list) {
-    const li = document.createElement('li');
-    li.className = 'chapter-item';
-    if (ch.id === currentId) li.classList.add('active');
-
-    // Create content wrapper
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'chapter-item-content';
-    contentDiv.onclick = () => loadChapter(ch.id);
-
-    // Title
-    const titleDiv = document.createElement('div');
-    titleDiv.className = 'chapter-item-title';
-    titleDiv.textContent = ch.title || 'Untitled';
-    contentDiv.appendChild(titleDiv);
-
-    // Add tags if present
-    if (ch.tags && ch.tags.length > 0) {
-        const tagsDiv = document.createElement('div');
-        tagsDiv.className = 'chapter-tags';
-        tagsDiv.textContent = ch.tags.map(t => `#${t}`).join(' ');
-        contentDiv.appendChild(tagsDiv);
-    }
-
-    li.appendChild(contentDiv);
-
-    // Share button (publish to library)
-    const shareBtn = document.createElement('button');
-    shareBtn.className = 'chapter-share-btn';
-    shareBtn.innerHTML = '📤';
-    shareBtn.title = window.LIBRARY && window.LIBRARY.isPublished(ch.id)
-        ? 'Published — click to unpublish'
-        : 'Share to library';
-    if (window.LIBRARY && window.LIBRARY.isPublished(ch.id)) {
-        shareBtn.classList.add('published');
-    }
-    shareBtn.onclick = (e) => {
-        e.stopPropagation();
-        publishToLibrary(ch.id);
+        // Update tag cloud
+        renderTagCloud();
     };
-    li.appendChild(shareBtn);
 
-    // View Styled button
-    const hasOriginalHtml = ch.metadata && ch.metadata.originalHtml;
-    const isLibraryCloneWithOriginal = ch.isLibraryClone && ch._sourceLibraryEntry && (ch._sourceLibraryEntry.metadata?.originalHtml || ch._sourceLibraryEntry.frontEndData?.metadata?.originalHtml);
+    // Helper function to render a single chapter item
+    function renderChapterItem(ch, list) {
+        const li = document.createElement('li');
+        li.className = 'chapter-item';
+        if (ch.id === currentId) li.classList.add('active');
 
-    if (hasOriginalHtml || isLibraryCloneWithOriginal) {
-        const styledBtn = document.createElement('button');
-        styledBtn.className = 'chapter-styled-btn';
-        styledBtn.innerHTML = '🎨';
-        styledBtn.title = 'View original HTML style';
-        styledBtn.onclick = (e) => {
+        // Create content wrapper
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'chapter-item-content';
+        contentDiv.onclick = () => loadChapter(ch.id);
+
+        // Title
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'chapter-item-title';
+        titleDiv.textContent = ch.title || 'Untitled';
+        contentDiv.appendChild(titleDiv);
+
+        // Add tags if present
+        if (ch.tags && ch.tags.length > 0) {
+            const tagsDiv = document.createElement('div');
+            tagsDiv.className = 'chapter-tags';
+            tagsDiv.textContent = ch.tags.map(t => `#${t}`).join(' ');
+            contentDiv.appendChild(tagsDiv);
+        }
+
+        li.appendChild(contentDiv);
+
+        // Share button (publish to library)
+        const shareBtn = document.createElement('button');
+        shareBtn.className = 'chapter-share-btn';
+        shareBtn.innerHTML = '📤';
+        shareBtn.title = window.LIBRARY && window.LIBRARY.isPublished(ch.id)
+            ? 'Published — click to unpublish'
+            : 'Share to library';
+        if (window.LIBRARY && window.LIBRARY.isPublished(ch.id)) {
+            shareBtn.classList.add('published');
+        }
+        shareBtn.onclick = (e) => {
             e.stopPropagation();
-            if (hasOriginalHtml) {
-                const w = window.open('', '_blank');
-                w.document.write(ch.metadata.originalHtml);
-                w.document.close();
-            } else if (window.LIBRARY && typeof window.LIBRARY.openStyledTab === 'function') {
-                window.LIBRARY.openStyledTab(ch._sourceLibraryEntry);
-            }
+            publishToLibrary(ch.id);
         };
-        li.appendChild(styledBtn);
+        li.appendChild(shareBtn);
+
+        // View Styled button
+        const hasOriginalHtml = ch.metadata && ch.metadata.originalHtml;
+        const isLibraryCloneWithOriginal = ch.isLibraryClone && ch._sourceLibraryEntry && (ch._sourceLibraryEntry.metadata?.originalHtml || ch._sourceLibraryEntry.frontEndData?.metadata?.originalHtml);
+
+        if (hasOriginalHtml || isLibraryCloneWithOriginal) {
+            const styledBtn = document.createElement('button');
+            styledBtn.className = 'chapter-styled-btn';
+            styledBtn.innerHTML = '🎨';
+            styledBtn.title = 'View original HTML style';
+            styledBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (hasOriginalHtml) {
+                    const w = window.open('', '_blank');
+                    w.document.write(ch.metadata.originalHtml);
+                    w.document.close();
+                } else if (window.LIBRARY && typeof window.LIBRARY.openStyledTab === 'function') {
+                    window.LIBRARY.openStyledTab(ch._sourceLibraryEntry);
+                }
+            };
+            li.appendChild(styledBtn);
+        }
+
+        // Delete button with trash icon
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'chapter-delete-btn';
+        deleteBtn.innerHTML = '🗑️';
+        deleteBtn.title = 'Delete page';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteChapter(ch.id);
+        };
+
+        li.appendChild(deleteBtn);
+        list.appendChild(li);
     }
 
-    // Delete button with trash icon
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'chapter-delete-btn';
-    deleteBtn.innerHTML = '🗑️';
-    deleteBtn.title = 'Delete page';
-    deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        deleteChapter(ch.id);
+    // ─── PUBLISH TO SHARED LIBRARY ───────────────────────────────────────────────
+
+    window.publishToLibrary = async function (chapterId) {
+        if (!window.LIBRARY || !window.api || !window.api.auth.isLoggedIn()) {
+            showToast('Library not available or not logged in');
+            return;
+        }
+
+        const chapter = chapters.find(c => c.id === chapterId);
+        if (!chapter) { showToast('Note not found'); return; }
+
+        const user = window.api.auth.getCurrentUser();
+
+        // If already published → offer to unpublish
+        if (window.LIBRARY.isPublished(chapterId)) {
+            const entry = await window.LIBRARY.getByChapterId(chapterId);
+            if (entry) {
+                if (!confirm(`"${chapter.title}" is already in the library.\n\nRemove it from the library?`)) return;
+                const result = await window.LIBRARY.deleteEntry(entry.id, user._id, chapterId);
+                if (result.ok) {
+                    showToast('📤 Removed from library');
+                    renderSidebar(); // refresh share button state
+                } else {
+                    showToast('❌ ' + result.error);
+                }
+            }
+            return;
+        }
+
+        // Make sure there's something worth sharing
+        const raw = (chapter.content || '').replace(/<[^>]+>/g, '').trim();
+        if (!chapter.title || chapter.title === 'Untitled Page') {
+            showToast('❌ Add a title to this note before sharing');
+            return;
+        }
+        if (raw.length < 10) {
+            showToast('❌ Note is too short to share');
+            return;
+        }
+
+        // ── Capture multi-page stream sections ───────────────────────────────────
+        // When the stream has more than one page loaded (e.g. all pages sharing the
+        // same tag), we capture each page as a section so the library can render
+        // it in the cheat-sheet format.  The original chapter.content is NOT
+        // modified — sections are a read-only snapshot stored alongside the entry.
+        let sections = null;
+        const streamBlocks = document.querySelectorAll('#sequentialStream .sequence-editor-block');
+
+        if (streamBlocks.length > 1) {
+            sections = [];
+            streamBlocks.forEach((block, idx) => {
+                // Title: first block uses the main chapter title; subsequent blocks
+                // have a `.continuation-break` sibling immediately before them whose
+                // `.continuation-label` holds the page title.
+                let sectionTitle = chapter.title;
+                const prevSibling = block.previousElementSibling;
+                if (prevSibling && prevSibling.classList.contains('continuation-break')) {
+                    const label = prevSibling.querySelector('.continuation-label');
+                    sectionTitle = label ? label.textContent.trim() : `Page ${idx + 1}`;
+                }
+
+                // Raw content from the editable area (not live editor bindings)
+                const contentArea = block.querySelector('.content-area');
+                const sectionContent = contentArea ? contentArea.innerHTML : '';
+
+                // Tags: match the block's page-block-{id} to the chapters array
+                const blockId = block.id.replace('page-block-', '');
+                const matchChapter = chapters.find(c => c.id === blockId);
+                const sectionTags = matchChapter ? (matchChapter.tags || []) : [];
+
+                sections.push({
+                    title: sectionTitle,
+                    content: sectionContent,
+                    tags: sectionTags,
+                });
+            });
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
+        const result = await window.LIBRARY.publish({ ...chapter, sections }, user);
+        if (result.ok) {
+            showToast('📤 Published to library!');
+            renderSidebar(); // refresh share button state
+
+            // Offer to jump to library panel
+            setTimeout(() => {
+                if (confirm('Note published! Open the library to view it?')) {
+                    openLibraryPanel();
+                }
+            }, 500);
+        } else {
+            showToast('❌ ' + result.error);
+        }
     };
 
-    li.appendChild(deleteBtn);
-    list.appendChild(li);
-}
+    // ─── PENDING CLONE HANDLER ───────────────────────────────────────────────────
+    // When user clones a note from the library, it's stored as a pending clone
+    // in localStorage. initApp picks it up here and saves it as a real chapter.
 
-// ─── PUBLISH TO SHARED LIBRARY ───────────────────────────────────────────────
+    async function checkPendingClone() {
+        if (!window.AUTH) return;
+        const pendingKey = window.AUTH.getStorageKey('nb_pending_clone');
+        const raw = localStorage.getItem(pendingKey);
+        if (!raw) return;
+        localStorage.removeItem(pendingKey);
+        try {
+            const clone = JSON.parse(raw);
+            if (!clone || !clone.id) return;
 
-window.publishToLibrary = async function (chapterId) {
-    if (!window.LIBRARY || !window.api || !window.api.auth.isLoggedIn()) {
-        showToast('Library not available or not logged in');
-        return;
-    }
-
-    const chapter = chapters.find(c => c.id === chapterId);
-    if (!chapter) { showToast('Note not found'); return; }
-
-    const user = window.api.auth.getCurrentUser();
-
-    // If already published → offer to unpublish
-    if (window.LIBRARY.isPublished(chapterId)) {
-        const entry = await window.LIBRARY.getByChapterId(chapterId);
-        if (entry) {
-            if (!confirm(`"${chapter.title}" is already in the library.\n\nRemove it from the library?`)) return;
-            const result = await window.LIBRARY.deleteEntry(entry.id, user._id, chapterId);
-            if (result.ok) {
-                showToast('📤 Removed from library');
-                renderSidebar(); // refresh share button state
+            if (clone._type === 'nb_shared_note_v1') {
+                await window.saveSharedNoteToSequence(clone);
             } else {
-                showToast('❌ ' + result.error);
+                chapters.unshift(clone);
+                await saveChapterToDB(clone);
+                renderSidebar();
+                loadChapter(clone.id);
+                showToast(`📋 "${clone.title}" cloned into your notebook!`);
             }
+        } catch (e) {
+            console.warn('Pending clone restore failed:', e);
         }
-        return;
     }
 
-    // Make sure there's something worth sharing
-    const raw = (chapter.content || '').replace(/<[^>]+>/g, '').trim();
-    if (!chapter.title || chapter.title === 'Untitled Page') {
-        showToast('❌ Add a title to this note before sharing');
-        return;
-    }
-    if (raw.length < 10) {
-        showToast('❌ Note is too short to share');
-        return;
-    }
+    // Expose for the embedded library panel's clone action
+    window._checkPendingClone = checkPendingClone;
 
-    // ── Capture multi-page stream sections ───────────────────────────────────
-    // When the stream has more than one page loaded (e.g. all pages sharing the
-    // same tag), we capture each page as a section so the library can render
-    // it in the cheat-sheet format.  The original chapter.content is NOT
-    // modified — sections are a read-only snapshot stored alongside the entry.
-    let sections = null;
-    const streamBlocks = document.querySelectorAll('#sequentialStream .sequence-editor-block');
+    // ─────────────────────────────────────────────────────────────────────────────
 
-    if (streamBlocks.length > 1) {
-        sections = [];
-        streamBlocks.forEach((block, idx) => {
-            // Title: first block uses the main chapter title; subsequent blocks
-            // have a `.continuation-break` sibling immediately before them whose
-            // `.continuation-label` holds the page title.
-            let sectionTitle = chapter.title;
-            const prevSibling = block.previousElementSibling;
-            if (prevSibling && prevSibling.classList.contains('continuation-break')) {
-                const label = prevSibling.querySelector('.continuation-label');
-                sectionTitle = label ? label.textContent.trim() : `Page ${idx + 1}`;
+    // Delete a chapter (OPTIMIZED)
+    window.deleteChapter = async (id) => {
+        const chapterIndex = chapters.findIndex(c => c.id === id);
+        if (chapterIndex === -1) return;
+
+        const chapter = chapters[chapterIndex];
+
+        // Remove from array (faster than filter for single item)
+        chapters.splice(chapterIndex, 1);
+
+        const wasCurrentChapter = (currentId === id);
+
+        // Delete from IndexedDB asynchronously (don't block UI)
+        deleteChapterFromDB(id).catch(err => console.error('Delete failed:', err));
+
+        // Handle UI updates
+        if (wasCurrentChapter) {
+            if (chapters.length > 0) {
+                // Load next available chapter without full re-render
+                loadChapter(chapters[0].id);
+            } else {
+                // No chapters left, create a new one
+                createNewChapter();
             }
-
-            // Raw content from the editable area (not live editor bindings)
-            const contentArea = block.querySelector('.content-area');
-            const sectionContent = contentArea ? contentArea.innerHTML : '';
-
-            // Tags: match the block's page-block-{id} to the chapters array
-            const blockId = block.id.replace('page-block-', '');
-            const matchChapter = chapters.find(c => c.id === blockId);
-            const sectionTags = matchChapter ? (matchChapter.tags || []) : [];
-
-            sections.push({
-                title: sectionTitle,
-                content: sectionContent,
-                tags: sectionTags,
-            });
-        });
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-
-    const result = await window.LIBRARY.publish({ ...chapter, sections }, user);
-    if (result.ok) {
-        showToast('📤 Published to library!');
-        renderSidebar(); // refresh share button state
-
-        // Offer to jump to library panel
-        setTimeout(() => {
-            if (confirm('Note published! Open the library to view it?')) {
-                openLibraryPanel();
-            }
-        }, 500);
-    } else {
-        showToast('❌ ' + result.error);
-    }
-};
-
-// ─── PENDING CLONE HANDLER ───────────────────────────────────────────────────
-// When user clones a note from the library, it's stored as a pending clone
-// in localStorage. initApp picks it up here and saves it as a real chapter.
-
-async function checkPendingClone() {
-    if (!window.AUTH) return;
-    const pendingKey = window.AUTH.getStorageKey('nb_pending_clone');
-    const raw = localStorage.getItem(pendingKey);
-    if (!raw) return;
-    localStorage.removeItem(pendingKey);
-    try {
-        const clone = JSON.parse(raw);
-        if (!clone || !clone.id) return;
-
-        if (clone._type === 'nb_shared_note_v1') {
-            await window.saveSharedNoteToSequence(clone);
         } else {
-            chapters.unshift(clone);
-            await saveChapterToDB(clone);
-            renderSidebar();
-            loadChapter(clone.id);
-            showToast(`📋 "${clone.title}" cloned into your notebook!`);
+            // Just update sidebar (no need to reload entire page)
+            requestAnimationFrame(() => renderSidebar());
         }
-    } catch (e) {
-        console.warn('Pending clone restore failed:', e);
-    }
-}
 
-// Expose for the embedded library panel's clone action
-window._checkPendingClone = checkPendingClone;
+        showToast('✓ Page deleted');
+    };
 
-// ─────────────────────────────────────────────────────────────────────────────
 
-// Delete a chapter (OPTIMIZED)
-window.deleteChapter = async (id) => {
-    const chapterIndex = chapters.findIndex(c => c.id === id);
-    if (chapterIndex === -1) return;
 
-    const chapter = chapters[chapterIndex];
+    // Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM)
+    window.loadChapter = (id) => {
+        const chapter = chapters.find(c => c.id === id);
+        if (!chapter) return;
 
-    // Remove from array (faster than filter for single item)
-    chapters.splice(chapterIndex, 1);
+        currentId = id;
 
-    const wasCurrentChapter = (currentId === id);
+        // Get the primary tag of this chapter
+        const primaryTag = chapter.tags && chapter.tags.length > 0 ? chapter.tags[0] : null;
 
-    // Delete from IndexedDB asynchronously (don't block UI)
-    deleteChapterFromDB(id).catch(err => console.error('Delete failed:', err));
+        // Find all chapters with the same primary tag
+        const relatedChapters = primaryTag
+            ? chapters.filter(ch => ch.tags && ch.tags.includes(primaryTag))
+            : [chapter];
 
-    // Handle UI updates
-    if (wasCurrentChapter) {
-        if (chapters.length > 0) {
-            // Load next available chapter without full re-render
-            loadChapter(chapters[0].id);
+        // Sort by creation date
+        relatedChapters.sort((a, b) => new Date(a.metadata?.createdAt || 0) - new Date(b.metadata?.createdAt || 0));
+
+        // Update title
+        document.getElementById('pageTitle').value = chapter.title || 'Untitled';
+
+        // Clear and recreate DOM with all related pages
+        const stream = document.getElementById('sequentialStream');
+
+        // Destroy previous virtual scroll manager if it exists
+        if (currentVirtualScrollManager) {
+            currentVirtualScrollManager.destroy();
+        }
+
+        // Use Virtual Scrolling for performance with large page sets
+        if (relatedChapters.length > 10) {
+            // Enable virtual scrolling for streams with more than 10 pages
+            currentVirtualScrollManager = new VirtualScrollManager(stream, relatedChapters, currentId);
+            currentVirtualScrollManager.init();
         } else {
-            // No chapters left, create a new one
-            createNewChapter();
-        }
-    } else {
-        // Just update sidebar (no need to reload entire page)
-        requestAnimationFrame(() => renderSidebar());
-    }
+            // For small page sets, render normally (no virtual scrolling overhead)
+            currentVirtualScrollManager = null;
+            stream.innerHTML = '';
 
-    showToast('✓ Page deleted');
-};
+            // Use DocumentFragment for efficient rendering
+            const fragment = document.createDocumentFragment();
 
+            relatedChapters.forEach((ch, index) => {
+                const block = document.createElement('div');
+                block.className = 'sequence-editor-block';
+                if (ch.id === currentId) block.classList.add('active-focus');
+                block.id = `page-block-${ch.id}`;
 
+                // Add title section for subsequent pages (index > 0)
+                if (index > 0) {
+                    const titleSection = document.createElement('div');
+                    titleSection.className = 'paper-title'; // Re-use main title class for consistency
+                    titleSection.style.marginTop = '0';
+                    titleSection.style.marginBottom = '0';
+                    titleSection.style.borderBottom = '2px solid var(--accent-color)';
+                    titleSection.style.borderRadius = '4px 4px 0 0';
+                    titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
 
-// Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM)
-window.loadChapter = (id) => {
-    const chapter = chapters.find(c => c.id === id);
-    if (!chapter) return;
+                    const titleInput = document.createElement('input');
+                    titleInput.type = 'text';
+                    titleInput.value = ch.title || 'Untitled';
+                    titleInput.className = 'page-title-input';
+                    titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
+                    titleInput.placeholder = "Page title...";
 
-    currentId = id;
+                    titleInput.oninput = () => {
+                        ch.title = titleInput.value;
+                        ch.lastEdited = new Date().toISOString();
+                        markUnsaved();
+                        saveChapterContent(ch.id);
+                    };
 
-    // Get the primary tag of this chapter
-    const primaryTag = chapter.tags && chapter.tags.length > 0 ? chapter.tags[0] : null;
+                    titleSection.appendChild(titleInput);
+                    block.appendChild(titleSection);
+                }
 
-    // Find all chapters with the same primary tag
-    const relatedChapters = primaryTag
-        ? chapters.filter(ch => ch.tags && ch.tags.includes(primaryTag))
-        : [chapter];
+                // Add content area
+                const contentArea = document.createElement('div');
+                contentArea.className = 'content-area';
+                contentArea.contentEditable = 'true';
+                contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
+                contentArea.dataset.chapterId = ch.id;
 
-    // Sort by creation date
-    relatedChapters.sort((a, b) => new Date(a.metadata?.createdAt || 0) - new Date(b.metadata?.createdAt || 0));
+                // Adjust padding for subsequent pages if they have a title
+                if (index > 0) {
+                    contentArea.style.paddingTop = '1rem';
+                }
 
-    // Update title
-    document.getElementById('pageTitle').value = chapter.title || 'Untitled';
-
-    // Clear and recreate DOM with all related pages
-    const stream = document.getElementById('sequentialStream');
-
-    // Destroy previous virtual scroll manager if it exists
-    if (currentVirtualScrollManager) {
-        currentVirtualScrollManager.destroy();
-    }
-
-    // Use Virtual Scrolling for performance with large page sets
-    if (relatedChapters.length > 10) {
-        // Enable virtual scrolling for streams with more than 10 pages
-        currentVirtualScrollManager = new VirtualScrollManager(stream, relatedChapters, currentId);
-        currentVirtualScrollManager.init();
-    } else {
-        // For small page sets, render normally (no virtual scrolling overhead)
-        currentVirtualScrollManager = null;
-        stream.innerHTML = '';
-
-        // Use DocumentFragment for efficient rendering
-        const fragment = document.createDocumentFragment();
-
-        relatedChapters.forEach((ch, index) => {
-            const block = document.createElement('div');
-            block.className = 'sequence-editor-block';
-            if (ch.id === currentId) block.classList.add('active-focus');
-            block.id = `page-block-${ch.id}`;
-
-            // Add title section for subsequent pages (index > 0)
-            if (index > 0) {
-                const titleSection = document.createElement('div');
-                titleSection.className = 'paper-title'; // Re-use main title class for consistency
-                titleSection.style.marginTop = '0';
-                titleSection.style.marginBottom = '0';
-                titleSection.style.borderBottom = '2px solid var(--accent-color)';
-                titleSection.style.borderRadius = '4px 4px 0 0';
-                titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
-
-                const titleInput = document.createElement('input');
-                titleInput.type = 'text';
-                titleInput.value = ch.title || 'Untitled';
-                titleInput.className = 'page-title-input';
-                titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
-                titleInput.placeholder = "Page title...";
-
-                titleInput.oninput = () => {
-                    ch.title = titleInput.value;
-                    ch.lastEdited = new Date().toISOString();
+                contentArea.oninput = () => {
                     markUnsaved();
                     saveChapterContent(ch.id);
                 };
 
-                titleSection.appendChild(titleInput);
-                block.appendChild(titleSection);
-            }
+                // Enable auto-checkbox functionality
+                setupAutoCheckbox(contentArea);
 
-            // Add content area
-            const contentArea = document.createElement('div');
-            contentArea.className = 'content-area';
-            contentArea.contentEditable = 'true';
-            contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
-            contentArea.dataset.chapterId = ch.id;
+                block.appendChild(contentArea);
+                fragment.appendChild(block);
+            });
 
-            // Adjust padding for subsequent pages if they have a title
-            if (index > 0) {
-                contentArea.style.paddingTop = '1rem';
-            }
+            stream.appendChild(fragment);
+        }
 
-            contentArea.oninput = () => {
-                markUnsaved();
-                saveChapterContent(ch.id);
-            };
+        // Update UI
+        updateToolVisibility(chapter);
+        renderSidebar();
 
-            // Enable auto-checkbox functionality
-            setupAutoCheckbox(contentArea);
+        // Handle whiteboard mode
+        if (chapter.isWhiteboard) {
+            document.getElementById('paper').classList.add('infinite');
+        } else {
+            document.getElementById('paper').classList.remove('infinite');
+        }
 
-            block.appendChild(contentArea);
-            fragment.appendChild(block);
-        });
+        // Restore sketch data if exists
+        if (chapter.sketchData) {
+            setTimeout(() => {
+                const canvas = document.getElementById('sketchCanvas');
+                const ctx = canvas?.getContext('2d');
+                if (ctx && chapter.sketchData) {
+                    const img = new Image();
+                    img.onload = () => ctx.drawImage(img, 0, 0);
+                    img.src = chapter.sketchData;
+                }
+            }, 100);
+        }
+    };
 
-        stream.appendChild(fragment);
-    }
+    // Save current chapter to database
+    window.saveCurrentToCloud = async () => {
+        const chapter = chapters.find(c => c.id === currentId);
+        if (!chapter) return;
 
-    // Update UI
-    updateToolVisibility(chapter);
-    renderSidebar();
+        // Update title
+        const titleEl = document.getElementById('pageTitle');
+        if (titleEl) chapter.title = titleEl.value;
 
-    // Handle whiteboard mode
-    if (chapter.isWhiteboard) {
-        document.getElementById('paper').classList.add('infinite');
-    } else {
-        document.getElementById('paper').classList.remove('infinite');
-    }
+        // Update content
+        const contentArea = document.querySelector(`#page-block-${currentId} .content-area`);
+        if (contentArea) chapter.content = contentArea.innerHTML;
 
-    // Restore sketch data if exists
-    if (chapter.sketchData) {
-        setTimeout(() => {
-            const canvas = document.getElementById('sketchCanvas');
-            const ctx = canvas?.getContext('2d');
-            if (ctx && chapter.sketchData) {
-                const img = new Image();
-                img.onload = () => ctx.drawImage(img, 0, 0);
-                img.src = chapter.sketchData;
-            }
-        }, 100);
-    }
-};
+        // Update timestamp
+        chapter.lastEdited = new Date().toISOString();
 
-// Save current chapter to database
-window.saveCurrentToCloud = async () => {
-    const chapter = chapters.find(c => c.id === currentId);
-    if (!chapter) return;
+        // Save to IndexedDB
+        await saveChapterToDB(chapter);
 
-    // Update title
-    const titleEl = document.getElementById('pageTitle');
-    if (titleEl) chapter.title = titleEl.value;
+        // Update status
+        const status = document.getElementById('saveStatus');
+        if (status) {
+            status.textContent = 'All changes saved';
+            status.style.color = 'var(--save-color)';
+        }
+    };
 
-    // Update content
-    const contentArea = document.querySelector(`#page-block-${currentId} .content-area`);
-    if (contentArea) chapter.content = contentArea.innerHTML;
+    // Mark content as unsaved
+    window.markUnsaved = () => {
+        const status = document.getElementById('saveStatus');
+        if (status) {
+            status.textContent = 'Saving...';
+            status.style.color = 'var(--ink-color)';
+        }
+    };
 
-    // Update timestamp
-    chapter.lastEdited = new Date().toISOString();
-
-    // Save to IndexedDB
-    await saveChapterToDB(chapter);
-
-    // Update status
-    const status = document.getElementById('saveStatus');
-    if (status) {
-        status.textContent = 'All changes saved';
-        status.style.color = 'var(--save-color)';
-    }
-};
-
-// Mark content as unsaved
-window.markUnsaved = () => {
-    const status = document.getElementById('saveStatus');
-    if (status) {
-        status.textContent = 'Saving...';
-        status.style.color = 'var(--ink-color)';
-    }
-};
-
-// Show toast notification
-window.showToast = (message) => {
-    // Create toast element if it doesn't exist
-    let toast = document.getElementById('globalToast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'globalToast';
-        toast.style.cssText = `
+    // Show toast notification
+    window.showToast = (message) => {
+        // Create toast element if it doesn't exist
+        let toast = document.getElementById('globalToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'globalToast';
+            toast.style.cssText = `
                     position: fixed;
                     bottom: 20px;
                     right: 20px;
@@ -10640,1627 +10652,1655 @@ window.showToast = (message) => {
                     font-size: 0.9rem;
                     max-width: 300px;
                 `;
-        document.body.appendChild(toast);
-    }
-
-    toast.textContent = message;
-    toast.style.opacity = '1';
-
-    setTimeout(() => {
-        toast.style.opacity = '0';
-    }, 3000);
-};
-
-// Setup drag and drop for images (fallback — workspace-level handler)
-window.setupDragAndDrop = () => {
-    const workspace = document.getElementById('workspace');
-    if (!workspace) return;
-
-    workspace.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    });
-
-    workspace.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const files = e.dataTransfer?.files;
-        if (!files || files.length === 0) return;
-
-        const file = files[0];
-        if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                insertResizableImage(event.target.result);
-                markUnsaved();
-                saveCurrentToCloud();
-            };
-            reader.readAsDataURL(file);
-            showToast('✓ Image added');
-        }
-    });
-};
-
-// Update storage quota display
-window.updateStorageQuota = async () => {
-    if (!navigator.storage || !navigator.storage.estimate) return;
-
-    try {
-        const estimate = await navigator.storage.estimate();
-        const usage = estimate.usage || 0;
-        const quota = estimate.quota || 0;
-        const percentUsed = quota > 0 ? (usage / quota) * 100 : 0;
-
-        const storageText = document.getElementById('storageText');
-        const storageBar = document.getElementById('storageBar');
-
-        if (storageText) {
-            const usageMB = (usage / (1024 * 1024)).toFixed(1);
-            const quotaMB = (quota / (1024 * 1024)).toFixed(0);
-            storageText.textContent = `${usageMB} MB / ${quotaMB} MB`;
+            document.body.appendChild(toast);
         }
 
-        if (storageBar) {
-            storageBar.style.width = `${percentUsed}%`;
+        toast.textContent = message;
+        toast.style.opacity = '1';
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+        }, 3000);
+    };
+
+    // Setup drag and drop for images (fallback — workspace-level handler)
+    window.setupDragAndDrop = () => {
+        const workspace = document.getElementById('workspace');
+        if (!workspace) return;
+
+        workspace.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        workspace.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const files = e.dataTransfer?.files;
+            if (!files || files.length === 0) return;
+
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    insertResizableImage(event.target.result);
+                    markUnsaved();
+                    saveCurrentToCloud();
+                };
+                reader.readAsDataURL(file);
+                showToast('✓ Image added');
+            }
+        });
+    };
+
+    // Update storage quota display
+    window.updateStorageQuota = async () => {
+        if (!navigator.storage || !navigator.storage.estimate) return;
+
+        try {
+            const estimate = await navigator.storage.estimate();
+            const usage = estimate.usage || 0;
+            const quota = estimate.quota || 0;
+            const percentUsed = quota > 0 ? (usage / quota) * 100 : 0;
+
+            const storageText = document.getElementById('storageText');
+            const storageBar = document.getElementById('storageBar');
+
+            if (storageText) {
+                const usageMB = (usage / (1024 * 1024)).toFixed(1);
+                const quotaMB = (quota / (1024 * 1024)).toFixed(0);
+                storageText.textContent = `${usageMB} MB / ${quotaMB} MB`;
+            }
+
+            if (storageBar) {
+                storageBar.style.width = `${percentUsed}%`;
+            }
+        } catch (err) {
+            console.error('Storage estimate error:', err);
         }
-    } catch (err) {
-        console.error('Storage estimate error:', err);
-    }
-};
+    };
 
-// Initialize My References system
-window.initMyReferences = async () => {
-    // Stub - can be implemented later
-    console.log('My References initialized');
-};
+    // Initialize My References system
+    window.initMyReferences = async () => {
+        // Stub - can be implemented later
+        console.log('My References initialized');
+    };
 
-// Save current text selection
-window.saveSelection = () => {
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0) {
-        window.savedRange = selection.getRangeAt(0);
-    }
-};
+    // Save current text selection
+    window.saveSelection = () => {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            window.savedRange = selection.getRangeAt(0);
+        }
+    };
 
-// Handle selection change
-window.handleSelectionChange = () => {
-    const selection = window.getSelection();
-    const textBubble = document.getElementById('textBubble');
+    // Handle selection change
+    window.handleSelectionChange = () => {
+        const selection = window.getSelection();
+        const textBubble = document.getElementById('textBubble');
 
-    if (!textBubble) return;
+        if (!textBubble) return;
 
-    if (selection.toString().length > 0) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
+        if (selection.toString().length > 0) {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
 
-        textBubble.style.display = 'flex';
-        textBubble.style.left = `${rect.left + window.scrollX}px`;
-        textBubble.style.top = `${rect.top + window.scrollY - 50}px`;
-    } else {
-        textBubble.style.display = 'none';
-    }
-};
-
-// Handle markdown input
-window.handleMarkdownInput = (e) => {
-    // Basic markdown support - can be enhanced later
-    // For now, just trigger save
-    if (e.target.classList.contains('content-area')) {
-        markUnsaved();
-        saveCurrentToCloud();
-    }
-};
-
-// Setup ruler events
-window.setupRulerEvents = () => {
-    const ruler = document.getElementById('engRuler');
-    if (!ruler) return;
-
-    let isDragging = false;
-    let startX, startY;
-
-    ruler.addEventListener('mousedown', (e) => {
-        if (e.target.id === 'rulerRotate') return;
-        isDragging = true;
-        startX = e.clientX - ruler.offsetLeft;
-        startY = e.clientY - ruler.offsetTop;
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        ruler.style.left = `${e.clientX - startX}px`;
-        ruler.style.top = `${e.clientY - startY}px`;
-    });
-
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-    });
-};
-
-// Switch math keyboard tab
-window.switchMathTab = (tab) => {
-    const mathKeys = document.getElementById('mathKeys');
-    if (!mathKeys) return;
-
-    // Update active tab button
-    document.querySelectorAll('.math-tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-
-    // If called from a button click, use event.target
-    // Otherwise, find the button for this category
-    try {
-        if (event?.target) {
-            event.target.classList.add('active');
+            textBubble.style.display = 'flex';
+            textBubble.style.left = `${rect.left + window.scrollX}px`;
+            textBubble.style.top = `${rect.top + window.scrollY - 50}px`;
         } else {
-            // Find and activate the button for this category
+            textBubble.style.display = 'none';
+        }
+    };
+
+    // Handle markdown input
+    window.handleMarkdownInput = (e) => {
+        // Basic markdown support - can be enhanced later
+        // For now, just trigger save
+        if (e.target.classList.contains('content-area')) {
+            markUnsaved();
+            saveCurrentToCloud();
+        }
+    };
+
+    // Setup ruler events
+    window.setupRulerEvents = () => {
+        const ruler = document.getElementById('engRuler');
+        if (!ruler) return;
+
+        let isDragging = false;
+        let startX, startY;
+
+        ruler.addEventListener('mousedown', (e) => {
+            if (e.target.id === 'rulerRotate') return;
+            isDragging = true;
+            startX = e.clientX - ruler.offsetLeft;
+            startY = e.clientY - ruler.offsetTop;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            ruler.style.left = `${e.clientX - startX}px`;
+            ruler.style.top = `${e.clientY - startY}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+    };
+
+    // Switch math keyboard tab
+    window.switchMathTab = (tab) => {
+        const mathKeys = document.getElementById('mathKeys');
+        if (!mathKeys) return;
+
+        // Update active tab button
+        document.querySelectorAll('.math-tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // If called from a button click, use event.target
+        // Otherwise, find the button for this category
+        try {
+            if (event?.target) {
+                event.target.classList.add('active');
+            } else {
+                // Find and activate the button for this category
+                const targetBtn = document.querySelector(`.math-tab-btn[onclick*="'${tab}'"]`);
+                if (targetBtn) {
+                    targetBtn.classList.add('active');
+                }
+            }
+        } catch (err) {
+            // If event is unreliable, just find the button manually
             const targetBtn = document.querySelector(`.math-tab-btn[onclick*="'${tab}'"]`);
             if (targetBtn) {
                 targetBtn.classList.add('active');
             }
         }
-    } catch (err) {
-        // If event is unreliable, just find the button manually
-        const targetBtn = document.querySelector(`.math-tab-btn[onclick*="'${tab}'"]`);
-        if (targetBtn) {
-            targetBtn.classList.add('active');
-        }
-    }
 
-    // Define math symbols for each tab
-    const symbols = {
-        basic: ['\\frac{}{}', 'x^2', 'x_n', '\\sqrt{}', '\\sum', '\\int', '\\pm', '\\times', '\\div', '\\neq', '\\leq', '\\geq'],
-        trig: ['\\sin', '\\cos', '\\tan', '\\cot', '\\sec', '\\csc', '\\arcsin', '\\arccos', '\\arctan'],
-        calc: ['\\lim', '\\frac{d}{dx}', '\\int', '\\partial', '\\nabla', '\\infty', '\\Delta'],
-        geom: ['\\angle', '\\triangle', '\\perp', '\\parallel', '\\cong', '\\sim', '\\degree'],
-        struct: ['()', '[]', '\\{\\}', '|', '\\left(\\right)', '\\begin{cases}\\end{cases}']
+        // Define math symbols for each tab
+        const symbols = {
+            basic: ['\\frac{}{}', 'x^2', 'x_n', '\\sqrt{}', '\\sum', '\\int', '\\pm', '\\times', '\\div', '\\neq', '\\leq', '\\geq'],
+            trig: ['\\sin', '\\cos', '\\tan', '\\cot', '\\sec', '\\csc', '\\arcsin', '\\arccos', '\\arctan'],
+            calc: ['\\lim', '\\frac{d}{dx}', '\\int', '\\partial', '\\nabla', '\\infty', '\\Delta'],
+            geom: ['\\angle', '\\triangle', '\\perp', '\\parallel', '\\cong', '\\sim', '\\degree'],
+            struct: ['()', '[]', '\\{\\}', '|', '\\left(\\right)', '\\begin{cases}\\end{cases}']
+        };
+
+        mathKeys.innerHTML = '';
+        (symbols[tab] || symbols.basic).forEach(sym => {
+            const btn = document.createElement('button');
+            btn.className = 'math-key-btn';
+            btn.textContent = sym;
+            btn.onclick = () => {
+                const buffer = document.getElementById('mathBuffer');
+                if (buffer) {
+                    buffer.value += sym;
+                    buffer.dispatchEvent(new Event('input'));
+                }
+            };
+            mathKeys.appendChild(btn);
+        });
     };
 
-    mathKeys.innerHTML = '';
-    (symbols[tab] || symbols.basic).forEach(sym => {
-        const btn = document.createElement('button');
-        btn.className = 'math-key-btn';
-        btn.textContent = sym;
-        btn.onclick = () => {
-            const buffer = document.getElementById('mathBuffer');
-            if (buffer) {
-                buffer.value += sym;
-                buffer.dispatchEvent(new Event('input'));
-            }
-        };
-        mathKeys.appendChild(btn);
-    });
-};
+    // Setup auto-checkbox functionality for content areas (for Eisenhower Matrix and task lists)
+    window.setupAutoCheckbox = (contentArea) => {
+        contentArea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                const selection = window.getSelection();
+                if (!selection.rangeCount) return;
 
-// Setup auto-checkbox functionality for content areas (for Eisenhower Matrix and task lists)
-window.setupAutoCheckbox = (contentArea) => {
-    contentArea.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            const selection = window.getSelection();
-            if (!selection.rangeCount) return;
+                const range = selection.getRangeAt(0);
+                const currentNode = range.commonAncestorContainer;
+                const currentElement = currentNode.nodeType === 3 ? currentNode.parentElement : currentNode;
 
-            const range = selection.getRangeAt(0);
-            const currentNode = range.commonAncestorContainer;
-            const currentElement = currentNode.nodeType === 3 ? currentNode.parentElement : currentNode;
+                // Find the current line - check multiple levels
+                let currentLine = currentElement.closest('div, p, li');
 
-            // Find the current line - check multiple levels
-            let currentLine = currentElement.closest('div, p, li');
-
-            // If we're in a span, check its parent
-            if (!currentLine && currentElement.tagName === 'SPAN') {
-                currentLine = currentElement.parentElement;
-            }
-
-            if (!currentLine) return;
-
-            // Check if current line or its parent has a checkbox
-            let hasCheckbox = currentLine.querySelector('input[type="checkbox"]');
-
-            // Also check if the line itself contains a checkbox as a direct child
-            if (!hasCheckbox) {
-                hasCheckbox = Array.from(currentLine.children).find(child =>
-                    child.tagName === 'INPUT' && child.type === 'checkbox'
-                );
-            }
-
-            // Check parent if still not found
-            if (!hasCheckbox && currentLine.parentElement) {
-                hasCheckbox = currentLine.parentElement.querySelector('input[type="checkbox"]');
-            }
-
-            if (hasCheckbox) {
-                e.preventDefault();
-
-                // Create new line with checkbox
-                const newLine = document.createElement('div');
-                newLine.style.cssText = 'margin-bottom: 0.5rem; display: flex; align-items: flex-start; gap: 0.5rem;';
-                newLine.dataset.hasCheckbox = 'true';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.style.cssText = 'margin-top: 0.25rem; cursor: pointer; flex-shrink: 0;';
-                checkbox.onclick = () => {
-                    markUnsaved();
-                    const chapterId = contentArea.dataset.chapterId;
-                    if (chapterId) saveChapterContent(chapterId);
-                    else saveCurrentToCloud();
-                };
-
-                const textSpan = document.createElement('span');
-                textSpan.contentEditable = 'true';
-                textSpan.style.cssText = 'flex: 1; outline: none;';
-                textSpan.innerHTML = '<br>'; // Placeholder for cursor
-
-                newLine.appendChild(checkbox);
-                newLine.appendChild(textSpan);
-
-                // Insert the new line after current line
-                if (currentLine.nextSibling) {
-                    currentLine.parentNode.insertBefore(newLine, currentLine.nextSibling);
-                } else {
-                    currentLine.parentNode.appendChild(newLine);
+                // If we're in a span, check its parent
+                if (!currentLine && currentElement.tagName === 'SPAN') {
+                    currentLine = currentElement.parentElement;
                 }
 
-                // Focus on the new text span
-                setTimeout(() => {
-                    textSpan.focus();
-                    const newRange = document.createRange();
-                    newRange.selectNodeContents(textSpan);
-                    newRange.collapse(true);
-                    const newSelection = window.getSelection();
-                    newSelection.removeAllRanges();
-                    newSelection.addRange(newRange);
-                }, 0);
-            }
-        }
-    });
+                if (!currentLine) return;
 
-    // Handle input events for touch devices (iPad stylus)
-    // This catches line breaks created by the browser on touch devices
-    let lastContent = contentArea.innerHTML;
-    contentArea.addEventListener('input', () => {
-        const currentContent = contentArea.innerHTML;
+                // Check if current line or its parent has a checkbox
+                let hasCheckbox = currentLine.querySelector('input[type="checkbox"]');
 
-        // Check if content changed (new line added)
-        if (currentContent !== lastContent) {
-            // Find all divs/paragraphs in the content area
-            const allLines = contentArea.querySelectorAll('div, p');
+                // Also check if the line itself contains a checkbox as a direct child
+                if (!hasCheckbox) {
+                    hasCheckbox = Array.from(currentLine.children).find(child =>
+                        child.tagName === 'INPUT' && child.type === 'checkbox'
+                    );
+                }
 
-            allLines.forEach(line => {
-                // Check if this line has a checkbox already or is marked as processed
-                const hasCheckbox = line.querySelector('input[type="checkbox"]');
-                const isProcessed = line.dataset.hasCheckbox === 'true';
+                // Check parent if still not found
+                if (!hasCheckbox && currentLine.parentElement) {
+                    hasCheckbox = currentLine.parentElement.querySelector('input[type="checkbox"]');
+                }
 
-                // If line doesn't have checkbox but previous sibling does, add one
-                if (!hasCheckbox && !isProcessed && line.previousElementSibling) {
-                    const prevHasCheckbox = line.previousElementSibling.querySelector('input[type="checkbox"]');
+                if (hasCheckbox) {
+                    e.preventDefault();
 
-                    if (prevHasCheckbox && line.textContent.trim() !== '') {
-                        // Convert this line to checkbox format
-                        const originalContent = line.innerHTML;
-                        line.innerHTML = '';
-                        line.style.cssText = 'margin-bottom: 0.5rem; display: flex; align-items: flex-start; gap: 0.5rem;';
-                        line.dataset.hasCheckbox = 'true';
+                    // Create new line with checkbox
+                    const newLine = document.createElement('div');
+                    newLine.style.cssText = 'margin-bottom: 0.5rem; display: flex; align-items: flex-start; gap: 0.5rem;';
+                    newLine.dataset.hasCheckbox = 'true';
 
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.style.cssText = 'margin-top: 0.25rem; cursor: pointer; flex-shrink: 0;';
-                        checkbox.onclick = () => {
-                            markUnsaved();
-                            const chapterId = contentArea.dataset.chapterId;
-                            if (chapterId) saveChapterContent(chapterId);
-                            else saveCurrentToCloud();
-                        };
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.style.cssText = 'margin-top: 0.25rem; cursor: pointer; flex-shrink: 0;';
+                    checkbox.onclick = () => {
+                        markUnsaved();
+                        const chapterId = contentArea.dataset.chapterId;
+                        if (chapterId) saveChapterContent(chapterId);
+                        else saveCurrentToCloud();
+                    };
 
-                        const textSpan = document.createElement('span');
-                        textSpan.contentEditable = 'true';
-                        textSpan.style.cssText = 'flex: 1; outline: none;';
-                        textSpan.innerHTML = originalContent;
+                    const textSpan = document.createElement('span');
+                    textSpan.contentEditable = 'true';
+                    textSpan.style.cssText = 'flex: 1; outline: none;';
+                    textSpan.innerHTML = '<br>'; // Placeholder for cursor
 
-                        line.appendChild(checkbox);
-                        line.appendChild(textSpan);
+                    newLine.appendChild(checkbox);
+                    newLine.appendChild(textSpan);
+
+                    // Insert the new line after current line
+                    if (currentLine.nextSibling) {
+                        currentLine.parentNode.insertBefore(newLine, currentLine.nextSibling);
+                    } else {
+                        currentLine.parentNode.appendChild(newLine);
                     }
+
+                    // Focus on the new text span
+                    setTimeout(() => {
+                        textSpan.focus();
+                        const newRange = document.createRange();
+                        newRange.selectNodeContents(textSpan);
+                        newRange.collapse(true);
+                        const newSelection = window.getSelection();
+                        newSelection.removeAllRanges();
+                        newSelection.addRange(newRange);
+                    }, 0);
                 }
-            });
-        }
-
-        lastContent = currentContent;
-    });
-};
-
-// ==================== END MISSING FUNCTIONS ====================
-
-// ==================== MINDMAP TEMPLATE FUNCTIONS ====================
-
-let mindmapState = {
-    nodes: [],
-    links: [],
-    linkingMode: false,
-    firstNode: null,
-    nextNodeId: 1
-};
-
-window.addMindmapNode = function () {
-    const canvas = document.getElementById('mindmapCanvas');
-    if (!canvas) return;
-
-    const nodeId = `mindmap-node-${mindmapState.nextNodeId++}`;
-    const node = document.createElement('div');
-    node.className = 'mindmap-node';
-    node.id = nodeId;
-    node.style.left = `${Math.random() * 60 + 20}%`;
-    node.style.top = `${Math.random() * 60 + 20}%`;
-    node.setAttribute('data-node-id', nodeId);
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'New Idea';
-    input.maxLength = 50;
-
-    node.appendChild(input);
-    canvas.appendChild(node);
-
-    // Make draggable
-    makeMindmapNodeDraggable(node);
-
-    // Add click handler for linking
-    node.addEventListener('click', (e) => {
-        if (mindmapState.linkingMode) {
-            handleMindmapNodeClick(nodeId);
-        }
-    });
-
-    mindmapState.nodes.push({ id: nodeId, element: node });
-    showToast('Node added! Drag to reposition');
-};
-
-window.addMindmapLink = function () {
-    mindmapState.linkingMode = true;
-    mindmapState.firstNode = null;
-
-    // Highlight all nodes
-    const nodes = document.querySelectorAll('.mindmap-node');
-    nodes.forEach(n => n.classList.add('linkable'));
-
-    showToast('🔗 Linking mode: Click first node, then second node');
-};
-
-function handleMindmapNodeClick(nodeId) {
-    if (!mindmapState.firstNode) {
-        // First node selected
-        mindmapState.firstNode = nodeId;
-        const firstElement = document.getElementById(nodeId);
-        if (firstElement) {
-            firstElement.classList.add('selected-for-link');
-            // Setup drag-to-link
-            setupDragToLink(firstElement, nodeId);
-        }
-        showToast('✓ First node selected. Drag to second node...');
-    } else {
-        // Second node selected - create link
-        const secondNode = nodeId;
-
-        if (mindmapState.firstNode === secondNode) {
-            showToast('⚠️ Cannot link node to itself');
-            return;
-        }
-
-        createMindmapLink(mindmapState.firstNode, secondNode);
-
-        // Reset linking mode
-        const nodes = document.querySelectorAll('.mindmap-node');
-        nodes.forEach(n => {
-            n.classList.remove('linkable');
-            n.classList.remove('selected-for-link');
+            }
         });
 
-        mindmapState.linkingMode = false;
-        mindmapState.firstNode = null;
-    }
-}
+        // Handle input events for touch devices (iPad stylus)
+        // This catches line breaks created by the browser on touch devices
+        let lastContent = contentArea.innerHTML;
+        contentArea.addEventListener('input', () => {
+            const currentContent = contentArea.innerHTML;
 
-function createMindmapLink(fromId, toId) {
-    const canvas = document.getElementById('mindmapCanvas');
-    if (!canvas) return;
+            // Check if content changed (new line added)
+            if (currentContent !== lastContent) {
+                // Find all divs/paragraphs in the content area
+                const allLines = contentArea.querySelectorAll('div, p');
 
-    // Create SVG layer if it doesn't exist
-    let svg = canvas.querySelector('svg.mindmap-links');
-    if (!svg) {
-        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.classList.add('mindmap-links');
-        svg.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1;';
-        canvas.insertBefore(svg, canvas.firstChild);
-    }
+                allLines.forEach(line => {
+                    // Check if this line has a checkbox already or is marked as processed
+                    const hasCheckbox = line.querySelector('input[type="checkbox"]');
+                    const isProcessed = line.dataset.hasCheckbox === 'true';
 
-    const fromNode = document.getElementById(fromId);
-    const toNode = document.getElementById(toId);
+                    // If line doesn't have checkbox but previous sibling does, add one
+                    if (!hasCheckbox && !isProcessed && line.previousElementSibling) {
+                        const prevHasCheckbox = line.previousElementSibling.querySelector('input[type="checkbox"]');
 
-    if (!fromNode || !toNode) return;
+                        if (prevHasCheckbox && line.textContent.trim() !== '') {
+                            // Convert this line to checkbox format
+                            const originalContent = line.innerHTML;
+                            line.innerHTML = '';
+                            line.style.cssText = 'margin-bottom: 0.5rem; display: flex; align-items: flex-start; gap: 0.5rem;';
+                            line.dataset.hasCheckbox = 'true';
 
-    // Create link line
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.classList.add('mindmap-link');
-    line.setAttribute('data-from', fromId);
-    line.setAttribute('data-to', toId);
-    line.setAttribute('stroke', '#3498db');
-    line.setAttribute('stroke-width', '2');
-    line.style.pointerEvents = 'auto';
-    line.style.cursor = 'pointer';
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.style.cssText = 'margin-top: 0.25rem; cursor: pointer; flex-shrink: 0;';
+                            checkbox.onclick = () => {
+                                markUnsaved();
+                                const chapterId = contentArea.dataset.chapterId;
+                                if (chapterId) saveChapterContent(chapterId);
+                                else saveCurrentToCloud();
+                            };
 
-    // Add click to delete
-    line.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (confirm('Delete this link?')) {
-            line.remove();
-            mindmapState.links = mindmapState.links.filter(l =>
-                !(l.from === fromId && l.to === toId)
-            );
-        }
-    });
+                            const textSpan = document.createElement('span');
+                            textSpan.contentEditable = 'true';
+                            textSpan.style.cssText = 'flex: 1; outline: none;';
+                            textSpan.innerHTML = originalContent;
 
-    svg.appendChild(line);
-
-    mindmapState.links.push({ from: fromId, to: toId, element: line });
-
-    // Update line position
-    updateMindmapLink(line, fromNode, toNode);
-
-    showToast('✓ Link created!');
-}
-
-function updateMindmapLink(line, fromNode, toNode) {
-    const canvas = document.getElementById('mindmapCanvas');
-    if (!canvas) return;
-
-    const canvasRect = canvas.getBoundingClientRect();
-    const fromRect = fromNode.getBoundingClientRect();
-    const toRect = toNode.getBoundingClientRect();
-
-    const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
-    const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
-    const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
-    const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
-
-    line.setAttribute('x1', x1);
-    line.setAttribute('y1', y1);
-    line.setAttribute('x2', x2);
-    line.setAttribute('y2', y2);
-}
-
-function makeMindmapNodeDraggable(node) {
-    let isDragging = false;
-    let startX, startY, initialLeft, initialTop;
-
-    node.addEventListener('mousedown', function (e) {
-        // Don't drag if clicking input
-        if (e.target.tagName === 'INPUT') return;
-
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-
-        const style = window.getComputedStyle(node);
-        initialLeft = parseFloat(style.left);
-        initialTop = parseFloat(style.top);
-
-        node.style.zIndex = 100;
-        e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', function (e) {
-        if (!isDragging) return;
-
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-
-        node.style.left = `${initialLeft + dx}px`;
-        node.style.top = `${initialTop + dy}px`;
-
-        // Update all connected links
-        updateLinksForNode(node.id);
-    });
-
-    document.addEventListener('mouseup', function () {
-        if (isDragging) {
-            isDragging = false;
-            node.style.zIndex = 10;
-        }
-    });
-}
-
-function updateLinksForNode(nodeId) {
-    mindmapState.links.forEach(link => {
-        if (link.from === nodeId || link.to === nodeId) {
-            const fromNode = document.getElementById(link.from);
-            const toNode = document.getElementById(link.to);
-            if (fromNode && toNode) {
-                updateMindmapLink(link.element, fromNode, toNode);
+                            line.appendChild(checkbox);
+                            line.appendChild(textSpan);
+                        }
+                    }
+                });
             }
-        }
-    });
-}
 
-window.autoLayoutMindmap = function () {
-    const canvas = document.getElementById('mindmapCanvas');
-    if (!canvas) return;
+            lastContent = currentContent;
+        });
+    };
 
-    const nodes = Array.from(canvas.querySelectorAll('.mindmap-node'));
-    const centerNode = nodes.find(n => n.classList.contains('central'));
-    const otherNodes = nodes.filter(n => !n.classList.contains('central'));
+    // ==================== END MISSING FUNCTIONS ====================
 
-    if (!centerNode) return;
+    // ==================== MINDMAP TEMPLATE FUNCTIONS ====================
 
-    // Position center node
-    centerNode.style.left = '50%';
-    centerNode.style.top = '50%';
-    centerNode.style.transform = 'translate(-50%, -50%)';
+    let mindmapState = {
+        nodes: [],
+        links: [],
+        linkingMode: false,
+        firstNode: null,
+        nextNodeId: 1
+    };
 
-    // Arrange other nodes in a circle
-    const radius = 200; // pixels
-    const angleStep = (2 * Math.PI) / otherNodes.length;
+    window.addMindmapNode = function () {
+        const canvas = document.getElementById('mindmapCanvas');
+        if (!canvas) return;
 
-    otherNodes.forEach((node, index) => {
-        const angle = index * angleStep;
-        const x = 50 + (radius * Math.cos(angle)) / canvas.clientWidth * 100; // Convert to %
-        const y = 50 + (radius * Math.sin(angle)) / canvas.clientHeight * 100;
+        const nodeId = `mindmap-node-${mindmapState.nextNodeId++}`;
+        const node = document.createElement('div');
+        node.className = 'mindmap-node';
+        node.id = nodeId;
+        node.style.left = `${Math.random() * 60 + 20}%`;
+        node.style.top = `${Math.random() * 60 + 20}%`;
+        node.setAttribute('data-node-id', nodeId);
 
-        node.style.left = `${x}%`;
-        node.style.top = `${y}%`;
-        node.style.transform = 'translate(-50%, -50%)';
-    });
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'New Idea';
+        input.maxLength = 50;
 
-    // Update all links
-    mindmapState.links.forEach(link => {
-        const fromNode = document.getElementById(link.from);
-        const toNode = document.getElementById(link.to);
-        if (fromNode && toNode) {
-            updateMindmapLink(link.element, fromNode, toNode);
-        }
-    });
+        node.appendChild(input);
+        canvas.appendChild(node);
 
-    showToast('🎨 Layout organized!');
-};
-
-// Initialize mindmap when template is loaded
-window.initMindmapTemplate = function () {
-    const canvas = document.getElementById('mindmapCanvas');
-    if (!canvas) return;
-
-    // Make all existing nodes (including central node) draggable
-    const existingNodes = canvas.querySelectorAll('.mindmap-node');
-    existingNodes.forEach(node => {
-        if (!node.id) {
-            node.id = `mindmap-node-${mindmapState.nextNodeId++}`;
-        }
+        // Make draggable
         makeMindmapNodeDraggable(node);
 
         // Add click handler for linking
         node.addEventListener('click', (e) => {
             if (mindmapState.linkingMode) {
-                handleMindmapNodeClick(node.id);
+                handleMindmapNodeClick(nodeId);
             }
         });
 
-        mindmapState.nodes.push({ id: node.id, element: node });
-    });
+        mindmapState.nodes.push({ id: nodeId, element: node });
+        showToast('Node added! Drag to reposition');
+    };
 
-    console.log('Mindmap template initialized - all nodes are draggable');
-};
+    window.addMindmapLink = function () {
+        mindmapState.linkingMode = true;
+        mindmapState.firstNode = null;
 
-// ==================== OUTLINE TEMPLATE FUNCTIONS ====================
+        // Highlight all nodes
+        const nodes = document.querySelectorAll('.mindmap-node');
+        nodes.forEach(n => n.classList.add('linkable'));
 
-// Outline label generators for each level
-// Level 1 → Roman numerals, Level 2 → Uppercase, Level 3 → Numbers, Level 4 → Lowercase
-const outlineLabelGenerators = {
-    1: (index) => {
-        const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
-            'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
-        return romans[index] || `${index + 1}`;
-    },
-    2: (index) => String.fromCharCode(65 + (index % 26)), // A, B, C, ...
-    3: (index) => `${index + 1}`,                          // 1, 2, 3, ...
-    4: (index) => String.fromCharCode(97 + (index % 26))   // a, b, c, ...
-};
+        showToast('🔗 Linking mode: Click first node, then second node');
+    };
 
-// ---- Helper: find the .outline-item ancestor of a DOM node ----
-function findOutlineItem(node) {
-    let current = node;
-    while (current && current.id !== 'outlineContent') {
-        if (current.classList && current.classList.contains('outline-item')) {
-            return current;
-        }
-        current = current.parentElement;
-    }
-    return null;
-}
-
-// ---- Helper: read / write level from class name ----
-function getItemLevel(item) {
-    const match = item.className.match(/level-(\d)/);
-    return match ? parseInt(match[1]) : 1;
-}
-
-function setItemLevel(item, level) {
-    // Preserve collapsed state if present
-    const isCollapsed = item.classList.contains('outline-collapsed');
-    item.className = `outline-item level-${level}`;
-    if (isCollapsed) item.classList.add('outline-collapsed');
-}
-
-// ---- Helper: get text content excluding the label span ----
-function getItemText(item) {
-    const label = item.querySelector('.outline-label');
-    const toggle = item.querySelector('.outline-toggle-btn');
-    let text = '';
-    for (let node of item.childNodes) {
-        if (node !== label && node !== toggle) {
-            text += node.textContent || '';
-        }
-    }
-    return text.trim();
-}
-
-// ---- Helper: create a new outline item div ----
-function createOutlineItem(level) {
-    const item = document.createElement('div');
-    item.className = `outline-item level-${level}`;
-
-    const label = document.createElement('span');
-    label.className = 'outline-label';
-    label.textContent = ''; // Will be set by renumberOutline
-
-    item.appendChild(label);
-    item.appendChild(document.createTextNode(' '));
-
-    return item;
-}
-
-// ---- Helper: place the caret at the end of an item's text ----
-function placeCursorAtEnd(item) {
-    const sel = window.getSelection();
-    const range = document.createRange();
-    const lastChild = item.lastChild;
-    if (lastChild && lastChild.nodeType === Node.TEXT_NODE) {
-        range.setStart(lastChild, lastChild.textContent.length);
-        range.collapse(true);
-    } else {
-        range.selectNodeContents(item);
-        range.collapse(false);
-    }
-    sel.removeAllRanges();
-    sel.addRange(range);
-}
-
-// ---- Helper: place the caret at the start of an item's text (after label) ----
-function placeCursorAtStart(item) {
-    const sel = window.getSelection();
-    const range = document.createRange();
-    const label = item.querySelector('.outline-label');
-    // Find the first text node after the label
-    let textNode = null;
-    for (let node of item.childNodes) {
-        if (node !== label && node !== item.querySelector('.outline-toggle-btn')) {
-            if (node.nodeType === Node.TEXT_NODE) {
-                textNode = node;
-                break;
+    function handleMindmapNodeClick(nodeId) {
+        if (!mindmapState.firstNode) {
+            // First node selected
+            mindmapState.firstNode = nodeId;
+            const firstElement = document.getElementById(nodeId);
+            if (firstElement) {
+                firstElement.classList.add('selected-for-link');
+                // Setup drag-to-link
+                setupDragToLink(firstElement, nodeId);
             }
-        }
-    }
-    if (textNode) {
-        // Skip leading space
-        const startOffset = textNode.textContent.startsWith(' ') ? 1 : 0;
-        range.setStart(textNode, startOffset);
-        range.collapse(true);
-    } else {
-        range.selectNodeContents(item);
-        range.collapse(false);
-    }
-    sel.removeAllRanges();
-    sel.addRange(range);
-}
-
-// ---- Helper: detect if cursor is at the very start of an item ----
-function isCursorAtStart(item) {
-    const sel = window.getSelection();
-    if (!sel.rangeCount) return false;
-
-    const anchorNode = sel.anchorNode;
-    const anchorOffset = sel.anchorOffset;
-    const label = item.querySelector('.outline-label');
-    const toggle = item.querySelector('.outline-toggle-btn');
-
-    // Cursor is on the item div itself at position 0, 1, or 2 (toggle/label are early children)
-    if (anchorNode === item && anchorOffset <= 2) return true;
-
-    // Cursor is inside the label or toggle
-    if (anchorNode === label || (label && label.contains(anchorNode))) return true;
-    if (anchorNode === toggle || (toggle && toggle.contains(anchorNode))) return true;
-
-    // Cursor is in a text node
-    if (anchorNode.nodeType === Node.TEXT_NODE) {
-        // If item text is empty, cursor is always "at start"
-        if (getItemText(item) === '') return true;
-
-        // Cursor at offset 0 in a text node right after the label
-        if (anchorOffset === 0) {
-            const prev = anchorNode.previousSibling;
-            if (!prev || prev === label || prev === toggle ||
-                (prev.nodeType === Node.TEXT_NODE && prev.textContent.trim() === '')) {
-                return true;
-            }
-        }
-        // Cursor at offset 1 if the text starts with a space (the space after label)
-        if (anchorOffset <= 1 && anchorNode.textContent.match(/^\s/)) {
-            const prev = anchorNode.previousSibling;
-            if (!prev || prev === label || prev === toggle) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-// ---- Helper: get all outline items as an array ----
-function getAllOutlineItems(container) {
-    return Array.from(container.querySelectorAll('.outline-item'));
-}
-
-// ---- Helper: get the previous visible sibling outline item ----
-function getPreviousOutlineItem(item, container) {
-    const items = getAllOutlineItems(container);
-    const idx = items.indexOf(item);
-    if (idx <= 0) return null;
-    return items[idx - 1];
-}
-
-// ================================================================
-//  RENUMBER OUTLINE — counter-array approach
-//  Tracks counters per level, resets deeper counters on level change.
-// ================================================================
-function renumberOutline(container) {
-    const items = getAllOutlineItems(container);
-    // counters[0] = level1 count, counters[1] = level2, etc.
-    const counters = [0, 0, 0, 0];
-
-    items.forEach(item => {
-        const level = getItemLevel(item); // 1-4
-        const idx = level - 1;            // 0-3
-
-        // Reset all deeper level counters when a higher level is encountered
-        for (let d = idx + 1; d < 4; d++) {
-            counters[d] = 0;
-        }
-
-        // Increment counter for this level
-        counters[idx]++;
-
-        // Assign label via generator
-        const label = item.querySelector('.outline-label');
-        if (label) {
-            const generator = outlineLabelGenerators[level];
-            label.textContent = generator
-                ? generator(counters[idx] - 1) + '.'
-                : `${counters[idx]}.`;
-        }
-    });
-
-    // After renumbering, refresh collapse toggle arrows
-    refreshOutlineToggles(container);
-}
-
-// ================================================================
-//  COLLAPSE / EXPAND — per-item toggle arrows (▶ / ▼)
-// ================================================================
-
-/**
- * Checks if an item has "children" — i.e., the next sibling items have a
- * deeper level. Children are all consecutive items with level > this item's
- * level, stopping when a same-or-higher level is hit.
- */
-function getOutlineChildren(item, container) {
-    const items = getAllOutlineItems(container);
-    const idx = items.indexOf(item);
-    const level = getItemLevel(item);
-    const children = [];
-
-    for (let i = idx + 1; i < items.length; i++) {
-        if (getItemLevel(items[i]) > level) {
-            children.push(items[i]);
+            showToast('✓ First node selected. Drag to second node...');
         } else {
-            break; // Same or higher level — stop
-        }
-    }
-    return children;
-}
+            // Second node selected - create link
+            const secondNode = nodeId;
 
-/**
- * Add or remove toggle arrows (▶/▼) on items that have children.
- * Called after every renumber.
- */
-function refreshOutlineToggles(container) {
-    const items = getAllOutlineItems(container);
-
-    items.forEach((item, i) => {
-        const level = getItemLevel(item);
-        let hasChildren = false;
-
-        // Check if the next item is deeper
-        if (i + 1 < items.length && getItemLevel(items[i + 1]) > level) {
-            hasChildren = true;
-        }
-
-        let toggleBtn = item.querySelector('.outline-toggle-btn');
-
-        if (hasChildren) {
-            // Add toggle button if not present
-            if (!toggleBtn) {
-                toggleBtn = document.createElement('span');
-                toggleBtn.className = 'outline-toggle-btn';
-                toggleBtn.setAttribute('contenteditable', 'false');
-                toggleBtn.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleOutlineItem(item, container);
-                });
-                // Insert as first child (before label)
-                item.insertBefore(toggleBtn, item.firstChild);
-            }
-            // Set arrow direction based on collapsed state
-            const isCollapsed = item.classList.contains('outline-collapsed');
-            toggleBtn.textContent = isCollapsed ? '▶' : '▼';
-            item.classList.add('has-children');
-        } else {
-            // Remove toggle if item has no children
-            if (toggleBtn) {
-                toggleBtn.remove();
-            }
-            item.classList.remove('has-children', 'outline-collapsed');
-        }
-    });
-}
-
-/**
- * Toggle collapse/expand for a single item.
- */
-function toggleOutlineItem(item, container) {
-    const isCollapsed = item.classList.contains('outline-collapsed');
-
-    if (isCollapsed) {
-        expandOutlineItem(item, container);
-    } else {
-        collapseOutlineItem(item, container);
-    }
-}
-
-/**
- * Collapse: hide all children (items with deeper level following this item).
- */
-function collapseOutlineItem(item, container) {
-    const children = getOutlineChildren(item, container);
-    children.forEach(child => {
-        child.style.display = 'none';
-        child.setAttribute('data-outline-hidden', 'true');
-    });
-    item.classList.add('outline-collapsed');
-
-    // Update toggle arrow
-    const toggleBtn = item.querySelector('.outline-toggle-btn');
-    if (toggleBtn) toggleBtn.textContent = '▶';
-}
-
-/**
- * Expand: show direct children. If a child is itself collapsed,
- * keep its children hidden (respect nested collapse state).
- */
-function expandOutlineItem(item, container) {
-    const items = getAllOutlineItems(container);
-    const idx = items.indexOf(item);
-    const level = getItemLevel(item);
-
-    item.classList.remove('outline-collapsed');
-
-    // Walk through children and show them, but respect nested collapse
-    let skipUntilLevel = -1;
-
-    for (let i = idx + 1; i < items.length; i++) {
-        const childLevel = getItemLevel(items[i]);
-
-        // Stop when we hit same or higher level than the parent
-        if (childLevel <= level) break;
-
-        // If we're skipping because of a nested collapsed parent
-        if (skipUntilLevel > 0 && childLevel > skipUntilLevel) {
-            // Keep hidden — nested under a collapsed item
-            continue;
-        }
-
-        // Show this item
-        items[i].style.display = '';
-        items[i].removeAttribute('data-outline-hidden');
-        skipUntilLevel = -1;
-
-        // If this child is itself collapsed, skip its descendants
-        if (items[i].classList.contains('outline-collapsed')) {
-            skipUntilLevel = childLevel;
-        }
-    }
-
-    // Update toggle arrow
-    const toggleBtn = item.querySelector('.outline-toggle-btn');
-    if (toggleBtn) toggleBtn.textContent = '▼';
-}
-
-/**
- * Collapse All — collapse every item that has children, hide all non-level-1 items.
- */
-window.collapseAllOutline = function () {
-    const container = document.getElementById('outlineContent');
-    if (!container) return;
-
-    const items = getAllOutlineItems(container);
-    items.forEach(item => {
-        const level = getItemLevel(item);
-        if (level > 1) {
-            item.style.display = 'none';
-            item.setAttribute('data-outline-hidden', 'true');
-        }
-        // Mark items with children as collapsed
-        const hasChildren = item.classList.contains('has-children');
-        if (hasChildren) {
-            item.classList.add('outline-collapsed');
-            const toggleBtn = item.querySelector('.outline-toggle-btn');
-            if (toggleBtn) toggleBtn.textContent = '▶';
-        }
-    });
-
-    showToast('Collapsed to level 1');
-};
-
-/**
- * Expand All — show every item and clear all collapsed states.
- */
-window.expandAllOutline = function () {
-    const container = document.getElementById('outlineContent');
-    if (!container) return;
-
-    const items = getAllOutlineItems(container);
-    items.forEach(item => {
-        item.style.display = '';
-        item.removeAttribute('data-outline-hidden');
-        item.classList.remove('outline-collapsed');
-
-        const toggleBtn = item.querySelector('.outline-toggle-btn');
-        if (toggleBtn) toggleBtn.textContent = '▼';
-    });
-
-    showToast('Expanded all levels');
-};
-
-// ================================================================
-//  MAIN KEYDOWN HANDLER
-// ================================================================
-function handleOutlineKeydown(e) {
-    const outlineContent = document.getElementById('outlineContent');
-    if (!outlineContent) return;
-
-    // Only handle keys inside the outline area
-    if (!outlineContent.contains(e.target) && e.target !== outlineContent) return;
-
-    const sel = window.getSelection();
-    let currentItem = findOutlineItem(sel.anchorNode);
-
-    // ===== TAB (indent deeper) =====
-    if (e.key === 'Tab' && !e.shiftKey) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        if (!currentItem) {
-            // Create a new item if none exists
-            const item = createOutlineItem(1);
-            outlineContent.appendChild(item);
-            renumberOutline(outlineContent);
-            placeCursorAtEnd(item);
-            return;
-        }
-
-        const level = getItemLevel(currentItem);
-
-        // GUARD: cannot indent past level 4
-        if (level >= 4) return;
-
-        // GUARD: first item in outline cannot be indented
-        const prevItem = getPreviousOutlineItem(currentItem, outlineContent);
-        if (!prevItem) return;
-
-        // GUARD: cannot jump more than 1 level deeper than previous sibling
-        // This ensures logical hierarchy — you can't go from level-1 to level-3
-        const prevLevel = getItemLevel(prevItem);
-        if (level + 1 > prevLevel + 1) return;
-
-        setItemLevel(currentItem, level + 1);
-        renumberOutline(outlineContent);
-        return;
-    }
-
-    // ===== SHIFT+TAB (outdent) =====
-    if (e.key === 'Tab' && e.shiftKey) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        if (!currentItem) return;
-
-        const level = getItemLevel(currentItem);
-        // GUARD: cannot outdent past level 1
-        if (level <= 1) return;
-
-        setItemLevel(currentItem, level - 1);
-        renumberOutline(outlineContent);
-        return;
-    }
-
-    // ===== ENTER (new item at same level, or remove empty item) =====
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        if (currentItem) {
-            const text = getItemText(currentItem);
-            const allItems = getAllOutlineItems(outlineContent);
-
-            // If current item is empty and there are other items, remove it
-            if (text === '' && allItems.length > 1) {
-                const prevItem = getPreviousOutlineItem(currentItem, outlineContent);
-                const nextSibling = currentItem.nextElementSibling;
-                currentItem.remove();
-                renumberOutline(outlineContent);
-
-                // Focus the previous item, or the next one if no previous
-                if (prevItem) {
-                    placeCursorAtEnd(prevItem);
-                } else if (nextSibling && nextSibling.classList.contains('outline-item')) {
-                    placeCursorAtStart(nextSibling);
-                }
+            if (mindmapState.firstNode === secondNode) {
+                showToast('⚠️ Cannot link node to itself');
                 return;
             }
 
-            // Normal case: insert new item at same level after current
-            const level = getItemLevel(currentItem);
-            const newItem = createOutlineItem(level);
-            currentItem.parentNode.insertBefore(newItem, currentItem.nextSibling);
-            renumberOutline(outlineContent);
-            placeCursorAtEnd(newItem);
-        } else {
-            // No current item — create a level-1 item
-            const newItem = createOutlineItem(1);
-            outlineContent.appendChild(newItem);
-            renumberOutline(outlineContent);
-            placeCursorAtEnd(newItem);
-        }
-        return;
-    }
+            createMindmapLink(mindmapState.firstNode, secondNode);
 
-    // ===== BACKSPACE (smart outdent at start of line) =====
-    if (e.key === 'Backspace') {
-        if (!currentItem) return;
+            // Reset linking mode
+            const nodes = document.querySelectorAll('.mindmap-node');
+            nodes.forEach(n => {
+                n.classList.remove('linkable');
+                n.classList.remove('selected-for-link');
+            });
 
-        if (isCursorAtStart(currentItem)) {
-            const level = getItemLevel(currentItem);
-            const text = getItemText(currentItem);
-
-            if (level > 1) {
-                // Outdent: move up one level (same as Shift+Tab)
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                setItemLevel(currentItem, level - 1);
-                renumberOutline(outlineContent);
-            } else if (text === '' && getAllOutlineItems(outlineContent).length > 1) {
-                // Level 1 with empty text: remove the item
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                const prevItem = getPreviousOutlineItem(currentItem, outlineContent);
-                currentItem.remove();
-                renumberOutline(outlineContent);
-                if (prevItem) {
-                    placeCursorAtEnd(prevItem);
-                }
-            }
-            // At level 1 with content → allow normal browser backspace (do nothing)
+            mindmapState.linkingMode = false;
+            mindmapState.firstNode = null;
         }
     }
-}
 
-// ================================================================
-//  INITIALIZATION
-// ================================================================
-window.initOutlineTemplate = function () {
-    const outlineContent = document.getElementById('outlineContent');
-    if (!outlineContent) return;
+    function createMindmapLink(fromId, toId) {
+        const canvas = document.getElementById('mindmapCanvas');
+        if (!canvas) return;
 
-    // Remove any old listener to prevent duplicates
-    outlineContent.removeEventListener('keydown', handleOutlineKeydown);
-    // Use capture phase to intercept before browser default focus behavior
-    outlineContent.addEventListener('keydown', handleOutlineKeydown, true);
-
-    // Initial renumber + toggle refresh
-    renumberOutline(outlineContent);
-
-    console.log('Outline template initialized with professional outlining support');
-};
-
-// Initialize the application
-async function initApp() {
-    try {
-        // Initialize IndexedDB
-        await initDB();
-
-        // Load all chapters from database
-        chapters = await loadAllChapters();
-
-        // Sort chapters by last edited (most recent first)
-        chapters.sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
-
-        // If no chapters exist, create a default one
-        if (chapters.length === 0) {
-            createNewChapter();
-        } else {
-            // Render sidebar with existing chapters
-            renderSidebar();
-
-            // Load the most recent chapter fully using loadChapter
-            loadChapter(chapters[0].id);
+        // Create SVG layer if it doesn't exist
+        let svg = canvas.querySelector('svg.mindmap-links');
+        if (!svg) {
+            svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.classList.add('mindmap-links');
+            svg.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1;';
+            canvas.insertBefore(svg, canvas.firstChild);
         }
 
-        // Setup drag and drop for images
-        setupDragAndDrop();
+        const fromNode = document.getElementById(fromId);
+        const toNode = document.getElementById(toId);
 
-        // Update storage quota display
-        updateStorageQuota();
+        if (!fromNode || !toNode) return;
 
-        // Render the user profile widget in the sidebar
-        if (window.LIBRARY) {
-            await window.LIBRARY.loadMyPublished();
-        }
-        renderUserProfile();
+        // Create link line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.classList.add('mindmap-link');
+        line.setAttribute('data-from', fromId);
+        line.setAttribute('data-to', toId);
+        line.setAttribute('stroke', '#3498db');
+        line.setAttribute('stroke-width', '2');
+        line.style.pointerEvents = 'auto';
+        line.style.cursor = 'pointer';
 
-        // Check if user just cloned a note from the library
-        await checkPendingClone();
-
-        // Initialize My References system
-        await initMyReferences();
-
-        // Set default paper texture (Grid)
-        const paper = document.getElementById('paper');
-        if (paper && !paper.className.includes('-texture')) {
-            paper.classList.add('grid-texture');
-        }
-
-        // Add event listener for selection changes
-        document.addEventListener('selectionchange', () => {
-            saveSelection();
-            handleSelectionChange();
-        });
-
-        // Event delegation for checkbox toggles in stream
-        document.getElementById('sequentialStream').addEventListener('click', function (e) {
-            if (e.target.classList.contains('checkbox')) {
-                e.preventDefault();
-                e.target.classList.toggle('checked');
-                const wrapper = e.target.parentElement;
-                const textDiv = wrapper.nextElementSibling;
-                if (textDiv && textDiv.classList.contains('checklist-text')) {
-                    textDiv.classList.toggle('completed');
-                }
-                // Trigger save
-                const block = e.target.closest('.content-area');
-                if (block && block.oninput) block.oninput();
+        // Add click to delete
+        line.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (confirm('Delete this link?')) {
+                line.remove();
+                mindmapState.links = mindmapState.links.filter(l =>
+                    !(l.from === fromId && l.to === toId)
+                );
             }
         });
 
-        // Markdown support on stream container
-        document.getElementById('sequentialStream').addEventListener('input', handleMarkdownInput);
+        svg.appendChild(line);
 
-        // Setup ruler events if ruler exists
-        setupRulerEvents();
+        mindmapState.links.push({ from: fromId, to: toId, element: line });
 
-        // Switch to basic math tab
-        switchMathTab('basic');
+        // Update line position
+        updateMindmapLink(line, fromNode, toNode);
 
-        // PHASE 1: Initialize Advanced Features
-        try {
-            initializeAdvancedFeatures();
-        } catch (err) {
-            console.warn('Some advanced features may not be available:', err.message);
-            showToast(`⚠️ ${err.message} - check console for details`);
-        }
-
-    } catch (err) {
-        console.error('Critical error initializing app:', err);
-        showToast('⚠️ Some features may not work correctly');
-    }
-}
-
-// ========== PHASE 1: ADVANCED FEATURES ==========
-let lassoSelector = null;
-let shapeRecognizer = null;
-
-function initializeAdvancedFeatures() {
-    const failures = [];
-
-    // Initialize Lasso Selection
-    try {
-        lassoSelector = new LassoSelector();
-        lassoSelector.initialize();
-        console.log('✅ Lasso Selection initialized');
-    } catch (err) {
-        console.error('❌ Lasso Selection failed:', err);
-        failures.push('Lasso Selection');
+        showToast('✓ Link created!');
     }
 
-    // Initialize Shape Recognition
-    try {
-        shapeRecognizer = new ShapeRecognizer();
-        shapeRecognizer.initialize();
-        shapeRecognizer.setSensitivity('moderate');
-        console.log('✅ Shape Recognition initialized');
-    } catch (err) {
-        console.error('❌ Shape Recognition failed:', err);
-        failures.push('Shape Recognition');
+    function updateMindmapLink(line, fromNode, toNode) {
+        const canvas = document.getElementById('mindmapCanvas');
+        if (!canvas) return;
+
+        const canvasRect = canvas.getBoundingClientRect();
+        const fromRect = fromNode.getBoundingClientRect();
+        const toRect = toNode.getBoundingClientRect();
+
+        const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left;
+        const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+        const x2 = toRect.left + toRect.width / 2 - canvasRect.left;
+        const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
     }
 
-    // Initialize Page Details Gesture
-    try {
-        const pageDetailsGesture = new PageDetailsGesture();
-        pageDetailsGesture.initialize();
-        console.log('✅ Page Details Gesture initialized');
-    } catch (err) {
-        console.error('❌ Page Details Gesture failed:', err);
-        failures.push('Page Details Gesture');
+    function makeMindmapNodeDraggable(node) {
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+
+        node.addEventListener('mousedown', function (e) {
+            // Don't drag if clicking input
+            if (e.target.tagName === 'INPUT') return;
+
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            const style = window.getComputedStyle(node);
+            initialLeft = parseFloat(style.left);
+            initialTop = parseFloat(style.top);
+
+            node.style.zIndex = 100;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!isDragging) return;
+
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            node.style.left = `${initialLeft + dx}px`;
+            node.style.top = `${initialTop + dy}px`;
+
+            // Update all connected links
+            updateLinksForNode(node.id);
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (isDragging) {
+                isDragging = false;
+                node.style.zIndex = 10;
+            }
+        });
     }
 
-    if (failures.length > 0) {
-        console.warn(`⚠️ Some features unavailable: ${failures.join(', ')}`);
-        // Don't throw — let Phase 2 and Phase 3 still initialize
-    } else {
-        console.log('✅ All Phase 1 Advanced Features initialized successfully');
-    }
-}
-
-function toggleLassoSelection() {
-    if (!lassoSelector) {
-        showToast('Lasso tool not available');
-        return;
+    function updateLinksForNode(nodeId) {
+        mindmapState.links.forEach(link => {
+            if (link.from === nodeId || link.to === nodeId) {
+                const fromNode = document.getElementById(link.from);
+                const toNode = document.getElementById(link.to);
+                if (fromNode && toNode) {
+                    updateMindmapLink(link.element, fromNode, toNode);
+                }
+            }
+        });
     }
 
-    // Exit sketch mode if active (mutual exclusion)
-    if (typeof isSketchMode !== 'undefined' && isSketchMode) {
-        if (typeof toggleSketchMode === 'function') toggleSketchMode();
-    }
+    window.autoLayoutMindmap = function () {
+        const canvas = document.getElementById('mindmapCanvas');
+        if (!canvas) return;
 
-    const isActive = lassoSelector.toggleLassoMode();
-    const btn = document.getElementById('lassoBtn');
-    if (btn) btn.classList.toggle('active', isActive);
+        const nodes = Array.from(canvas.querySelectorAll('.mindmap-node'));
+        const centerNode = nodes.find(n => n.classList.contains('central'));
+        const otherNodes = nodes.filter(n => !n.classList.contains('central'));
 
-    showToast(isActive ? 'Lasso Selection Active — Draw to select elements' : 'Lasso Selection Disabled');
-}
+        if (!centerNode) return;
 
-function toggleShapeRecognition() {
-    if (!shapeRecognizer) {
-        showToast('Shape recognition not available');
-        return;
-    }
+        // Position center node
+        centerNode.style.left = '50%';
+        centerNode.style.top = '50%';
+        centerNode.style.transform = 'translate(-50%, -50%)';
 
-    shapeRecognizer.isEnabled = !shapeRecognizer.isEnabled;
-    const btn = document.getElementById('shapeRecBtn');
+        // Arrange other nodes in a circle
+        const radius = 200; // pixels
+        const angleStep = (2 * Math.PI) / otherNodes.length;
 
-    if (shapeRecognizer.isEnabled) {
-        btn.style.background = '#9b59b6';
-        btn.style.color = 'white';
-        showToast('Shape Recognition ON - Draw shapes to auto-correct');
+        otherNodes.forEach((node, index) => {
+            const angle = index * angleStep;
+            const x = 50 + (radius * Math.cos(angle)) / canvas.clientWidth * 100; // Convert to %
+            const y = 50 + (radius * Math.sin(angle)) / canvas.clientHeight * 100;
 
-        // Connect shape recognition to drawing system
-        connectShapeRecognition();
-    } else {
-        btn.style.background = '';
-        btn.style.color = '';
-        showToast('Shape Recognition OFF');
-    }
-}
+            node.style.left = `${x}%`;
+            node.style.top = `${y}%`;
+            node.style.transform = 'translate(-50%, -50%)';
+        });
 
-function connectShapeRecognition() {
-    // This function will integrate shape recognition with the existing drawing system
-    // When a stroke ends, analyze it for shapes
+        // Update all links
+        mindmapState.links.forEach(link => {
+            const fromNode = document.getElementById(link.from);
+            const toNode = document.getElementById(link.to);
+            if (fromNode && toNode) {
+                updateMindmapLink(link.element, fromNode, toNode);
+            }
+        });
 
-    // Hook into the existing sketch canvas system
-    shapeRecognizer.onShapeDetected = (shapeResult) => {
-        // When a shape is accepted, draw it on the canvas
-        drawPerfectShape(shapeResult);
-        showToast(`${shapeResult.type} detected and corrected!`);
+        showToast('🎨 Layout organized!');
     };
-}
 
-function drawPerfectShape(shapeResult) {
-    // Get the active canvas context
-    const canvas = document.querySelector('canvas.active, canvas');
-    if (!canvas) return;
+    // Initialize mindmap when template is loaded
+    window.initMindmapTemplate = function () {
+        const canvas = document.getElementById('mindmapCanvas');
+        if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    const bounds = shapeResult.params.bounds || shapeResult.params;
+        // Make all existing nodes (including central node) draggable
+        const existingNodes = canvas.querySelectorAll('.mindmap-node');
+        existingNodes.forEach(node => {
+            if (!node.id) {
+                node.id = `mindmap-node-${mindmapState.nextNodeId++}`;
+            }
+            makeMindmapNodeDraggable(node);
 
-    ctx.strokeStyle = '#2c3e50';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+            // Add click handler for linking
+            node.addEventListener('click', (e) => {
+                if (mindmapState.linkingMode) {
+                    handleMindmapNodeClick(node.id);
+                }
+            });
 
-    if (shapeResult.type === 'circle') {
-        const { center, radius } = shapeResult.params;
-        ctx.beginPath();
-        ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI);
-        ctx.stroke();
-    } else if (shapeResult.type === 'rectangle' || shapeResult.type === 'square') {
-        const { bounds } = shapeResult.params;
-        ctx.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
-    } else if (shapeResult.type === 'line') {
-        const { start, end } = shapeResult.params;
-        ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x, end.y);
-        ctx.stroke();
-    }
-}
+            mindmapState.nodes.push({ id: node.id, element: node });
+        });
 
-// ========== END PHASE 1 ADVANCED FEATURES ==========
+        console.log('Mindmap template initialized - all nodes are draggable');
+    };
 
-// ========== PHASE 2: AUDIO RECORDING ==========
-let audioRecorder = null;
-window.widgetRail = null;
+    // ==================== OUTLINE TEMPLATE FUNCTIONS ====================
 
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        window.widgetRail = new WidgetRailManager();
-        window.widgetRail.initialize();
-    } catch (e) {
-        console.error('Error initializing widget rail:', e);
-    }
-});
+    // Outline label generators for each level
+    // Level 1 → Roman numerals, Level 2 → Uppercase, Level 3 → Numbers, Level 4 → Lowercase
+    const outlineLabelGenerators = {
+        1: (index) => {
+            const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
+                'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
+            return romans[index] || `${index + 1}`;
+        },
+        2: (index) => String.fromCharCode(65 + (index % 26)), // A, B, C, ...
+        3: (index) => `${index + 1}`,                          // 1, 2, 3, ...
+        4: (index) => String.fromCharCode(97 + (index % 26))   // a, b, c, ...
+    };
 
-// Update initializeAdvancedFeatures to include audio recorder
-const originalInitAdvanced = initializeAdvancedFeatures;
-initializeAdvancedFeatures = function () {
-    // Run Phase 1 — but don't let its throws block Phase 2
-    try { originalInitAdvanced(); } catch (e) { /* Phase 1 partial failures already logged */ }
-
-    // Initialize Audio Recorder
-    try {
-        audioRecorder = new AudioRecorderWidget();
-        audioRecorder.initialize();
-        if (window.widgetRail) {
-            window.widgetRail.attachAudioRecorder(audioRecorder);
+    // ---- Helper: find the .outline-item ancestor of a DOM node ----
+    function findOutlineItem(node) {
+        let current = node;
+        while (current && current.id !== 'outlineContent') {
+            if (current.classList && current.classList.contains('outline-item')) {
+                return current;
+            }
+            current = current.parentElement;
         }
-        console.log('✅ Audio Recorder initialized');
-    } catch (err) {
-        console.error('Error initializing audio recorder:', err);
-    }
-};
-
-// toggleAudioRecording: the AudioRecorderWidget class wires #audioRecordBtn
-// directly in its own _wireButton() method, so no wrapper needed here.
-function toggleAudioRecording() {
-    if (audioRecorder) audioRecorder.toggle();
-}
-
-
-
-// ========== END PHASE 2 AUDIO RECORDING ==========
-
-// ========== PHASE 3: GESTURE FEATURES ==========
-let scribbleEraser = null;
-let pageDetailsGesture = null;
-
-// Update initializeAdvancedFeatures to include Phase 3
-const originalInitAdvanced2 = initializeAdvancedFeatures;
-initializeAdvancedFeatures = function () {
-    // Run Phase 2 — but don't let its throws block Phase 3
-    try { originalInitAdvanced2(); } catch (e) { /* Phase 2 partial failures already logged */ }
-
-    // Initialize Scribble Eraser
-    try {
-        scribbleEraser = new ScribbleEraser();
-        scribbleEraser.initialize();
-        scribbleEraser.setSensitivity('medium');
-        console.log('✅ Scribble Eraser initialized');
-    } catch (err) {
-        console.error('Error initializing scribble eraser:', err);
+        return null;
     }
 
-    // Initialize Page Details Gesture
-    try {
-        pageDetailsGesture = new PageDetailsGesture();
-        pageDetailsGesture.initialize();
-        console.log('✅ Page Details Gesture initialized');
-    } catch (err) {
-        console.error('Error initializing page details gesture:', err);
+    // ---- Helper: read / write level from class name ----
+    function getItemLevel(item) {
+        const match = item.className.match(/level-(\d)/);
+        return match ? parseInt(match[1]) : 1;
     }
-};
 
-// Note: Scribble eraser integrates with existing drawing/sketch system
-// It will analyze strokes and automatically trigger erase when scribble detected
-// No additional UI buttons needed - it works automatically when enabled
+    function setItemLevel(item, level) {
+        // Preserve collapsed state if present
+        const isCollapsed = item.classList.contains('outline-collapsed');
+        item.className = `outline-item level-${level}`;
+        if (isCollapsed) item.classList.add('outline-collapsed');
+    }
 
-// ========== END PHASE 3 GESTURE FEATURES ==========
+    // ---- Helper: get text content excluding the label span ----
+    function getItemText(item) {
+        const label = item.querySelector('.outline-label');
+        const toggle = item.querySelector('.outline-toggle-btn');
+        let text = '';
+        for (let node of item.childNodes) {
+            if (node !== label && node !== toggle) {
+                text += node.textContent || '';
+            }
+        }
+        return text.trim();
+    }
+
+    // ---- Helper: create a new outline item div ----
+    function createOutlineItem(level) {
+        const item = document.createElement('div');
+        item.className = `outline-item level-${level}`;
+
+        const label = document.createElement('span');
+        label.className = 'outline-label';
+        label.textContent = ''; // Will be set by renumberOutline
+
+        item.appendChild(label);
+        item.appendChild(document.createTextNode(' '));
+
+        return item;
+    }
+
+    // ---- Helper: place the caret at the end of an item's text ----
+    function placeCursorAtEnd(item) {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        const lastChild = item.lastChild;
+        if (lastChild && lastChild.nodeType === Node.TEXT_NODE) {
+            range.setStart(lastChild, lastChild.textContent.length);
+            range.collapse(true);
+        } else {
+            range.selectNodeContents(item);
+            range.collapse(false);
+        }
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    // ---- Helper: place the caret at the start of an item's text (after label) ----
+    function placeCursorAtStart(item) {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        const label = item.querySelector('.outline-label');
+        // Find the first text node after the label
+        let textNode = null;
+        for (let node of item.childNodes) {
+            if (node !== label && node !== item.querySelector('.outline-toggle-btn')) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    textNode = node;
+                    break;
+                }
+            }
+        }
+        if (textNode) {
+            // Skip leading space
+            const startOffset = textNode.textContent.startsWith(' ') ? 1 : 0;
+            range.setStart(textNode, startOffset);
+            range.collapse(true);
+        } else {
+            range.selectNodeContents(item);
+            range.collapse(false);
+        }
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    // ---- Helper: detect if cursor is at the very start of an item ----
+    function isCursorAtStart(item) {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return false;
+
+        const anchorNode = sel.anchorNode;
+        const anchorOffset = sel.anchorOffset;
+        const label = item.querySelector('.outline-label');
+        const toggle = item.querySelector('.outline-toggle-btn');
+
+        // Cursor is on the item div itself at position 0, 1, or 2 (toggle/label are early children)
+        if (anchorNode === item && anchorOffset <= 2) return true;
+
+        // Cursor is inside the label or toggle
+        if (anchorNode === label || (label && label.contains(anchorNode))) return true;
+        if (anchorNode === toggle || (toggle && toggle.contains(anchorNode))) return true;
+
+        // Cursor is in a text node
+        if (anchorNode.nodeType === Node.TEXT_NODE) {
+            // If item text is empty, cursor is always "at start"
+            if (getItemText(item) === '') return true;
+
+            // Cursor at offset 0 in a text node right after the label
+            if (anchorOffset === 0) {
+                const prev = anchorNode.previousSibling;
+                if (!prev || prev === label || prev === toggle ||
+                    (prev.nodeType === Node.TEXT_NODE && prev.textContent.trim() === '')) {
+                    return true;
+                }
+            }
+            // Cursor at offset 1 if the text starts with a space (the space after label)
+            if (anchorOffset <= 1 && anchorNode.textContent.match(/^\s/)) {
+                const prev = anchorNode.previousSibling;
+                if (!prev || prev === label || prev === toggle) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // ---- Helper: get all outline items as an array ----
+    function getAllOutlineItems(container) {
+        return Array.from(container.querySelectorAll('.outline-item'));
+    }
+
+    // ---- Helper: get the previous visible sibling outline item ----
+    function getPreviousOutlineItem(item, container) {
+        const items = getAllOutlineItems(container);
+        const idx = items.indexOf(item);
+        if (idx <= 0) return null;
+        return items[idx - 1];
+    }
+
+    // ================================================================
+    //  RENUMBER OUTLINE — counter-array approach
+    //  Tracks counters per level, resets deeper counters on level change.
+    // ================================================================
+    function renumberOutline(container) {
+        const items = getAllOutlineItems(container);
+        // counters[0] = level1 count, counters[1] = level2, etc.
+        const counters = [0, 0, 0, 0];
+
+        items.forEach(item => {
+            const level = getItemLevel(item); // 1-4
+            const idx = level - 1;            // 0-3
+
+            // Reset all deeper level counters when a higher level is encountered
+            for (let d = idx + 1; d < 4; d++) {
+                counters[d] = 0;
+            }
+
+            // Increment counter for this level
+            counters[idx]++;
+
+            // Assign label via generator
+            const label = item.querySelector('.outline-label');
+            if (label) {
+                const generator = outlineLabelGenerators[level];
+                label.textContent = generator
+                    ? generator(counters[idx] - 1) + '.'
+                    : `${counters[idx]}.`;
+            }
+        });
+
+        // After renumbering, refresh collapse toggle arrows
+        refreshOutlineToggles(container);
+    }
+
+    // ================================================================
+    //  COLLAPSE / EXPAND — per-item toggle arrows (▶ / ▼)
+    // ================================================================
+
+    /**
+     * Checks if an item has "children" — i.e., the next sibling items have a
+     * deeper level. Children are all consecutive items with level > this item's
+     * level, stopping when a same-or-higher level is hit.
+     */
+    function getOutlineChildren(item, container) {
+        const items = getAllOutlineItems(container);
+        const idx = items.indexOf(item);
+        const level = getItemLevel(item);
+        const children = [];
+
+        for (let i = idx + 1; i < items.length; i++) {
+            if (getItemLevel(items[i]) > level) {
+                children.push(items[i]);
+            } else {
+                break; // Same or higher level — stop
+            }
+        }
+        return children;
+    }
+
+    /**
+     * Add or remove toggle arrows (▶/▼) on items that have children.
+     * Called after every renumber.
+     */
+    function refreshOutlineToggles(container) {
+        const items = getAllOutlineItems(container);
+
+        items.forEach((item, i) => {
+            const level = getItemLevel(item);
+            let hasChildren = false;
+
+            // Check if the next item is deeper
+            if (i + 1 < items.length && getItemLevel(items[i + 1]) > level) {
+                hasChildren = true;
+            }
+
+            let toggleBtn = item.querySelector('.outline-toggle-btn');
+
+            if (hasChildren) {
+                // Add toggle button if not present
+                if (!toggleBtn) {
+                    toggleBtn = document.createElement('span');
+                    toggleBtn.className = 'outline-toggle-btn';
+                    toggleBtn.setAttribute('contenteditable', 'false');
+                    toggleBtn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleOutlineItem(item, container);
+                    });
+                    // Insert as first child (before label)
+                    item.insertBefore(toggleBtn, item.firstChild);
+                }
+                // Set arrow direction based on collapsed state
+                const isCollapsed = item.classList.contains('outline-collapsed');
+                toggleBtn.textContent = isCollapsed ? '▶' : '▼';
+                item.classList.add('has-children');
+            } else {
+                // Remove toggle if item has no children
+                if (toggleBtn) {
+                    toggleBtn.remove();
+                }
+                item.classList.remove('has-children', 'outline-collapsed');
+            }
+        });
+    }
+
+    /**
+     * Toggle collapse/expand for a single item.
+     */
+    function toggleOutlineItem(item, container) {
+        const isCollapsed = item.classList.contains('outline-collapsed');
+
+        if (isCollapsed) {
+            expandOutlineItem(item, container);
+        } else {
+            collapseOutlineItem(item, container);
+        }
+    }
+
+    /**
+     * Collapse: hide all children (items with deeper level following this item).
+     */
+    function collapseOutlineItem(item, container) {
+        const children = getOutlineChildren(item, container);
+        children.forEach(child => {
+            child.style.display = 'none';
+            child.setAttribute('data-outline-hidden', 'true');
+        });
+        item.classList.add('outline-collapsed');
+
+        // Update toggle arrow
+        const toggleBtn = item.querySelector('.outline-toggle-btn');
+        if (toggleBtn) toggleBtn.textContent = '▶';
+    }
+
+    /**
+     * Expand: show direct children. If a child is itself collapsed,
+     * keep its children hidden (respect nested collapse state).
+     */
+    function expandOutlineItem(item, container) {
+        const items = getAllOutlineItems(container);
+        const idx = items.indexOf(item);
+        const level = getItemLevel(item);
+
+        item.classList.remove('outline-collapsed');
+
+        // Walk through children and show them, but respect nested collapse
+        let skipUntilLevel = -1;
+
+        for (let i = idx + 1; i < items.length; i++) {
+            const childLevel = getItemLevel(items[i]);
+
+            // Stop when we hit same or higher level than the parent
+            if (childLevel <= level) break;
+
+            // If we're skipping because of a nested collapsed parent
+            if (skipUntilLevel > 0 && childLevel > skipUntilLevel) {
+                // Keep hidden — nested under a collapsed item
+                continue;
+            }
+
+            // Show this item
+            items[i].style.display = '';
+            items[i].removeAttribute('data-outline-hidden');
+            skipUntilLevel = -1;
+
+            // If this child is itself collapsed, skip its descendants
+            if (items[i].classList.contains('outline-collapsed')) {
+                skipUntilLevel = childLevel;
+            }
+        }
+
+        // Update toggle arrow
+        const toggleBtn = item.querySelector('.outline-toggle-btn');
+        if (toggleBtn) toggleBtn.textContent = '▼';
+    }
+
+    /**
+     * Collapse All — collapse every item that has children, hide all non-level-1 items.
+     */
+    window.collapseAllOutline = function () {
+        const container = document.getElementById('outlineContent');
+        if (!container) return;
+
+        const items = getAllOutlineItems(container);
+        items.forEach(item => {
+            const level = getItemLevel(item);
+            if (level > 1) {
+                item.style.display = 'none';
+                item.setAttribute('data-outline-hidden', 'true');
+            }
+            // Mark items with children as collapsed
+            const hasChildren = item.classList.contains('has-children');
+            if (hasChildren) {
+                item.classList.add('outline-collapsed');
+                const toggleBtn = item.querySelector('.outline-toggle-btn');
+                if (toggleBtn) toggleBtn.textContent = '▶';
+            }
+        });
+
+        showToast('Collapsed to level 1');
+    };
+
+    /**
+     * Expand All — show every item and clear all collapsed states.
+     */
+    window.expandAllOutline = function () {
+        const container = document.getElementById('outlineContent');
+        if (!container) return;
+
+        const items = getAllOutlineItems(container);
+        items.forEach(item => {
+            item.style.display = '';
+            item.removeAttribute('data-outline-hidden');
+            item.classList.remove('outline-collapsed');
+
+            const toggleBtn = item.querySelector('.outline-toggle-btn');
+            if (toggleBtn) toggleBtn.textContent = '▼';
+        });
+
+        showToast('Expanded all levels');
+    };
+
+    // ================================================================
+    //  MAIN KEYDOWN HANDLER
+    // ================================================================
+    function handleOutlineKeydown(e) {
+        const outlineContent = document.getElementById('outlineContent');
+        if (!outlineContent) return;
+
+        // Only handle keys inside the outline area
+        if (!outlineContent.contains(e.target) && e.target !== outlineContent) return;
+
+        const sel = window.getSelection();
+        let currentItem = findOutlineItem(sel.anchorNode);
+
+        // ===== TAB (indent deeper) =====
+        if (e.key === 'Tab' && !e.shiftKey) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            if (!currentItem) {
+                // Create a new item if none exists
+                const item = createOutlineItem(1);
+                outlineContent.appendChild(item);
+                renumberOutline(outlineContent);
+                placeCursorAtEnd(item);
+                return;
+            }
+
+            const level = getItemLevel(currentItem);
+
+            // GUARD: cannot indent past level 4
+            if (level >= 4) return;
+
+            // GUARD: first item in outline cannot be indented
+            const prevItem = getPreviousOutlineItem(currentItem, outlineContent);
+            if (!prevItem) return;
+
+            // GUARD: cannot jump more than 1 level deeper than previous sibling
+            // This ensures logical hierarchy — you can't go from level-1 to level-3
+            const prevLevel = getItemLevel(prevItem);
+            if (level + 1 > prevLevel + 1) return;
+
+            setItemLevel(currentItem, level + 1);
+            renumberOutline(outlineContent);
+            return;
+        }
+
+        // ===== SHIFT+TAB (outdent) =====
+        if (e.key === 'Tab' && e.shiftKey) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            if (!currentItem) return;
+
+            const level = getItemLevel(currentItem);
+            // GUARD: cannot outdent past level 1
+            if (level <= 1) return;
+
+            setItemLevel(currentItem, level - 1);
+            renumberOutline(outlineContent);
+            return;
+        }
+
+        // ===== ENTER (new item at same level, or remove empty item) =====
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            if (currentItem) {
+                const text = getItemText(currentItem);
+                const allItems = getAllOutlineItems(outlineContent);
+
+                // If current item is empty and there are other items, remove it
+                if (text === '' && allItems.length > 1) {
+                    const prevItem = getPreviousOutlineItem(currentItem, outlineContent);
+                    const nextSibling = currentItem.nextElementSibling;
+                    currentItem.remove();
+                    renumberOutline(outlineContent);
+
+                    // Focus the previous item, or the next one if no previous
+                    if (prevItem) {
+                        placeCursorAtEnd(prevItem);
+                    } else if (nextSibling && nextSibling.classList.contains('outline-item')) {
+                        placeCursorAtStart(nextSibling);
+                    }
+                    return;
+                }
+
+                // Normal case: insert new item at same level after current
+                const level = getItemLevel(currentItem);
+                const newItem = createOutlineItem(level);
+                currentItem.parentNode.insertBefore(newItem, currentItem.nextSibling);
+                renumberOutline(outlineContent);
+                placeCursorAtEnd(newItem);
+            } else {
+                // No current item — create a level-1 item
+                const newItem = createOutlineItem(1);
+                outlineContent.appendChild(newItem);
+                renumberOutline(outlineContent);
+                placeCursorAtEnd(newItem);
+            }
+            return;
+        }
+
+        // ===== BACKSPACE (smart outdent at start of line) =====
+        if (e.key === 'Backspace') {
+            if (!currentItem) return;
+
+            if (isCursorAtStart(currentItem)) {
+                const level = getItemLevel(currentItem);
+                const text = getItemText(currentItem);
+
+                if (level > 1) {
+                    // Outdent: move up one level (same as Shift+Tab)
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    setItemLevel(currentItem, level - 1);
+                    renumberOutline(outlineContent);
+                } else if (text === '' && getAllOutlineItems(outlineContent).length > 1) {
+                    // Level 1 with empty text: remove the item
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    const prevItem = getPreviousOutlineItem(currentItem, outlineContent);
+                    currentItem.remove();
+                    renumberOutline(outlineContent);
+                    if (prevItem) {
+                        placeCursorAtEnd(prevItem);
+                    }
+                }
+                // At level 1 with content → allow normal browser backspace (do nothing)
+            }
+        }
+    }
+
+    // ================================================================
+    //  INITIALIZATION
+    // ================================================================
+    window.initOutlineTemplate = function () {
+        const outlineContent = document.getElementById('outlineContent');
+        if (!outlineContent) return;
+
+        // Remove any old listener to prevent duplicates
+        outlineContent.removeEventListener('keydown', handleOutlineKeydown);
+        // Use capture phase to intercept before browser default focus behavior
+        outlineContent.addEventListener('keydown', handleOutlineKeydown, true);
+
+        // Initial renumber + toggle refresh
+        renumberOutline(outlineContent);
+
+        console.log('Outline template initialized with professional outlining support');
+    };
+
+    // Initialize the application
+    async function initApp() {
+        try {
+            // Initialize IndexedDB
+            await initDB();
+
+            // Load all chapters from database
+            chapters = await loadAllChapters();
+
+            // Sort chapters by last edited (most recent first)
+            chapters.sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
+
+            // If no chapters exist, create a default one
+            if (chapters.length === 0) {
+                createNewChapter();
+            } else {
+                // Render sidebar with existing chapters
+                renderSidebar();
+
+                // Load the most recent chapter fully using loadChapter
+                loadChapter(chapters[0].id);
+            }
+
+            // Setup drag and drop for images
+            setupDragAndDrop();
+
+            // Update storage quota display
+            updateStorageQuota();
+
+            // Render the user profile widget in the sidebar
+            if (window.LIBRARY) {
+                await window.LIBRARY.loadMyPublished();
+            }
+            renderUserProfile();
+
+            // Check if user just cloned a note from the library
+            await checkPendingClone();
+
+            // Initialize My References system
+            await initMyReferences();
+
+            // Set default paper texture (Grid)
+            const paper = document.getElementById('paper');
+            if (paper && !paper.className.includes('-texture')) {
+                paper.classList.add('grid-texture');
+            }
+
+            // Add event listener for selection changes
+            document.addEventListener('selectionchange', () => {
+                saveSelection();
+                handleSelectionChange();
+            });
+
+            // Notebook Realism: Dog-Ear Bookmark click handler
+            const paperEl = document.getElementById('paper');
+            if (paperEl) {
+                paperEl.addEventListener('click', async (e) => {
+                    // Check if click was in the top right corner (approx 50x50 area)
+                    const rect = paperEl.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+
+                    if (clickX > rect.width - 50 && clickY < 50) {
+                        const chapter = chapters.find(c => c.id === currentId);
+                        if (chapter) {
+                            if (!chapter.metadata) chapter.metadata = {};
+                            chapter.metadata.isBookmarked = !chapter.metadata.isBookmarked;
+                            await saveChapterToDB(chapter);
+
+                            if (chapter.metadata.isBookmarked) {
+                                paperEl.classList.add('bookmarked');
+                                showToast('📍 Page Bookmarked');
+                            } else {
+                                paperEl.classList.remove('bookmarked');
+                                showToast('Bookmarked removed');
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Event delegation for checkbox toggles in stream
+            document.getElementById('sequentialStream').addEventListener('click', function (e) {
+                if (e.target.classList.contains('checkbox')) {
+                    e.preventDefault();
+                    e.target.classList.toggle('checked');
+                    const wrapper = e.target.parentElement;
+                    const textDiv = wrapper.nextElementSibling;
+                    if (textDiv && textDiv.classList.contains('checklist-text')) {
+                        textDiv.classList.toggle('completed');
+                    }
+                    // Trigger save
+                    const block = e.target.closest('.content-area');
+                    if (block && block.oninput) block.oninput();
+                }
+            });
+
+            // Markdown support on stream container
+            document.getElementById('sequentialStream').addEventListener('input', handleMarkdownInput);
+
+            // Setup ruler events if ruler exists
+            setupRulerEvents();
+
+            // Switch to basic math tab
+            switchMathTab('basic');
+
+            // PHASE 1: Initialize Advanced Features
+            try {
+                initializeAdvancedFeatures();
+            } catch (err) {
+                console.warn('Some advanced features may not be available:', err.message);
+                showToast(`⚠️ ${err.message} - check console for details`);
+            }
+
+        } catch (err) {
+            console.error('Critical error initializing app:', err);
+            showToast('⚠️ Some features may not work correctly');
+        }
+    }
+
+    // ========== PHASE 1: ADVANCED FEATURES ==========
+    let lassoSelector = null;
+    let shapeRecognizer = null;
+
+    function initializeAdvancedFeatures() {
+        const failures = [];
+
+        // Initialize Lasso Selection
+        try {
+            lassoSelector = new LassoSelector();
+            lassoSelector.initialize();
+            console.log('✅ Lasso Selection initialized');
+        } catch (err) {
+            console.error('❌ Lasso Selection failed:', err);
+            failures.push('Lasso Selection');
+        }
+
+        // Initialize Shape Recognition
+        try {
+            shapeRecognizer = new ShapeRecognizer();
+            shapeRecognizer.initialize();
+            shapeRecognizer.setSensitivity('moderate');
+            console.log('✅ Shape Recognition initialized');
+        } catch (err) {
+            console.error('❌ Shape Recognition failed:', err);
+            failures.push('Shape Recognition');
+        }
+
+        // Initialize Page Details Gesture
+        try {
+            const pageDetailsGesture = new PageDetailsGesture();
+            pageDetailsGesture.initialize();
+            console.log('✅ Page Details Gesture initialized');
+        } catch (err) {
+            console.error('❌ Page Details Gesture failed:', err);
+            failures.push('Page Details Gesture');
+        }
+
+        if (failures.length > 0) {
+            console.warn(`⚠️ Some features unavailable: ${failures.join(', ')}`);
+            // Don't throw — let Phase 2 and Phase 3 still initialize
+        } else {
+            console.log('✅ All Phase 1 Advanced Features initialized successfully');
+        }
+    }
+
+    function toggleLassoSelection() {
+        if (!lassoSelector) {
+            showToast('Lasso tool not available');
+            return;
+        }
+
+        // Exit sketch mode if active (mutual exclusion)
+        if (typeof isSketchMode !== 'undefined' && isSketchMode) {
+            if (typeof toggleSketchMode === 'function') toggleSketchMode();
+        }
+
+        const isActive = lassoSelector.toggleLassoMode();
+        const btn = document.getElementById('lassoBtn');
+        if (btn) btn.classList.toggle('active', isActive);
+
+        showToast(isActive ? 'Lasso Selection Active — Draw to select elements' : 'Lasso Selection Disabled');
+    }
+
+    function toggleShapeRecognition() {
+        if (!shapeRecognizer) {
+            showToast('Shape recognition not available');
+            return;
+        }
+
+        shapeRecognizer.isEnabled = !shapeRecognizer.isEnabled;
+        const btn = document.getElementById('shapeRecBtn');
+
+        if (shapeRecognizer.isEnabled) {
+            btn.style.background = '#9b59b6';
+            btn.style.color = 'white';
+            showToast('Shape Recognition ON - Draw shapes to auto-correct');
+
+            // Connect shape recognition to drawing system
+            connectShapeRecognition();
+        } else {
+            btn.style.background = '';
+            btn.style.color = '';
+            showToast('Shape Recognition OFF');
+        }
+    }
+
+    function connectShapeRecognition() {
+        // This function will integrate shape recognition with the existing drawing system
+        // When a stroke ends, analyze it for shapes
+
+        // Hook into the existing sketch canvas system
+        shapeRecognizer.onShapeDetected = (shapeResult) => {
+            // When a shape is accepted, draw it on the canvas
+            drawPerfectShape(shapeResult);
+            showToast(`${shapeResult.type} detected and corrected!`);
+        };
+    }
+
+    function drawPerfectShape(shapeResult) {
+        // Get the active canvas context
+        const canvas = document.querySelector('canvas.active, canvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const bounds = shapeResult.params.bounds || shapeResult.params;
+
+        ctx.strokeStyle = '#2c3e50';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        if (shapeResult.type === 'circle') {
+            const { center, radius } = shapeResult.params;
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+        } else if (shapeResult.type === 'rectangle' || shapeResult.type === 'square') {
+            const { bounds } = shapeResult.params;
+            ctx.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
+        } else if (shapeResult.type === 'line') {
+            const { start, end } = shapeResult.params;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+        }
+    }
+
+    // ========== END PHASE 1 ADVANCED FEATURES ==========
+
+    // ========== PHASE 2: AUDIO RECORDING ==========
+    let audioRecorder = null;
+    window.widgetRail = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        try {
+            window.widgetRail = new WidgetRailManager();
+            window.widgetRail.initialize();
+        } catch (e) {
+            console.error('Error initializing widget rail:', e);
+        }
+    });
+
+    // Update initializeAdvancedFeatures to include audio recorder
+    const originalInitAdvanced = initializeAdvancedFeatures;
+    initializeAdvancedFeatures = function () {
+        // Run Phase 1 — but don't let its throws block Phase 2
+        try { originalInitAdvanced(); } catch (e) { /* Phase 1 partial failures already logged */ }
+
+        // Initialize Audio Recorder
+        try {
+            audioRecorder = new AudioRecorderWidget();
+            audioRecorder.initialize();
+            if (window.widgetRail) {
+                window.widgetRail.attachAudioRecorder(audioRecorder);
+            }
+            console.log('✅ Audio Recorder initialized');
+        } catch (err) {
+            console.error('Error initializing audio recorder:', err);
+        }
+    };
+
+    // toggleAudioRecording: the AudioRecorderWidget class wires #audioRecordBtn
+    // directly in its own _wireButton() method, so no wrapper needed here.
+    function toggleAudioRecording() {
+        if (audioRecorder) audioRecorder.toggle();
+    }
 
 
 
-initApp();
-setTimeout(resizeCanvas, 500);
+    // ========== END PHASE 2 AUDIO RECORDING ==========
+
+    // ========== PHASE 3: GESTURE FEATURES ==========
+    let scribbleEraser = null;
+    let pageDetailsGesture = null;
+
+    // Update initializeAdvancedFeatures to include Phase 3
+    const originalInitAdvanced2 = initializeAdvancedFeatures;
+    initializeAdvancedFeatures = function () {
+        // Run Phase 2 — but don't let its throws block Phase 3
+        try { originalInitAdvanced2(); } catch (e) { /* Phase 2 partial failures already logged */ }
+
+        // Initialize Scribble Eraser
+        try {
+            scribbleEraser = new ScribbleEraser();
+            scribbleEraser.initialize();
+            scribbleEraser.setSensitivity('medium');
+            console.log('✅ Scribble Eraser initialized');
+        } catch (err) {
+            console.error('Error initializing scribble eraser:', err);
+        }
+
+        // Initialize Page Details Gesture
+        try {
+            pageDetailsGesture = new PageDetailsGesture();
+            pageDetailsGesture.initialize();
+            console.log('✅ Page Details Gesture initialized');
+        } catch (err) {
+            console.error('Error initializing page details gesture:', err);
+        }
+    };
+
+    // Note: Scribble eraser integrates with existing drawing/sketch system
+    // It will analyze strokes and automatically trigger erase when scribble detected
+    // No additional UI buttons needed - it works automatically when enabled
+
+    // ========== END PHASE 3 GESTURE FEATURES ==========
 
 
-// ========== AUTO-GENERATED EVENT LISTENERS ==========
-document.addEventListener("DOMContentLoaded", function () {
-    (function () { var el = document.querySelector('#darkModeToggle'); if (el) el.addEventListener('click', function () { toggleDarkMode() }); })();
-    (function () { var el = document.querySelector('#mobileMenuBtn'); if (el) el.addEventListener('click', function () { toggleMobileSidebar() }); })();
-    (function () { var el = document.querySelector('#_auto_1'); if (el) el.addEventListener('click', function () { toggleFocusMode() }); })();
-    (function () { var el = document.querySelector('#_auto_2'); if (el) el.addEventListener('click', function () { exitFlashcardMode() }); })();
-    (function () { var el = document.querySelector('#_auto_3'); if (el) el.addEventListener('click', function () { flipCard() }); })();
-    (function () { var el = document.querySelector('#_auto_4'); if (el) el.addEventListener('click', function () { prevCard() }); })();
-    (function () { var el = document.querySelector('#_auto_5'); if (el) el.addEventListener('click', function () { nextCard() }); })();
-    (function () { var el = document.querySelector('#_auto_6'); if (el) el.addEventListener('click', function () { toggleCircuitComponents() }); })();
-    (function () { var el = document.querySelector('#mathBuffer'); if (el) el.addEventListener('input', function () { updateMathPreview() }); })();
-    (function () { var el = document.querySelector('#_auto_7'); if (el) el.addEventListener('click', function () { insertMathFromBuffer() }); })();
-    (function () { var el = document.querySelector('#_auto_8'); if (el) el.addEventListener('click', function () { toggleMathMode() }); })();
-    (function () { var el = document.querySelector('#_auto_9'); if (el) el.addEventListener('click', function () { switchMathTab('basic', this) }); })();
-    (function () { var el = document.querySelector('#_auto_10'); if (el) el.addEventListener('click', function () { switchMathTab('trig', this) }); })();
-    (function () { var el = document.querySelector('#_auto_11'); if (el) el.addEventListener('click', function () { switchMathTab('calc', this) }); })();
-    (function () { var el = document.querySelector('#_auto_12'); if (el) el.addEventListener('click', function () { switchMathTab('geom', this) }); })();
-    (function () { var el = document.querySelector('#_auto_13'); if (el) el.addEventListener('click', function () { switchMathTab('struct', this) }); })();
-    (function () { var el = document.querySelector('#_auto_14'); if (el) el.addEventListener('click', function () { confirmTraceTable() }); })();
-    (function () { var el = document.querySelector('#_auto_15'); if (el) el.addEventListener('click', function () { closeTraceModal() }); })();
-    (function () { var el = document.querySelector('#constInput'); if (el) el.addEventListener('input', function () { lookupConstant() }); })();
-    (function () { var el = document.querySelector('#_auto_16'); if (el) el.addEventListener('click', function () { confirmConstant() }); })();
-    (function () { var el = document.querySelector('#_auto_17'); if (el) el.addEventListener('click', function () { closeConstantModal() }); })();
-    (function () { var el = document.querySelector('#_auto_18'); if (el) el.addEventListener('click', function () { renderAnatomyMap('body') }); })();
-    (function () { var el = document.querySelector('#_auto_19'); if (el) el.addEventListener('click', function () { renderAnatomyMap('tooth') }); })();
-    (function () { var el = document.querySelector('#_auto_20'); if (el) el.addEventListener('click', function () { renderAnatomyMap('brain') }); })();
-    (function () { var el = document.querySelector('#_auto_21'); if (el) el.addEventListener('click', function () { closeAnatomyModal() }); })();
-    (function () { var el = document.querySelector('#_auto_22'); if (el) el.addEventListener('click', function () { resolvePdfMode('annotate') }); })();
-    (function () { var el = document.querySelector('#_auto_23'); if (el) el.addEventListener('click', function () { resolvePdfMode('split') }); })();
-    (function () { var el = document.querySelector('#_auto_24'); if (el) el.addEventListener('click', function () { closePdfModeModal() }); })();
-    (function () { var el = document.querySelector('#_auto_25'); if (el) el.addEventListener('click', function () { formatText('bold') }); })();
-    (function () { var el = document.querySelector('#_auto_26'); if (el) el.addEventListener('click', function () { formatText('italic') }); })();
-    (function () { var el = document.querySelector('#_auto_27'); if (el) el.addEventListener('click', function () { formatText('formatBlock', 'h2') }); })();
-    (function () { var el = document.querySelector('#_auto_28'); if (el) el.addEventListener('click', function () { formatText('formatBlock', 'h3') }); })();
-    (function () { var el = document.querySelector('#_auto_29'); if (el) el.addEventListener('click', function () { formatText('insertUnorderedList') }); })();
-    (function () { var el = document.querySelector('#_auto_30'); if (el) el.addEventListener('click', function () { saveToMyReferences() }); })();
-    (function () { var el = document.querySelector('#categoryFilter'); if (el) el.addEventListener('change', function () { filterChapters() }); })();
-    (function () { var el = document.querySelector('#sidebarSearch'); if (el) el.addEventListener('input', function () { renderSidebar() }); })();
-    (function () { var el = document.querySelector('#_auto_31'); if (el) el.addEventListener('click', function () { toggleSection('pagesContent', 'pagesArrow', 'pagesSectionWrapper') }); })();
-    (function () { var el = document.querySelector('#_auto_32'); if (el) el.addEventListener('click', function () { toggleSection('tagsContent', 'tagsArrow', 'tagsSectionWrapper') }); })();
-    (function () { var el = document.querySelector('#_auto_33'); if (el) el.addEventListener('click', function () { toggleSection('pomodoroContent', 'pomodoroArrow', 'pomodoroSectionWrapper') }); })();
-    (function () { var el = document.querySelector('#pomodoroStartBtn'); if (el) el.addEventListener('click', function () { startPomodoro() }); })();
-    (function () { var el = document.querySelector('#pomodoroPauseBtn'); if (el) el.addEventListener('click', function () { pausePomodoro() }); })();
-    (function () { var el = document.querySelector('#_auto_34'); if (el) el.addEventListener('click', function () { resetPomodoro() }); })();
-    (function () { var el = document.querySelector('#dndToggle'); if (el) el.addEventListener('change', function () { updateDndSetting() }); })();
-    (function () { var el = document.querySelector('#_auto_35'); if (el) el.addEventListener('click', function () { toggleSection('knowledgeBaseContent', 'knowledgeBaseArrow', 'knowledgeBaseSectionWrapper') }); })();
-    (function () { var el = document.querySelector('#_auto_36'); if (el) el.addEventListener('click', function () { toggleSection('myReferencesContent', 'myReferencesArrow', 'myReferencesSectionWrapper') }); })();
-    (function () { var el = document.querySelector('#_auto_37'); if (el) el.addEventListener('click', function () { toggleSection('toolsContent', 'toolsArrow') }); })();
-    (function () { var el = document.querySelector('#installAppBtn'); if (el) el.addEventListener('click', function () { installPWA() }); })();
-    (function () { var el = document.querySelector('#_auto_38'); if (el) el.addEventListener('click', function () { createNewChapter() }); })();
-    (function () { var el = document.querySelector('#_auto_39'); if (el) el.addEventListener('click', function () { toggleFocusMode() }); })();
-    (function () { var el = document.querySelector('#_auto_40'); if (el) el.addEventListener('click', function () { startFlashcardMode() }); })();
-    (function () { var el = document.querySelector('#paperStyleBtn'); if (el) el.addEventListener('click', function () { cyclePaperStyle() }); })();
-    (function () { var el = document.querySelector('#_auto_42'); if (el) el.addEventListener('click', function () { window.print() }); })();
-    (function () { var el = document.querySelector('#readModeBtn'); if (el) el.addEventListener('click', function () { toggleReadMode() }); })();
-    (function () { var el = document.querySelector('#_auto_43'); if (el) el.addEventListener('click', function () { openMetadataModal() }); })();
-    (function () { var el = document.querySelector('#_auto_44'); if (el) el.addEventListener('change', function () { loadLecturePdf(this) }); })();
-    (function () { var el = document.querySelector('#_auto_45'); if (el) el.addEventListener('change', function () { importBackgroundFile(this) }); })();
-    (function () { var el = document.querySelector('#sketchToggle'); if (el) el.addEventListener('click', function () { toggleSketchMode() }); })();
-    (function () { var el = document.querySelector('#_auto_46'); if (el) el.addEventListener('click', function () { toggleTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_47'); if (el) el.addEventListener('click', function () { exportData() }); })();
-    (function () { var el = document.querySelector('#importFile'); if (el) el.addEventListener('change', function () { importData(this) }); })();
-    (function () { var el = document.querySelector('#_auto_48'); if (el) el.addEventListener('click', function () { wipeAllData() }); })();
-    (function () { var el = document.querySelector('#voiceBtn'); if (el) el.addEventListener('click', function () { toggleVoiceTranscription() }); })();
-    (function () { var el = document.querySelector('#eraserBtn'); if (el) el.addEventListener('click', function () { selectSketchTool('eraser') }); })();
-    (function () { var el = document.querySelector('#customColorPicker'); if (el) el.addEventListener('change', function () { setCustomColor(this.value) }); })();
-    (function () { var el = document.querySelector('#lassoBtn'); if (el) el.addEventListener('click', function () { toggleLassoSelection() }); })();
-    (function () { var el = document.querySelector('#shapeRecBtn'); if (el) el.addEventListener('click', function () { toggleShapeRecognition() }); })();
-    (function () { var el = document.querySelector('#audioRecordBtn'); /* wired by AudioRecorderWidget._wireButton() */ })();
-    (function () { var el = document.querySelector('#_auto_49'); if (el) el.addEventListener('click', function () { insertBlock('header') }); })();
-    (function () { var el = document.querySelector('#_auto_50'); if (el) el.addEventListener('click', function () { insertBlock('note') }); })();
-    (function () { var el = document.querySelector('#_auto_51'); if (el) el.addEventListener('click', function () { insertBlock('todo') }); })();
-    (function () { var el = document.querySelector('#_auto_52'); if (el) el.addEventListener('click', function () { insertCSCodeBlock() }); })();
-    (function () { var el = document.querySelector('#_auto_53'); if (el) el.addEventListener('click', function () { insertAlgoStep() }); })();
-    (function () { var el = document.querySelector('#_auto_54'); if (el) el.addEventListener('click', function () { insertComplexity() }); })();
-    (function () { var el = document.querySelector('#_auto_55'); if (el) el.addEventListener('click', function () { insertTraceTable() }); })();
-    (function () { var el = document.querySelector('#_auto_56'); if (el) el.addEventListener('click', function () { openAnatomyModal() }); })();
-    (function () { var el = document.querySelector('#_auto_57'); if (el) el.addEventListener('click', function () { activateAnatomyPin() }); })();
-    (function () { var el = document.querySelector('#_auto_58'); if (el) el.addEventListener('click', function () { setHighlightPreset('symptom') }); })();
-    (function () { var el = document.querySelector('#_auto_59'); if (el) el.addEventListener('click', function () { setHighlightPreset('drug') }); })();
-    (function () { var el = document.querySelector('#_auto_60'); if (el) el.addEventListener('click', function () { insertTimeline() }); })();
-    (function () { var el = document.querySelector('#_auto_61'); if (el) el.addEventListener('click', function () { insertComparison() }); })();
-    (function () { var el = document.querySelector('#mathModeBtn'); if (el) el.addEventListener('click', function () { toggleMathMode() }); })();
-    (function () { var el = document.querySelector('#_auto_62'); if (el) el.addEventListener('click', function () { toggleRuler() }); })();
-    (function () { var el = document.querySelector('#_auto_63'); if (el) el.addEventListener('click', function () { insertEquation() }); })();
-    (function () { var el = document.querySelector('#_auto_64'); if (el) el.addEventListener('click', function () { insertAssumptions() }); })();
-    (function () { var el = document.querySelector('#_auto_65'); if (el) el.addEventListener('click', function () { insertConstants() }); })();
-    (function () { var el = document.querySelector('#circuitComponentsBtn'); if (el) el.addEventListener('click', function () { toggleCircuitComponents() }); })();
-    (function () { var el = document.querySelector('#stickerBtn'); if (el) el.addEventListener('click', function () { toggleStickerMode() }); })();
-    (function () { var el = document.querySelector('#_auto_66'); if (el) el.addEventListener('click', function () { triggerImageUpload() }); })();
-    (function () { var el = document.querySelector('#_auto_67'); if (el) el.addEventListener('click', function () { clearSketch() }); })();
-    (function () { var el = document.querySelector('#trayToggle'); if (el) el.addEventListener('click', function () { toggleTray() }); })();
-    (function () { var el = document.querySelector('#_auto_68'); if (el) el.addEventListener('click', function () { toggleTopTools() }); })();
-    (function () { var el = document.querySelector('#_auto_69'); if (el) el.addEventListener('click', function () { selectWritingTool('pen') }); })();
-    (function () { var el = document.querySelector('#_auto_70'); if (el) el.addEventListener('click', function () { selectWritingTool('pencil') }); })();
-    (function () { var el = document.querySelector('#_auto_71'); if (el) el.addEventListener('click', function () { selectWritingTool('highlighter') }); })();
-    (function () { var el = document.querySelector('#_auto_72'); if (el) el.addEventListener('click', function () { selectWritingTool('marker') }); })();
-    (function () { var el = document.querySelector('#_auto_73'); if (el) el.addEventListener('click', function () { selectWritingTool('elegant') }); })();
-    (function () { var el = document.querySelector('#_auto_74'); if (el) el.addEventListener('click', function () { selectWritingTool('brush') }); })();
-    (function () { var el = document.querySelector('#_auto_75'); if (el) el.addEventListener('click', function () { selectWritingTool('chalk') }); })();
-    (function () { var el = document.querySelector('#_auto_76'); if (el) el.addEventListener('click', function () { toggleTopTools() }); })();
-    (function () { var el = document.querySelector('#_auto_77'); if (el) el.addEventListener('click', function () { undoSketch() }); })();
-    (function () { var el = document.querySelector('#_auto_78'); if (el) el.addEventListener('click', function () { redoSketch() }); })();
-    (function () { var el = document.querySelector('#imageInput'); if (el) el.addEventListener('change', function (event) { handleImageUpload(event) }); })();
-    (function () { var el = document.querySelector('#pageTitle'); if (el) el.addEventListener('input', function () { markUnsaved(); saveCurrentToCloud() }); })();
-    (function () { var el = document.querySelector('#_auto_79'); if (el) el.addEventListener('click', function () { addPageToStream() }); })();
-    (function () { var el = document.querySelector('#_auto_80'); if (el) el.addEventListener('click', function () { closeLecturePane() }); })();
-    (function () { var el = document.querySelector('#metaTagInput'); if (el) el.addEventListener('keydown', function (event) { handleMetaTagInput(event) }); })();
-    (function () { var el = document.querySelector('#_auto_81'); if (el) el.addEventListener('click', function () { addTagFromInput() }); })();
-    (function () { var el = document.querySelector('#metaType'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
-    (function () { var el = document.querySelector('#metaSystem'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
-    (function () { var el = document.querySelector('#metaTooth'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
-    (function () { var el = document.querySelector('#metaQuadrant'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
-    (function () { var el = document.querySelector('#metaSpecialty'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
-    (function () { var el = document.querySelector('#metaEngBranch'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
-    (function () { var el = document.querySelector('#metaDifficulty'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
-    (function () { var el = document.querySelector('#_auto_82'); if (el) el.addEventListener('click', function () { closeMetadataModal() }); })();
-    (function () { var el = document.querySelector('#_auto_83'); if (el) el.addEventListener('click', function () { showCSTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_84'); if (el) el.addEventListener('click', function () { showMedTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_85'); if (el) el.addEventListener('click', function () { showDentistryTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_86'); if (el) el.addEventListener('click', function () { showEngineeringTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_87'); if (el) el.addEventListener('click', function () { showAdvancedTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_88'); if (el) el.addEventListener('click', function () { applyTemplate('default') }); })();
-    (function () { var el = document.querySelector('#_auto_89'); if (el) el.addEventListener('click', function () { applyTemplate('whiteboard') }); })();
-    (function () { var el = document.querySelector('#_auto_90'); if (el) el.addEventListener('click', function () { applyTemplate('meeting') }); })();
-    (function () { var el = document.querySelector('#_auto_91'); if (el) el.addEventListener('click', function () { applyTemplate('journal') }); })();
-    (function () { var el = document.querySelector('#_auto_92'); if (el) el.addEventListener('click', function () { applyTemplate('eisenhower') }); })();
-    (function () { var el = document.querySelector('#_auto_93'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_94'); if (el) el.addEventListener('click', function () { applyTemplate('cornell') }); })();
-    (function () { var el = document.querySelector('#_auto_95'); if (el) el.addEventListener('click', function () { applyTemplate('zettelkasten') }); })();
-    (function () { var el = document.querySelector('#_auto_96'); if (el) el.addEventListener('click', function () { applyTemplate('outline') }); })();
-    (function () { var el = document.querySelector('#_auto_97'); if (el) el.addEventListener('click', function () { applyTemplate('mindmap') }); })();
-    (function () { var el = document.querySelector('#_auto_98'); if (el) el.addEventListener('click', function () { applyTemplate('sq3r') }); })();
-    (function () { var el = document.querySelector('#_auto_99'); if (el) el.addEventListener('click', function () { applyTemplate('feynman') }); })();
-    (function () { var el = document.querySelector('#_auto_100'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_101'); if (el) el.addEventListener('click', function () { applyTemplate('algo') }); })();
-    (function () { var el = document.querySelector('#_auto_102'); if (el) el.addEventListener('click', function () { applyTemplate('logicGates') }); })();
-    (function () { var el = document.querySelector('#_auto_103'); if (el) el.addEventListener('click', function () { applyTemplate('sysDesign') }); })();
-    (function () { var el = document.querySelector('#_auto_104'); if (el) el.addEventListener('click', function () { applyTemplate('codeStudy') }); })();
-    (function () { var el = document.querySelector('#_auto_105'); if (el) el.addEventListener('click', function () { applyTemplate('project') }); })();
-    (function () { var el = document.querySelector('#_auto_106'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_107'); if (el) el.addEventListener('click', function () { applyTemplate('anatomy') }); })();
-    (function () { var el = document.querySelector('#_auto_108'); if (el) el.addEventListener('click', function () { applyTemplate('disease') }); })();
-    (function () { var el = document.querySelector('#_auto_109'); if (el) el.addEventListener('click', function () { applyTemplate('drug') }); })();
-    (function () { var el = document.querySelector('#_auto_110'); if (el) el.addEventListener('click', function () { applyTemplate('physio') }); })();
-    (function () { var el = document.querySelector('#_auto_111'); if (el) el.addEventListener('click', function () { applyTemplate('pathway') }); })();
-    (function () { var el = document.querySelector('#_auto_112'); if (el) el.addEventListener('click', function () { applyTemplate('lab') }); })();
-    (function () { var el = document.querySelector('#_auto_113'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_114'); if (el) el.addEventListener('click', function () { applyTemplate('dental_anatomy') }); })();
-    (function () { var el = document.querySelector('#_auto_115'); if (el) el.addEventListener('click', function () { applyTemplate('oral_pathology') }); })();
-    (function () { var el = document.querySelector('#_auto_116'); if (el) el.addEventListener('click', function () { applyTemplate('dental_procedure') }); })();
-    (function () { var el = document.querySelector('#_auto_117'); if (el) el.addEventListener('click', function () { applyTemplate('dental_case') }); })();
-    (function () { var el = document.querySelector('#_auto_118'); if (el) el.addEventListener('click', function () { applyTemplate('prostho_plan') }); })();
-    (function () { var el = document.querySelector('#_auto_119'); if (el) el.addEventListener('click', function () { applyTemplate('endo_case') }); })();
-    (function () { var el = document.querySelector('#_auto_120'); if (el) el.addEventListener('click', function () { applyTemplate('perio_case') }); })();
-    (function () { var el = document.querySelector('#_auto_121'); if (el) el.addEventListener('click', function () { applyTemplate('oral_radiology') }); })();
-    (function () { var el = document.querySelector('#_auto_122'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_123'); if (el) el.addEventListener('click', function () { applyTemplate('prob_sol') }); })();
-    (function () { var el = document.querySelector('#_auto_124'); if (el) el.addEventListener('click', function () { applyTemplate('circuit') }); })();
-    (function () { var el = document.querySelector('#_auto_125'); if (el) el.addEventListener('click', function () { applyTemplate('mech_sys') }); })();
-    (function () { var el = document.querySelector('#_auto_126'); if (el) el.addEventListener('click', function () { applyTemplate('struct') }); })();
-    (function () { var el = document.querySelector('#_auto_127'); if (el) el.addEventListener('click', function () { applyTemplate('control') }); })();
-    (function () { var el = document.querySelector('#_auto_128'); if (el) el.addEventListener('click', function () { applyTemplate('process') }); })();
-    (function () { var el = document.querySelector('#_auto_129'); if (el) el.addEventListener('click', function () { applyTemplate('lab_exp') }); })();
-    (function () { var el = document.querySelector('#_auto_130'); if (el) el.addEventListener('click', function () { toggleTemplates() }); })();
-    (function () { var el = document.querySelector('#_auto_131'); if (el) el.addEventListener('click', function () { exitDnd() }); })();
-    (function () { var el = document.querySelector('#_auto_132'); if (el) el.addEventListener('click', function () { closeRefModal() }); })();
-});
+
+    initApp();
+    setTimeout(resizeCanvas, 500);
+
+
+    // ========== AUTO-GENERATED EVENT LISTENERS ==========
+    document.addEventListener("DOMContentLoaded", function () {
+        (function () { var el = document.querySelector('#darkModeToggle'); if (el) el.addEventListener('click', function () { toggleDarkMode() }); })();
+        (function () { var el = document.querySelector('#mobileMenuBtn'); if (el) el.addEventListener('click', function () { toggleMobileSidebar() }); })();
+        (function () { var el = document.querySelector('#_auto_1'); if (el) el.addEventListener('click', function () { toggleFocusMode() }); })();
+        (function () { var el = document.querySelector('#_auto_2'); if (el) el.addEventListener('click', function () { exitFlashcardMode() }); })();
+        (function () { var el = document.querySelector('#_auto_3'); if (el) el.addEventListener('click', function () { flipCard() }); })();
+        (function () { var el = document.querySelector('#_auto_4'); if (el) el.addEventListener('click', function () { prevCard() }); })();
+        (function () { var el = document.querySelector('#_auto_5'); if (el) el.addEventListener('click', function () { nextCard() }); })();
+        (function () { var el = document.querySelector('#_auto_6'); if (el) el.addEventListener('click', function () { toggleCircuitComponents() }); })();
+        (function () { var el = document.querySelector('#mathBuffer'); if (el) el.addEventListener('input', function () { updateMathPreview() }); })();
+        (function () { var el = document.querySelector('#_auto_7'); if (el) el.addEventListener('click', function () { insertMathFromBuffer() }); })();
+        (function () { var el = document.querySelector('#_auto_8'); if (el) el.addEventListener('click', function () { toggleMathMode() }); })();
+        (function () { var el = document.querySelector('#_auto_9'); if (el) el.addEventListener('click', function () { switchMathTab('basic', this) }); })();
+        (function () { var el = document.querySelector('#_auto_10'); if (el) el.addEventListener('click', function () { switchMathTab('trig', this) }); })();
+        (function () { var el = document.querySelector('#_auto_11'); if (el) el.addEventListener('click', function () { switchMathTab('calc', this) }); })();
+        (function () { var el = document.querySelector('#_auto_12'); if (el) el.addEventListener('click', function () { switchMathTab('geom', this) }); })();
+        (function () { var el = document.querySelector('#_auto_13'); if (el) el.addEventListener('click', function () { switchMathTab('struct', this) }); })();
+        (function () { var el = document.querySelector('#_auto_14'); if (el) el.addEventListener('click', function () { confirmTraceTable() }); })();
+        (function () { var el = document.querySelector('#_auto_15'); if (el) el.addEventListener('click', function () { closeTraceModal() }); })();
+        (function () { var el = document.querySelector('#constInput'); if (el) el.addEventListener('input', function () { lookupConstant() }); })();
+        (function () { var el = document.querySelector('#_auto_16'); if (el) el.addEventListener('click', function () { confirmConstant() }); })();
+        (function () { var el = document.querySelector('#_auto_17'); if (el) el.addEventListener('click', function () { closeConstantModal() }); })();
+        (function () { var el = document.querySelector('#_auto_18'); if (el) el.addEventListener('click', function () { renderAnatomyMap('body') }); })();
+        (function () { var el = document.querySelector('#_auto_19'); if (el) el.addEventListener('click', function () { renderAnatomyMap('tooth') }); })();
+        (function () { var el = document.querySelector('#_auto_20'); if (el) el.addEventListener('click', function () { renderAnatomyMap('brain') }); })();
+        (function () { var el = document.querySelector('#_auto_21'); if (el) el.addEventListener('click', function () { closeAnatomyModal() }); })();
+        (function () { var el = document.querySelector('#_auto_22'); if (el) el.addEventListener('click', function () { resolvePdfMode('annotate') }); })();
+        (function () { var el = document.querySelector('#_auto_23'); if (el) el.addEventListener('click', function () { resolvePdfMode('split') }); })();
+        (function () { var el = document.querySelector('#_auto_24'); if (el) el.addEventListener('click', function () { closePdfModeModal() }); })();
+        (function () { var el = document.querySelector('#_auto_25'); if (el) el.addEventListener('click', function () { formatText('bold') }); })();
+        (function () { var el = document.querySelector('#_auto_26'); if (el) el.addEventListener('click', function () { formatText('italic') }); })();
+        (function () { var el = document.querySelector('#_auto_27'); if (el) el.addEventListener('click', function () { formatText('formatBlock', 'h2') }); })();
+        (function () { var el = document.querySelector('#_auto_28'); if (el) el.addEventListener('click', function () { formatText('formatBlock', 'h3') }); })();
+        (function () { var el = document.querySelector('#_auto_29'); if (el) el.addEventListener('click', function () { formatText('insertUnorderedList') }); })();
+        (function () { var el = document.querySelector('#_auto_30'); if (el) el.addEventListener('click', function () { saveToMyReferences() }); })();
+        (function () { var el = document.querySelector('#categoryFilter'); if (el) el.addEventListener('change', function () { filterChapters() }); })();
+        (function () { var el = document.querySelector('#sidebarSearch'); if (el) el.addEventListener('input', function () { renderSidebar() }); })();
+        (function () { var el = document.querySelector('#_auto_31'); if (el) el.addEventListener('click', function () { toggleSection('pagesContent', 'pagesArrow', 'pagesSectionWrapper') }); })();
+        (function () { var el = document.querySelector('#_auto_32'); if (el) el.addEventListener('click', function () { toggleSection('tagsContent', 'tagsArrow', 'tagsSectionWrapper') }); })();
+        (function () { var el = document.querySelector('#_auto_33'); if (el) el.addEventListener('click', function () { toggleSection('pomodoroContent', 'pomodoroArrow', 'pomodoroSectionWrapper') }); })();
+        (function () { var el = document.querySelector('#pomodoroStartBtn'); if (el) el.addEventListener('click', function () { startPomodoro() }); })();
+        (function () { var el = document.querySelector('#pomodoroPauseBtn'); if (el) el.addEventListener('click', function () { pausePomodoro() }); })();
+        (function () { var el = document.querySelector('#_auto_34'); if (el) el.addEventListener('click', function () { resetPomodoro() }); })();
+        (function () { var el = document.querySelector('#dndToggle'); if (el) el.addEventListener('change', function () { updateDndSetting() }); })();
+        (function () { var el = document.querySelector('#_auto_35'); if (el) el.addEventListener('click', function () { toggleSection('knowledgeBaseContent', 'knowledgeBaseArrow', 'knowledgeBaseSectionWrapper') }); })();
+        (function () { var el = document.querySelector('#_auto_36'); if (el) el.addEventListener('click', function () { toggleSection('myReferencesContent', 'myReferencesArrow', 'myReferencesSectionWrapper') }); })();
+        (function () { var el = document.querySelector('#_auto_37'); if (el) el.addEventListener('click', function () { toggleSection('toolsContent', 'toolsArrow') }); })();
+        (function () { var el = document.querySelector('#installAppBtn'); if (el) el.addEventListener('click', function () { installPWA() }); })();
+        (function () { var el = document.querySelector('#_auto_38'); if (el) el.addEventListener('click', function () { createNewChapter() }); })();
+        (function () { var el = document.querySelector('#_auto_39'); if (el) el.addEventListener('click', function () { toggleFocusMode() }); })();
+        (function () { var el = document.querySelector('#_auto_40'); if (el) el.addEventListener('click', function () { startFlashcardMode() }); })();
+        (function () { var el = document.querySelector('#paperStyleBtn'); if (el) el.addEventListener('click', function () { cyclePaperStyle() }); })();
+        (function () { var el = document.querySelector('#_auto_42'); if (el) el.addEventListener('click', function () { window.print() }); })();
+        (function () { var el = document.querySelector('#readModeBtn'); if (el) el.addEventListener('click', function () { toggleReadMode() }); })();
+        (function () { var el = document.querySelector('#_auto_43'); if (el) el.addEventListener('click', function () { openMetadataModal() }); })();
+        (function () { var el = document.querySelector('#_auto_44'); if (el) el.addEventListener('change', function () { loadLecturePdf(this) }); })();
+        (function () { var el = document.querySelector('#_auto_45'); if (el) el.addEventListener('change', function () { importBackgroundFile(this) }); })();
+        (function () { var el = document.querySelector('#sketchToggle'); if (el) el.addEventListener('click', function () { toggleSketchMode() }); })();
+        (function () { var el = document.querySelector('#_auto_46'); if (el) el.addEventListener('click', function () { toggleTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_47'); if (el) el.addEventListener('click', function () { exportData() }); })();
+        (function () { var el = document.querySelector('#importFile'); if (el) el.addEventListener('change', function () { importData(this) }); })();
+        (function () { var el = document.querySelector('#_auto_48'); if (el) el.addEventListener('click', function () { wipeAllData() }); })();
+        (function () { var el = document.querySelector('#voiceBtn'); if (el) el.addEventListener('click', function () { toggleVoiceTranscription() }); })();
+        (function () { var el = document.querySelector('#eraserBtn'); if (el) el.addEventListener('click', function () { selectSketchTool('eraser') }); })();
+        (function () { var el = document.querySelector('#customColorPicker'); if (el) el.addEventListener('change', function () { setCustomColor(this.value) }); })();
+        (function () { var el = document.querySelector('#lassoBtn'); if (el) el.addEventListener('click', function () { toggleLassoSelection() }); })();
+        (function () { var el = document.querySelector('#shapeRecBtn'); if (el) el.addEventListener('click', function () { toggleShapeRecognition() }); })();
+        (function () { var el = document.querySelector('#audioRecordBtn'); /* wired by AudioRecorderWidget._wireButton() */ })();
+        (function () { var el = document.querySelector('#_auto_49'); if (el) el.addEventListener('click', function () { insertBlock('header') }); })();
+        (function () { var el = document.querySelector('#_auto_50'); if (el) el.addEventListener('click', function () { insertBlock('note') }); })();
+        (function () { var el = document.querySelector('#_auto_51'); if (el) el.addEventListener('click', function () { insertBlock('todo') }); })();
+        (function () { var el = document.querySelector('#_auto_52'); if (el) el.addEventListener('click', function () { insertCSCodeBlock() }); })();
+        (function () { var el = document.querySelector('#_auto_53'); if (el) el.addEventListener('click', function () { insertAlgoStep() }); })();
+        (function () { var el = document.querySelector('#_auto_54'); if (el) el.addEventListener('click', function () { insertComplexity() }); })();
+        (function () { var el = document.querySelector('#_auto_55'); if (el) el.addEventListener('click', function () { insertTraceTable() }); })();
+        (function () { var el = document.querySelector('#_auto_56'); if (el) el.addEventListener('click', function () { openAnatomyModal() }); })();
+        (function () { var el = document.querySelector('#_auto_57'); if (el) el.addEventListener('click', function () { activateAnatomyPin() }); })();
+        (function () { var el = document.querySelector('#_auto_58'); if (el) el.addEventListener('click', function () { setHighlightPreset('symptom') }); })();
+        (function () { var el = document.querySelector('#_auto_59'); if (el) el.addEventListener('click', function () { setHighlightPreset('drug') }); })();
+        (function () { var el = document.querySelector('#_auto_60'); if (el) el.addEventListener('click', function () { insertTimeline() }); })();
+        (function () { var el = document.querySelector('#_auto_61'); if (el) el.addEventListener('click', function () { insertComparison() }); })();
+        (function () { var el = document.querySelector('#mathModeBtn'); if (el) el.addEventListener('click', function () { toggleMathMode() }); })();
+        (function () { var el = document.querySelector('#_auto_62'); if (el) el.addEventListener('click', function () { toggleRuler() }); })();
+        (function () { var el = document.querySelector('#_auto_63'); if (el) el.addEventListener('click', function () { insertEquation() }); })();
+        (function () { var el = document.querySelector('#_auto_64'); if (el) el.addEventListener('click', function () { insertAssumptions() }); })();
+        (function () { var el = document.querySelector('#_auto_65'); if (el) el.addEventListener('click', function () { insertConstants() }); })();
+        (function () { var el = document.querySelector('#circuitComponentsBtn'); if (el) el.addEventListener('click', function () { toggleCircuitComponents() }); })();
+        (function () { var el = document.querySelector('#stickerBtn'); if (el) el.addEventListener('click', function () { toggleStickerMode() }); })();
+        (function () { var el = document.querySelector('#_auto_66'); if (el) el.addEventListener('click', function () { triggerImageUpload() }); })();
+        (function () { var el = document.querySelector('#_auto_67'); if (el) el.addEventListener('click', function () { clearSketch() }); })();
+        (function () { var el = document.querySelector('#trayToggle'); if (el) el.addEventListener('click', function () { toggleTray() }); })();
+        (function () { var el = document.querySelector('#_auto_68'); if (el) el.addEventListener('click', function () { toggleTopTools() }); })();
+        (function () { var el = document.querySelector('#_auto_69'); if (el) el.addEventListener('click', function () { selectWritingTool('pen') }); })();
+        (function () { var el = document.querySelector('#_auto_70'); if (el) el.addEventListener('click', function () { selectWritingTool('pencil') }); })();
+        (function () { var el = document.querySelector('#_auto_71'); if (el) el.addEventListener('click', function () { selectWritingTool('highlighter') }); })();
+        (function () { var el = document.querySelector('#_auto_72'); if (el) el.addEventListener('click', function () { selectWritingTool('marker') }); })();
+        (function () { var el = document.querySelector('#_auto_73'); if (el) el.addEventListener('click', function () { selectWritingTool('elegant') }); })();
+        (function () { var el = document.querySelector('#_auto_74'); if (el) el.addEventListener('click', function () { selectWritingTool('brush') }); })();
+        (function () { var el = document.querySelector('#_auto_75'); if (el) el.addEventListener('click', function () { selectWritingTool('chalk') }); })();
+        (function () { var el = document.querySelector('#_auto_76'); if (el) el.addEventListener('click', function () { toggleTopTools() }); })();
+        (function () { var el = document.querySelector('#_auto_77'); if (el) el.addEventListener('click', function () { undoSketch() }); })();
+        (function () { var el = document.querySelector('#_auto_78'); if (el) el.addEventListener('click', function () { redoSketch() }); })();
+        (function () { var el = document.querySelector('#imageInput'); if (el) el.addEventListener('change', function (event) { handleImageUpload(event) }); })();
+        (function () { var el = document.querySelector('#pageTitle'); if (el) el.addEventListener('input', function () { markUnsaved(); saveCurrentToCloud() }); })();
+        (function () { var el = document.querySelector('#_auto_79'); if (el) el.addEventListener('click', function () { addPageToStream() }); })();
+        (function () { var el = document.querySelector('#_auto_80'); if (el) el.addEventListener('click', function () { closeLecturePane() }); })();
+        (function () { var el = document.querySelector('#metaTagInput'); if (el) el.addEventListener('keydown', function (event) { handleMetaTagInput(event) }); })();
+        (function () { var el = document.querySelector('#_auto_81'); if (el) el.addEventListener('click', function () { addTagFromInput() }); })();
+        (function () { var el = document.querySelector('#metaType'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
+        (function () { var el = document.querySelector('#metaSystem'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
+        (function () { var el = document.querySelector('#metaTooth'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
+        (function () { var el = document.querySelector('#metaQuadrant'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
+        (function () { var el = document.querySelector('#metaSpecialty'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
+        (function () { var el = document.querySelector('#metaEngBranch'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
+        (function () { var el = document.querySelector('#metaDifficulty'); if (el) el.addEventListener('change', function () { updatePageMeta() }); })();
+        (function () { var el = document.querySelector('#_auto_82'); if (el) el.addEventListener('click', function () { closeMetadataModal() }); })();
+        (function () { var el = document.querySelector('#_auto_83'); if (el) el.addEventListener('click', function () { showCSTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_84'); if (el) el.addEventListener('click', function () { showMedTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_85'); if (el) el.addEventListener('click', function () { showDentistryTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_86'); if (el) el.addEventListener('click', function () { showEngineeringTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_87'); if (el) el.addEventListener('click', function () { showAdvancedTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_88'); if (el) el.addEventListener('click', function () { applyTemplate('default') }); })();
+        (function () { var el = document.querySelector('#_auto_89'); if (el) el.addEventListener('click', function () { applyTemplate('whiteboard') }); })();
+        (function () { var el = document.querySelector('#_auto_90'); if (el) el.addEventListener('click', function () { applyTemplate('meeting') }); })();
+        (function () { var el = document.querySelector('#_auto_91'); if (el) el.addEventListener('click', function () { applyTemplate('journal') }); })();
+        (function () { var el = document.querySelector('#_auto_92'); if (el) el.addEventListener('click', function () { applyTemplate('eisenhower') }); })();
+        (function () { var el = document.querySelector('#_auto_93'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_94'); if (el) el.addEventListener('click', function () { applyTemplate('cornell') }); })();
+        (function () { var el = document.querySelector('#_auto_95'); if (el) el.addEventListener('click', function () { applyTemplate('zettelkasten') }); })();
+        (function () { var el = document.querySelector('#_auto_96'); if (el) el.addEventListener('click', function () { applyTemplate('outline') }); })();
+        (function () { var el = document.querySelector('#_auto_97'); if (el) el.addEventListener('click', function () { applyTemplate('mindmap') }); })();
+        (function () { var el = document.querySelector('#_auto_98'); if (el) el.addEventListener('click', function () { applyTemplate('sq3r') }); })();
+        (function () { var el = document.querySelector('#_auto_99'); if (el) el.addEventListener('click', function () { applyTemplate('feynman') }); })();
+        (function () { var el = document.querySelector('#_auto_100'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_101'); if (el) el.addEventListener('click', function () { applyTemplate('algo') }); })();
+        (function () { var el = document.querySelector('#_auto_102'); if (el) el.addEventListener('click', function () { applyTemplate('logicGates') }); })();
+        (function () { var el = document.querySelector('#_auto_103'); if (el) el.addEventListener('click', function () { applyTemplate('sysDesign') }); })();
+        (function () { var el = document.querySelector('#_auto_104'); if (el) el.addEventListener('click', function () { applyTemplate('codeStudy') }); })();
+        (function () { var el = document.querySelector('#_auto_105'); if (el) el.addEventListener('click', function () { applyTemplate('project') }); })();
+        (function () { var el = document.querySelector('#_auto_106'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_107'); if (el) el.addEventListener('click', function () { applyTemplate('anatomy') }); })();
+        (function () { var el = document.querySelector('#_auto_108'); if (el) el.addEventListener('click', function () { applyTemplate('disease') }); })();
+        (function () { var el = document.querySelector('#_auto_109'); if (el) el.addEventListener('click', function () { applyTemplate('drug') }); })();
+        (function () { var el = document.querySelector('#_auto_110'); if (el) el.addEventListener('click', function () { applyTemplate('physio') }); })();
+        (function () { var el = document.querySelector('#_auto_111'); if (el) el.addEventListener('click', function () { applyTemplate('pathway') }); })();
+        (function () { var el = document.querySelector('#_auto_112'); if (el) el.addEventListener('click', function () { applyTemplate('lab') }); })();
+        (function () { var el = document.querySelector('#_auto_113'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_114'); if (el) el.addEventListener('click', function () { applyTemplate('dental_anatomy') }); })();
+        (function () { var el = document.querySelector('#_auto_115'); if (el) el.addEventListener('click', function () { applyTemplate('oral_pathology') }); })();
+        (function () { var el = document.querySelector('#_auto_116'); if (el) el.addEventListener('click', function () { applyTemplate('dental_procedure') }); })();
+        (function () { var el = document.querySelector('#_auto_117'); if (el) el.addEventListener('click', function () { applyTemplate('dental_case') }); })();
+        (function () { var el = document.querySelector('#_auto_118'); if (el) el.addEventListener('click', function () { applyTemplate('prostho_plan') }); })();
+        (function () { var el = document.querySelector('#_auto_119'); if (el) el.addEventListener('click', function () { applyTemplate('endo_case') }); })();
+        (function () { var el = document.querySelector('#_auto_120'); if (el) el.addEventListener('click', function () { applyTemplate('perio_case') }); })();
+        (function () { var el = document.querySelector('#_auto_121'); if (el) el.addEventListener('click', function () { applyTemplate('oral_radiology') }); })();
+        (function () { var el = document.querySelector('#_auto_122'); if (el) el.addEventListener('click', function () { showMainTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_123'); if (el) el.addEventListener('click', function () { applyTemplate('prob_sol') }); })();
+        (function () { var el = document.querySelector('#_auto_124'); if (el) el.addEventListener('click', function () { applyTemplate('circuit') }); })();
+        (function () { var el = document.querySelector('#_auto_125'); if (el) el.addEventListener('click', function () { applyTemplate('mech_sys') }); })();
+        (function () { var el = document.querySelector('#_auto_126'); if (el) el.addEventListener('click', function () { applyTemplate('struct') }); })();
+        (function () { var el = document.querySelector('#_auto_127'); if (el) el.addEventListener('click', function () { applyTemplate('control') }); })();
+        (function () { var el = document.querySelector('#_auto_128'); if (el) el.addEventListener('click', function () { applyTemplate('process') }); })();
+        (function () { var el = document.querySelector('#_auto_129'); if (el) el.addEventListener('click', function () { applyTemplate('lab_exp') }); })();
+        (function () { var el = document.querySelector('#_auto_130'); if (el) el.addEventListener('click', function () { toggleTemplates() }); })();
+        (function () { var el = document.querySelector('#_auto_131'); if (el) el.addEventListener('click', function () { exitDnd() }); })();
+        (function () { var el = document.querySelector('#_auto_132'); if (el) el.addEventListener('click', function () { closeRefModal() }); })();
+    });
