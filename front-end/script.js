@@ -824,21 +824,33 @@ async function libHandleImport(e) {
     e.target.value = '';
     const result = await window.LIBRARY.importFromFile(file);
     if (result.ok) {
-        // Save as a pending clone so the main notebook logic picks it up
-        const pendingKey = window.api && window.api.auth.isLoggedIn()
-            ? 'nb_pending_clone_' + window.api.auth.getCurrentUser()._id
-            : 'nb_pending_clone';
-        localStorage.setItem(pendingKey, JSON.stringify(result.entry));
-
-        libToast('✅ Note imported into your Notebook!');
-        libCloseModal();
-        closeLibraryPanel();
-
-        // Trigger the pending-clone handler that exists in the main app
-        if (typeof window._checkPendingClone === 'function') {
-            window._checkPendingClone();
+        if (file.name.endsWith('.html') && window.api && window.api.auth.isLoggedIn()) {
+            try {
+                await window.api.library.upload(result.entry);
+                libToast('✅ HTML imported to Library!');
+                libRenderCards();
+                if (typeof renderSidebar === 'function') renderSidebar();
+            } catch (err) {
+                libToast('❌ Failed to import HTML to Library');
+                console.error(err);
+            }
         } else {
-            setTimeout(() => { if (typeof renderSidebar === 'function') renderSidebar(); }, 600);
+            // Save as a pending clone so the main notebook logic picks it up
+            const pendingKey = window.api && window.api.auth.isLoggedIn()
+                ? 'nb_pending_clone_' + window.api.auth.getCurrentUser()._id
+                : 'nb_pending_clone';
+            localStorage.setItem(pendingKey, JSON.stringify(result.entry));
+
+            libToast('✅ Note imported into your Notebook!');
+            libCloseModal();
+            closeLibraryPanel();
+
+            // Trigger the pending-clone handler that exists in the main app
+            if (typeof window._checkPendingClone === 'function') {
+                window._checkPendingClone();
+            } else {
+                setTimeout(() => { if (typeof renderSidebar === 'function') renderSidebar(); }, 600);
+            }
         }
     } else {
         libToast('❌ ' + result.error);
@@ -4939,10 +4951,22 @@ window.importData = (input) => {
                 initApp();
                 showToast("Backup Restored!");
             } else if (importedData && importedData._type === 'nb_shared_note_v1') {
-                if (isHtmlImport && file.name.endsWith('.html')) {
-                    importedData._autoPublish = true;
+                if (isHtmlImport) {
+                    if (window.api && window.api.auth.isLoggedIn()) {
+                        try {
+                            await window.api.library.upload(importedData);
+                            showToast("✅ HTML imported to Library!");
+                            if (typeof openLibraryPanel === 'function') openLibraryPanel();
+                        } catch (err) {
+                            showToast("❌ Failed to import HTML to Library");
+                            console.error(err);
+                        }
+                    } else {
+                        showToast("❌ Please log in to import HTML directly to the Library.");
+                    }
+                } else {
+                    await window.saveSharedNoteToSequence(importedData);
                 }
-                await window.saveSharedNoteToSequence(importedData);
             } else {
                 alert("Invalid backup file format.");
             }
