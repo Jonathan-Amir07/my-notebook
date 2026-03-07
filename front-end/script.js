@@ -5704,11 +5704,6 @@ window.toggleSketchMode = () => {
     isSketchMode = !isSketchMode;
     document.body.classList.toggle('sketch-mode', isSketchMode);
     document.getElementById('sketchToggle').classList.toggle('active', isSketchMode);
-
-    if (isSketchMode) {
-        resizeCanvas();
-    }
-
     const editors = document.querySelectorAll('.content-area');
     editors.forEach(e => e.contentEditable = !isSketchMode);
 
@@ -6024,7 +6019,10 @@ window.applyTemplate = async (key) => {
                         <div class="outline-header">
                             <input type="text" class="outline-title" placeholder="Chapter / Topic" />
                             <div class="outline-controls">
-                                <button class="cornell-btn" onclick="collapseAllOutline()">↻ Collapse All</button>
+                                <button class="cornell-btn" onclick="outdentOutlineItemUI()" title="Decrease Indent (Shift+Tab)">⇤</button>
+                                <button class="cornell-btn" onclick="indentOutlineItemUI()" title="Increase Indent (Tab)">⇥</button>
+                                <button class="cornell-btn" onclick="addOutlineItemUI()" title="Add Item (Enter)">+</button>
+                                <button class="cornell-btn" style="margin-left:8px;" onclick="collapseAllOutline()">↻ Collapse All</button>
                                 <button class="cornell-btn" onclick="expandAllOutline()">⊕ Expand All</button>
                             </div>
                         </div>
@@ -10573,19 +10571,15 @@ window.loadChapter = (id) => {
         document.getElementById('paper').classList.remove('infinite');
     }
 
-    // Ensure canvas is resized to match the new paper dimensions
-    resizeCanvas();
-
     // Restore sketch data if exists
-    const savedSketch = chapter.sketch || chapter.sketchData;
-    if (savedSketch) {
+    if (chapter.sketchData) {
         setTimeout(() => {
             const canvas = document.getElementById('sketchCanvas');
             const ctx = canvas?.getContext('2d');
-            if (ctx) {
+            if (ctx && chapter.sketchData) {
                 const img = new Image();
                 img.onload = () => ctx.drawImage(img, 0, 0);
-                img.src = savedSketch;
+                img.src = chapter.sketchData;
             }
         }, 100);
     }
@@ -11645,6 +11639,67 @@ window.expandAllOutline = function () {
     });
 
     showToast('Expanded all levels');
+};
+
+// ================================================================
+//  UI BUTTON HANDLERS FOR HIGHLIGHTED OUTLINE ITEMS
+// ================================================================
+
+window.addOutlineItemUI = function () {
+    const outlineContent = document.getElementById('outlineContent');
+    if (!outlineContent) return;
+
+    const sel = window.getSelection();
+    let currentItem = sel.rangeCount > 0 ? findOutlineItem(sel.anchorNode) : null;
+
+    if (currentItem) {
+        const level = getItemLevel(currentItem);
+        const newItem = createOutlineItem(level);
+        currentItem.parentNode.insertBefore(newItem, currentItem.nextSibling);
+        renumberOutline(outlineContent);
+        placeCursorAtEnd(newItem);
+    } else {
+        const newItem = createOutlineItem(1);
+        outlineContent.appendChild(newItem);
+        renumberOutline(outlineContent);
+        placeCursorAtEnd(newItem);
+    }
+};
+
+window.indentOutlineItemUI = function () {
+    const outlineContent = document.getElementById('outlineContent');
+    if (!outlineContent) return;
+
+    const sel = window.getSelection();
+    let currentItem = sel.rangeCount > 0 ? findOutlineItem(sel.anchorNode) : null;
+    if (!currentItem) return;
+
+    const level = getItemLevel(currentItem);
+    if (level >= 4) return;
+
+    const prevItem = getPreviousOutlineItem(currentItem, outlineContent);
+    if (!prevItem) return;
+
+    const prevLevel = getItemLevel(prevItem);
+    if (level + 1 > prevLevel + 1) return;
+
+    setItemLevel(currentItem, level + 1);
+    renumberOutline(outlineContent);
+};
+
+window.outdentOutlineItemUI = function () {
+    const outlineContent = document.getElementById('outlineContent');
+    if (!outlineContent) return;
+
+    const sel = window.getSelection();
+    let currentItem = sel.rangeCount > 0 ? findOutlineItem(sel.anchorNode) : null;
+    if (!currentItem) return;
+
+    const level = getItemLevel(currentItem);
+    if (level <= 1) return;
+
+    setItemLevel(currentItem, level - 1);
+    renumberOutline(outlineContent);
 };
 
 // ================================================================
