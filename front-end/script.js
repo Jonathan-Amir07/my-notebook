@@ -8073,63 +8073,6 @@ window.addZettelTag = function (tagText) {
 };
 
 
-// MINDMAP FUNCTIONS
-let mindmapNodes = [];
-let mindmapConnections = [];
-let selectedNode = null;
-
-window.addMindmapNode = function () {
-    const canvas = document.getElementById('mindmapCanvas');
-    if (!canvas) return;
-
-    const node = document.createElement('div');
-    node.className = 'mindmap-node';
-    node.style.left = (200 + Math.random() * 400) + 'px';
-    node.style.top = (100 + Math.random() * 300) + 'px';
-    node.innerHTML = '<input type="text" placeholder="New idea..." maxlength="100" />';
-
-    makeMindmapNodeDraggable(node);
-    canvas.appendChild(node);
-
-    showToast("+ Node added");
-};
-
-function makeMindmapNodeDraggable(node) {
-    let isDragging = false;
-    let currentX, currentY, initialX, initialY;
-
-    node.addEventListener('mousedown', function (e) {
-        if (e.target.tagName === 'INPUT') return;
-        isDragging = true;
-        initialX = e.clientX - node.offsetLeft;
-        initialY = e.clientY - node.offsetTop;
-        node.classList.add('selected');
-        selectedNode = node;
-    });
-
-    document.addEventListener('mousemove', function (e) {
-        if (isDragging) {
-            e.preventDefault();
-            currentX = e.clientX - initialX;
-            currentY = e.clientY - initialY;
-            node.style.left = currentX + 'px';
-            node.style.top = currentY + 'px';
-        }
-    });
-
-    document.addEventListener('mouseup', function () {
-        isDragging = false;
-    });
-}
-
-window.addMindmapLink = function () {
-    showToast("💡 Click two nodes to link them");
-};
-
-window.autoLayoutMindmap = function () {
-    showToast("🎨 Auto-layout applied");
-};
-
 // SQ3R FUNCTIONS
 let sq3rCurrentStep = 1;
 
@@ -11194,22 +11137,40 @@ window.autoLayoutMindmap = function () {
 
     if (!centerNode) return;
 
-    // Position center node
-    centerNode.style.left = '50%';
+    // Position center node on the left-middle
+    centerNode.style.left = '20%';
     centerNode.style.top = '50%';
     centerNode.style.transform = 'translate(-50%, -50%)';
 
-    // Arrange other nodes in a circle
-    const radius = 200; // pixels
-    const angleStep = (2 * Math.PI) / otherNodes.length;
+    // Arrange other nodes horizontally to the right
+    const horizontalSpacing = 25; // % distance between layers
+    const verticalPadding = 10;   // % margin on top/bottom
+
+    // Sort nodes to arrange them predictably (optional, but helps consistency)
+    otherNodes.sort((a, b) => a.id.localeCompare(b.id));
 
     otherNodes.forEach((node, index) => {
-        const angle = index * angleStep;
-        const x = 50 + (radius * Math.cos(angle)) / canvas.clientWidth * 100; // Convert to %
-        const y = 50 + (radius * Math.sin(angle)) / canvas.clientHeight * 100;
+        // Distribute them evenly vertically
+        const numNodes = otherNodes.length;
+        const totalVerticalSpace = 100 - (verticalPadding * 2);
 
-        node.style.left = `${x}%`;
-        node.style.top = `${y}%`;
+        let targetY = 50; // default center
+        if (numNodes > 1) {
+            const step = totalVerticalSpace / (numNodes - 1);
+            targetY = verticalPadding + (index * step);
+        }
+
+        // Tiered layout (e.g. staggering x position based on count, or just placing them all right of the center)
+        // Here we'll do a simple starburst out to the right:
+        let targetX = 20 + horizontalSpacing;
+
+        // If there are many nodes, stagger them into multiple columns
+        if (index > Math.floor(numNodes / 2)) {
+            targetX += horizontalSpacing;
+        }
+
+        node.style.left = `${targetX}%`;
+        node.style.top = `${targetY}%`;
         node.style.transform = 'translate(-50%, -50%)';
     });
 
@@ -11230,12 +11191,28 @@ window.initMindmapTemplate = function () {
     const canvas = document.getElementById('mindmapCanvas');
     if (!canvas) return;
 
+    // Reset state to avoid accumulating duplicates on reloads
+    mindmapState.nodes = [];
+    mindmapState.links = [];
+    mindmapState.linkingMode = false;
+    mindmapState.firstNode = null;
+
+    // Extract maximum existing node ID number to set nextNodeId safely
+    let maxId = 0;
+
     // Make all existing nodes (including central node) draggable
     const existingNodes = canvas.querySelectorAll('.mindmap-node');
     existingNodes.forEach(node => {
         if (!node.id) {
             node.id = `mindmap-node-${mindmapState.nextNodeId++}`;
         }
+
+        // Extract ID number for tracking
+        const match = node.id.match(/mindmap-node-(\d+)/);
+        if (match && parseInt(match[1]) > maxId) {
+            maxId = parseInt(match[1]);
+        }
+
         makeMindmapNodeDraggable(node);
 
         // Add click handler for linking
@@ -11248,7 +11225,35 @@ window.initMindmapTemplate = function () {
         mindmapState.nodes.push({ id: node.id, element: node });
     });
 
-    console.log('Mindmap template initialized - all nodes are draggable');
+    mindmapState.nextNodeId = Math.max(mindmapState.nextNodeId, maxId + 1);
+
+    // Parse existing SVG links so they move when nodes are dragged
+    const svgLinks = canvas.querySelectorAll('svg.mindmap-links line.mindmap-link');
+    svgLinks.forEach(line => {
+        const fromId = line.getAttribute('data-from');
+        const toId = line.getAttribute('data-to');
+
+        // Setup click-to-delete listener since it's lost on reload
+        line.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (confirm('Delete this link?')) {
+                line.remove();
+                mindmapState.links = mindmapState.links.filter(l =>
+                    !(l.from === fromId && l.to === toId)
+                );
+            }
+        });
+
+        mindmapState.links.push({ from: fromId, to: toId, element: line });
+
+        const fromNode = document.getElementById(fromId);
+        const toNode = document.getElementById(toId);
+        if (fromNode && toNode) {
+            updateMindmapLink(line, fromNode, toNode);
+        }
+    });
+
+    console.log('Mindmap template initialized - nodes and links restored');
 };
 
 // ==================== OUTLINE TEMPLATE FUNCTIONS ====================
