@@ -1403,9 +1403,10 @@ body {
     background: #f8f9fa;
     border: 2px solid #9b59b6;
     border-radius: 8px;
-    min-height: 600px;
+    height: 600px;
     margin: 20px 0;
-    overflow: hidden;
+    overflow: auto;
+    /* enable scrollbars */
 }
 
 .mindmap-toolbar {
@@ -1422,11 +1423,14 @@ body {
 }
 
 .mindmap-canvas {
-    width: 100%;
-    height: 100%;
-    min-height: 600px;
+    width: 3000px;
+    height: 3000px;
     position: relative;
     cursor: grab;
+    background-size: 20px 20px;
+    background-image:
+        linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
 }
 
 .mindmap-canvas.grabbing {
@@ -5641,10 +5645,7 @@ body.dark-mode .lasso-selected {
 
 /* ═══════════════════════════════════════════
    STICKY NOTE WIDGET
-═══════════════════════════════════════════ */
-.sticky-wrap {}
 
-.sticky-colors {
     display: flex;
     gap: 5px;
     margin-bottom: 6px;

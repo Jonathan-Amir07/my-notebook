@@ -10935,8 +10935,9 @@ window.addMindmapNode = function () {
     const node = document.createElement('div');
     node.className = 'mindmap-node';
     node.id = nodeId;
-    node.style.left = `${Math.random() * 60 + 20}%`;
-    node.style.top = `${Math.random() * 60 + 20}%`;
+    // Spawn near the center of the 3000x3000 canvas
+    node.style.left = `${1500 + (Math.random() * 200 - 100)}px`;
+    node.style.top = `${1500 + (Math.random() * 200 - 100)}px`;
     node.setAttribute('data-node-id', nodeId);
 
     const input = document.createElement('input');
@@ -11137,44 +11138,81 @@ window.autoLayoutMindmap = function () {
 
     if (!centerNode) return;
 
-    // Position center node on the left-middle
-    centerNode.style.left = '20%';
-    centerNode.style.top = '50%';
-    centerNode.style.transform = 'translate(-50%, -50%)';
+    // 1. Build Adjacency List for BFS
+    const adjList = {};
+    nodes.forEach(n => adjList[n.id] = []);
 
-    // Arrange other nodes horizontally to the right
-    const horizontalSpacing = 25; // % distance between layers
-    const verticalPadding = 10;   // % margin on top/bottom
-
-    // Sort nodes to arrange them predictably (optional, but helps consistency)
-    otherNodes.sort((a, b) => a.id.localeCompare(b.id));
-
-    otherNodes.forEach((node, index) => {
-        // Distribute them evenly vertically
-        const numNodes = otherNodes.length;
-        const totalVerticalSpace = 100 - (verticalPadding * 2);
-
-        let targetY = 50; // default center
-        if (numNodes > 1) {
-            const step = totalVerticalSpace / (numNodes - 1);
-            targetY = verticalPadding + (index * step);
+    // Mindmap links are directed (from -> to), but for layout, we might treat it as a directed tree going outwards
+    mindmapState.links.forEach(link => {
+        if (adjList[link.from] && adjList[link.to]) {
+            adjList[link.from].push(link.to);
         }
-
-        // Tiered layout (e.g. staggering x position based on count, or just placing them all right of the center)
-        // Here we'll do a simple starburst out to the right:
-        let targetX = 20 + horizontalSpacing;
-
-        // If there are many nodes, stagger them into multiple columns
-        if (index > Math.floor(numNodes / 2)) {
-            targetX += horizontalSpacing;
-        }
-
-        node.style.left = `${targetX}%`;
-        node.style.top = `${targetY}%`;
-        node.style.transform = 'translate(-50%, -50%)';
     });
 
-    // Update all links
+    // 2. BFS to determine node depths (levels)
+    const depths = { [centerNode.id]: 0 };
+    const queue = [centerNode.id];
+    let maxDepth = 0;
+
+    while (queue.length > 0) {
+        const currId = queue.shift();
+        const curDepth = depths[currId];
+
+        adjList[currId].forEach(neighborId => {
+            if (depths[neighborId] === undefined) { // Avoid cycles
+                depths[neighborId] = curDepth + 1;
+                maxDepth = Math.max(maxDepth, curDepth + 1);
+                queue.push(neighborId);
+            }
+        });
+    }
+
+    // Handle disconnected nodes (assign them a fictitious depth at the end)
+    otherNodes.forEach(n => {
+        if (depths[n.id] === undefined) {
+            depths[n.id] = maxDepth + 1;
+        }
+    });
+
+    // 3. Group nodes by depth
+    const nodesByDepth = {};
+    nodes.forEach(n => {
+        const d = depths[n.id];
+        if (!nodesByDepth[d]) nodesByDepth[d] = [];
+        nodesByDepth[d].push(n);
+    });
+
+    // 4. Position Nodes
+    // Base layout coordinates (start at center-left heavily padded context)
+    const startX = 200; // pixels from left of the 3000px canvas
+    const startY = 1500; // vertical center of 3000px canvas
+    const horizontalSpacing = 350; // pixels between tiers horizontally
+    const verticalSpacing = 150; // default pixels between nodes vertically
+
+    Object.keys(nodesByDepth).forEach(depthKey => {
+        const depth = parseInt(depthKey);
+        const tierNodes = nodesByDepth[depth];
+
+        // Sort nodes arbitrarily (alphabetical by ID) for consistency
+        tierNodes.sort((a, b) => a.id.localeCompare(b.id));
+
+        const numNodes = tierNodes.length;
+        const totalHeight = (numNodes - 1) * verticalSpacing;
+        let currentY = startY - (totalHeight / 2); // Center the column vertically
+
+        tierNodes.forEach(node => {
+            const x = startX + (depth * horizontalSpacing);
+            const y = currentY;
+
+            node.style.left = `${x}px`;
+            node.style.top = `${y}px`;
+            node.style.transform = 'translate(-50%, -50%)';
+
+            currentY += verticalSpacing;
+        });
+    });
+
+    // 5. Update Links
     mindmapState.links.forEach(link => {
         const fromNode = document.getElementById(link.from);
         const toNode = document.getElementById(link.to);
@@ -11183,7 +11221,15 @@ window.autoLayoutMindmap = function () {
         }
     });
 
-    showToast('🎨 Layout organized!');
+    // 6. Scroll container to the root node
+    const container = canvas.parentElement;
+    if (container) {
+        // Center the viewport on startX and startY
+        container.scrollLeft = startX - (container.clientWidth / 2) + 150; // offset slightly left
+        container.scrollTop = startY - (container.clientHeight / 2);
+    }
+
+    showToast('🌳 Tree Layout applied!');
 };
 
 // Initialize mindmap when template is loaded
@@ -11252,6 +11298,22 @@ window.initMindmapTemplate = function () {
             updateMindmapLink(line, fromNode, toNode);
         }
     });
+
+    // Attempt to scroll so the central node (or roughly center of graph) is in view
+    setTimeout(() => {
+        const centerNode = Array.from(existingNodes).find(n => n.classList.contains('central'));
+        const container = canvas.parentElement;
+        if (container) {
+            if (centerNode) {
+                container.scrollLeft = centerNode.offsetLeft - (container.clientWidth / 2) + (centerNode.offsetWidth / 2);
+                container.scrollTop = centerNode.offsetTop - (container.clientHeight / 2) + (centerNode.offsetHeight / 2);
+            } else {
+                // Default center of the 3000x3000 canvas
+                container.scrollLeft = 1500 - (container.clientWidth / 2);
+                container.scrollTop = 1500 - (container.clientHeight / 2);
+            }
+        }
+    }, 100);
 
     console.log('Mindmap template initialized - nodes and links restored');
 };
