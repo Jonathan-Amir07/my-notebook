@@ -10400,11 +10400,50 @@ window.deleteChapter = async (id) => {
 
 
 
-// Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM)
+// Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM WITH FLIP ANIMATION)
 window.loadChapter = (id) => {
     const chapter = chapters.find(c => c.id === id);
     if (!chapter) return;
 
+    // Do nothing if already on the exact same chapter
+    if (currentId === id) return;
+
+    // Trigger page flip animation
+    const paper = document.getElementById('paper');
+    if (paper) {
+
+        // Ensure container has perspective class
+        const wrapper = paper.parentElement;
+        if (wrapper && !wrapper.classList.contains('page-flip-container')) {
+            wrapper.classList.add('page-flip-container');
+        }
+
+        // Apply flip-out animation
+        paper.classList.add('page-flip-element');
+        paper.classList.remove('anim-page-enter');
+        paper.classList.add('anim-page-turn');
+
+        // Wait for half the flip (250ms based on CSS) before swapping content
+        setTimeout(() => {
+            executeLoadChapterLogic(chapter, id);
+
+            // Swap to flip-in animation
+            paper.classList.remove('anim-page-turn');
+            paper.classList.add('anim-page-enter');
+
+            // Cleanup animation classes after it finishes
+            setTimeout(() => {
+                paper.classList.remove('anim-page-enter');
+            }, 250);
+        }, 250);
+    } else {
+        // Fallback if no paper element exists
+        executeLoadChapterLogic(chapter, id);
+    }
+};
+
+// Core logic detached to allow animation wrapping
+function executeLoadChapterLogic(chapter, id) {
     currentId = id;
 
     // Get the primary tag of this chapter
