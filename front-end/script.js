@@ -4670,8 +4670,8 @@ function draw(e) {
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     } else if (activeSketchTool === 'highlighter') {
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.4)';
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)';
         ctx.lineWidth = 20;
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
@@ -4759,10 +4759,6 @@ window.selectSketchTool = (tool) => {
     if (tool !== 'highlighter') customStrokeStyle = null;
     activeSketchTool = tool === activeSketchTool ? 'brush' : tool;
 
-    // Update body cursor for Sketch Tools
-    document.body.className = document.body.className.replace(/\bcursor-[^\s]+\b/g, '');
-    document.body.classList.add(`cursor-${activeSketchTool}`);
-
     document.getElementById('eraserBtn').classList.toggle('active', activeSketchTool === 'eraser');
     const highlighterBtn = document.querySelector('.tool-opt.highlighter');
     if (highlighterBtn) highlighterBtn.classList.toggle('active', activeSketchTool === 'highlighter');
@@ -4779,10 +4775,6 @@ window.selectWritingTool = (tool, save = true) => {
     document.querySelectorAll('.content-area').forEach(e => {
         e.className = `content-area writing-tool-${tool}`;
     });
-
-    // Update body cursor
-    document.body.className = document.body.className.replace(/\bcursor-[^\s]+\b/g, '');
-    document.body.classList.add(`cursor-${tool}`);
 
     document.querySelectorAll('.tool-opt').forEach(o => o.classList.toggle('active', o.dataset.tool === tool));
     if (save) {
@@ -5712,6 +5704,11 @@ window.toggleSketchMode = () => {
     isSketchMode = !isSketchMode;
     document.body.classList.toggle('sketch-mode', isSketchMode);
     document.getElementById('sketchToggle').classList.toggle('active', isSketchMode);
+
+    if (isSketchMode) {
+        resizeCanvas();
+    }
+
     const editors = document.querySelectorAll('.content-area');
     editors.forEach(e => e.contentEditable = !isSketchMode);
 
@@ -10483,133 +10480,114 @@ window.loadChapter = (id) => {
     // Update title
     document.getElementById('pageTitle').value = chapter.title || 'Untitled';
 
-    const renderStream = () => {
+    // Clear and recreate DOM with all related pages
+    const stream = document.getElementById('sequentialStream');
 
-        // Clear and recreate DOM with all related pages
-        const stream = document.getElementById('sequentialStream');
+    // Destroy previous virtual scroll manager if it exists
+    if (currentVirtualScrollManager) {
+        currentVirtualScrollManager.destroy();
+    }
 
-        // Destroy previous virtual scroll manager if it exists
-        if (currentVirtualScrollManager) {
-            currentVirtualScrollManager.destroy();
-        }
+    // Use Virtual Scrolling for performance with large page sets
+    if (relatedChapters.length > 10) {
+        // Enable virtual scrolling for streams with more than 10 pages
+        currentVirtualScrollManager = new VirtualScrollManager(stream, relatedChapters, currentId);
+        currentVirtualScrollManager.init();
+    } else {
+        // For small page sets, render normally (no virtual scrolling overhead)
+        currentVirtualScrollManager = null;
+        stream.innerHTML = '';
 
-        // Use Virtual Scrolling for performance with large page sets
-        if (relatedChapters.length > 10) {
-            // Enable virtual scrolling for streams with more than 10 pages
-            currentVirtualScrollManager = new VirtualScrollManager(stream, relatedChapters, currentId);
-            currentVirtualScrollManager.init();
-        } else {
-            // For small page sets, render normally (no virtual scrolling overhead)
-            currentVirtualScrollManager = null;
-            stream.innerHTML = '';
+        // Use DocumentFragment for efficient rendering
+        const fragment = document.createDocumentFragment();
 
-            // Use DocumentFragment for efficient rendering
-            const fragment = document.createDocumentFragment();
+        relatedChapters.forEach((ch, index) => {
+            const block = document.createElement('div');
+            block.className = 'sequence-editor-block';
+            if (ch.id === currentId) block.classList.add('active-focus');
+            block.id = `page-block-${ch.id}`;
 
-            relatedChapters.forEach((ch, index) => {
-                const block = document.createElement('div');
-                block.className = 'sequence-editor-block';
-                if (ch.id === currentId) block.classList.add('active-focus');
-                block.id = `page-block-${ch.id}`;
+            // Add title section for subsequent pages (index > 0)
+            if (index > 0) {
+                const titleSection = document.createElement('div');
+                titleSection.className = 'paper-title'; // Re-use main title class for consistency
+                titleSection.style.marginTop = '0';
+                titleSection.style.marginBottom = '0';
+                titleSection.style.borderBottom = '2px solid var(--accent-color)';
+                titleSection.style.borderRadius = '4px 4px 0 0';
+                titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
 
-                // Add title section for subsequent pages (index > 0)
-                if (index > 0) {
-                    const titleSection = document.createElement('div');
-                    titleSection.className = 'paper-title'; // Re-use main title class for consistency
-                    titleSection.style.marginTop = '0';
-                    titleSection.style.marginBottom = '0';
-                    titleSection.style.borderBottom = '2px solid var(--accent-color)';
-                    titleSection.style.borderRadius = '4px 4px 0 0';
-                    titleSection.style.background = 'rgba(0, 0, 0, 0.02)';
+                const titleInput = document.createElement('input');
+                titleInput.type = 'text';
+                titleInput.value = ch.title || 'Untitled';
+                titleInput.className = 'page-title-input';
+                titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
+                titleInput.placeholder = "Page title...";
 
-                    const titleInput = document.createElement('input');
-                    titleInput.type = 'text';
-                    titleInput.value = ch.title || 'Untitled';
-                    titleInput.className = 'page-title-input';
-                    titleInput.style.cssText = 'width: 100%; border: none; background: transparent; font-size: 2.4rem; font-weight: 400; color: var(--ink-color); outline: none; font-family: inherit; padding: 0.5rem;';
-                    titleInput.placeholder = "Page title...";
-
-                    titleInput.oninput = () => {
-                        ch.title = titleInput.value;
-                        ch.lastEdited = new Date().toISOString();
-                        markUnsaved();
-                        saveChapterContent(ch.id);
-                    };
-
-                    titleSection.appendChild(titleInput);
-                    block.appendChild(titleSection);
-                }
-
-                // Add content area
-                const contentArea = document.createElement('div');
-                contentArea.className = 'content-area';
-                contentArea.contentEditable = 'true';
-                contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
-                contentArea.dataset.chapterId = ch.id;
-
-                // Adjust padding for subsequent pages if they have a title
-                if (index > 0) {
-                    contentArea.style.paddingTop = '1rem';
-                }
-
-                contentArea.oninput = () => {
+                titleInput.oninput = () => {
+                    ch.title = titleInput.value;
+                    ch.lastEdited = new Date().toISOString();
                     markUnsaved();
                     saveChapterContent(ch.id);
                 };
 
-                // Enable auto-checkbox functionality
-                setupAutoCheckbox(contentArea);
+                titleSection.appendChild(titleInput);
+                block.appendChild(titleSection);
+            }
 
-                block.appendChild(contentArea);
-                fragment.appendChild(block);
-            });
+            // Add content area
+            const contentArea = document.createElement('div');
+            contentArea.className = 'content-area';
+            contentArea.contentEditable = 'true';
+            contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
+            contentArea.dataset.chapterId = ch.id;
 
-            stream.appendChild(fragment);
-        }
+            // Adjust padding for subsequent pages if they have a title
+            if (index > 0) {
+                contentArea.style.paddingTop = '1rem';
+            }
 
-        // Update UI
-        updateToolVisibility(chapter);
-        renderSidebar();
+            contentArea.oninput = () => {
+                markUnsaved();
+                saveChapterContent(ch.id);
+            };
 
-        // Handle whiteboard mode
-        if (chapter.isWhiteboard) {
-            document.getElementById('paper').classList.add('infinite');
-        } else {
-            document.getElementById('paper').classList.remove('infinite');
-        }
+            // Enable auto-checkbox functionality
+            setupAutoCheckbox(contentArea);
 
-        // Restore sketch data if exists
-        if (chapter.sketchData) {
-            setTimeout(() => {
-                const canvas = document.getElementById('sketchCanvas');
-                const ctx = canvas?.getContext('2d');
-                if (ctx && chapter.sketchData) {
-                    const img = new Image();
-                    img.onload = () => ctx.drawImage(img, 0, 0);
-                    img.src = chapter.sketchData;
-                }
-            }, 100);
-        }
-    }; // end of renderStream
+            block.appendChild(contentArea);
+            fragment.appendChild(block);
+        });
 
-    // Trigger page flip animation
-    const paper = document.querySelector('.paper');
-
-    // Set initial dog-ear state
-    if (paper) {
-        paper.classList.toggle('bookmarked', !!chapter.metadata?.bookmarked);
+        stream.appendChild(fragment);
     }
 
-    if (paper && !paper.classList.contains('page-flip-in') && !paper.classList.contains('page-flip-out')) {
-        paper.classList.add('page-flip-out');
-        setTimeout(() => {
-            renderStream();
-            paper.classList.remove('page-flip-out');
-            paper.classList.add('page-flip-in');
-            setTimeout(() => paper.classList.remove('page-flip-in'), 400);
-        }, 300);
+    // Update UI
+    updateToolVisibility(chapter);
+    renderSidebar();
+
+    // Handle whiteboard mode
+    if (chapter.isWhiteboard) {
+        document.getElementById('paper').classList.add('infinite');
     } else {
-        renderStream();
+        document.getElementById('paper').classList.remove('infinite');
+    }
+
+    // Ensure canvas is resized to match the new paper dimensions
+    resizeCanvas();
+
+    // Restore sketch data if exists
+    const savedSketch = chapter.sketch || chapter.sketchData;
+    if (savedSketch) {
+        setTimeout(() => {
+            const canvas = document.getElementById('sketchCanvas');
+            const ctx = canvas?.getContext('2d');
+            if (ctx) {
+                const img = new Image();
+                img.onload = () => ctx.drawImage(img, 0, 0);
+                img.src = savedSketch;
+            }
+        }, 100);
     }
 };
 
@@ -12129,19 +12107,6 @@ setTimeout(resizeCanvas, 500);
 
 // ========== AUTO-GENERATED EVENT LISTENERS ==========
 document.addEventListener("DOMContentLoaded", function () {
-    (function () {
-        var el = document.querySelector('#dogEarBtn'); if (el) el.addEventListener('click', function () {
-            const chapter = chapters.find(c => c.id === currentId);
-            if (chapter) {
-                chapter.metadata = chapter.metadata || {};
-                chapter.metadata.bookmarked = !chapter.metadata.bookmarked;
-                const paper = document.querySelector('.paper');
-                if (paper) paper.classList.toggle('bookmarked', chapter.metadata.bookmarked);
-                saveChapterToDB(chapter);
-                renderSidebar();
-            }
-        });
-    })();
     (function () { var el = document.querySelector('#darkModeToggle'); if (el) el.addEventListener('click', function () { toggleDarkMode() }); })();
     (function () { var el = document.querySelector('#mobileMenuBtn'); if (el) el.addEventListener('click', function () { toggleMobileSidebar() }); })();
     (function () { var el = document.querySelector('#_auto_1'); if (el) el.addEventListener('click', function () { toggleFocusMode() }); })();
