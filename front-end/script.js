@@ -6380,7 +6380,7 @@ function openAccountModal() {
     const modal = document.createElement('div');
     modal.id = 'accountModal';
     modal.className = 'floating-pane';
-    modal.style.cssText = 'display:block; width:310px; z-index:3000; top:180px; right:20px;';
+    modal.style.cssText = 'display:block; width:310px; z-index:3000; top:230px; right:20px;';
     modal.innerHTML = `
         <h3 style="margin-bottom:15px; font-family:'Caveat',cursive; font-size:1.3rem;">👤 Account</h3>
 
