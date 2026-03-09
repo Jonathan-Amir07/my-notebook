@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" name="viewport" />
+    <meta name="google-site-verification" content="Vme-v5M053RDm2Y4FcAqa0NO-lXXmSMIp3Y0GTnmuEk" />
+    <title>Academic Notebook — Free Online Study &amp; Note-Taking Tool</title>
+    <meta name="description"
+        content="A powerful free notebook app for students. Features: handwriting, math equations, circuit diagrams, flashcards, PDF annotation, sketch tools, and more. Works offline." />
+    <meta name="keywords"
+        content="academic notebook, note taking, study tool, engineering notebook, medical notes, math equations, circuit diagrams, flashcards, free" />
+    <link rel="canonical" href="https://my-notebook-hee8.vercel.app/" />
+    <meta property="og:title" content="Academic Notebook — Free Online Study Tool" />
+    <meta property="og:description"
+        content="A powerful free notebook for students. Handwriting, equations, circuits, flashcards, PDF annotation and more." />
+    <meta property="og:url" content="https://my-notebook-hee8.vercel.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Academic Notebook" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Academic Notebook — Free Study Tool" />
+    <meta name="twitter:description"
+        content="A powerful free notebook for students. Handwriting, equations, circuits, flashcards and more." />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Indie+Flower&amp;family=Patrick+Hand&amp;family=Caveat:wght@400;700&amp;family=Shadows+Into+Light&amp;family=Permanent+Marker&amp;family=Kalam:wght@300;400;700&amp;family=Architects+Daughter&amp;family=Fira+Code:wght@400;600&amp;display=swap"
+        rel="stylesheet" />
+    <!-- KaTeX for Math Rendering -->
+    <link href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <!-- PDF.js for Lecture Mode 2.0 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Prism.js for Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+    <!-- PWA MANIFEST & SETTINGS -->
+    <meta content="#2c3e50" name="theme-color" />
+    <meta content="yes" name="apple-mobile-web-app-capable" />
+    <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style" />
+    <meta content="Notebook" name="apple-mobile-web-app-title" />
+    <link href="assets/icon.svg" id="appIcon" rel="icon" type="image/svg+xml">
+    <link href="assets/icon.svg" id="appleIcon" rel="apple-touch-icon" />
+    <link href="manifest.json" id="appManifest" rel="manifest" />
+    <!-- Advanced Features Scripts -->
+    <script src="lasso-selection.js"></script>
+    <script src="shape-recognition.js"></script>
+    <script src="audio-recorder.js"></script>
+    <script src="scribble-eraser.js"></script>
+    <script src="page-details-gesture.js"></script>
+    </link>
+    <link href="styles.css" rel="stylesheet" />
+    <!-- API system: must load before script.js -->
+    <script src="api.js?v=3"></script>
+    <script defer="" src="script.js?v=3"></script>
+</head>
+
+<body class="cursor-pen">
+    <button class="btn-dark-circle" id="darkModeToggle" title="Toggle Dark Mode">🌙</button>
+    <button class="btn-menu-mobile" id="mobileMenuBtn" title="Toggle Menu">☰</button>
+    <button class="btn-exit-focus" id="_auto_1">Exit Focus</button>
+    <!-- FLASHCARD OVERLAY -->
+    <div class="flashcard-overlay" id="flashcardOverlay">
+        <button class="fc-btn-exit" id="_auto_2">✕</button>
+        <div class="flashcard-container" id="flashcardContainer">
+            <div class="flashcard" id="_auto_3">
+                <div class="flashcard-face flashcard-front">
+                    <span class="flashcard-label">Question</span>
+                    <div id="fcQuestion">...</div>
+                </div>
+                <div class="flashcard-face flashcard-back">
+                    <span class="flashcard-label">Answer</span>
+                    <div id="fcAnswer">...</div>
+                </div>
+            </div>
+        </div>
+        <div class="flashcard-controls">
+            <button class="fc-btn" id="_auto_4">← Prev</button>
+            <span id="fcCounter">1 / 1</span>
+            <button class="fc-btn" id="_auto_5">Next →</button>
+        </div>
+        <div class="no-cards-msg" id="noCardsMsg" style="display:none;">
+            No flashcards found!<br />
+            <span style="font-size:0.8rem; opacity:0.7;">Use "Question :: Answer" format<br />or Headers (H1-H3)
+                followed
+                by text.</span>
+        </div>
+    </div>
+    <!-- CIRCUIT COMPONENTS OVERLAY -->
+    <div class="circuit-components-overlay" id="circuitComponentsOverlay">
+        <div class="circuit-components-panel">
+            <div class="circuit-components-title">⚡ Circuit Components Library</div>
+            <div class="circuit-components-subtitle">Click to add or drag for precise placement</div>
+            <div class="circuit-components-grid">
+                <div class="circuit-component-card" data-component="resistor" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <line stroke="#2c3e50" stroke-width="2" x1="5" x2="15" y1="20" y2="20"></line>
+                        <rect fill="none" height="10" stroke="#2c3e50" stroke-width="2" width="10" x="15" y="15"></rect>
+                        <line stroke="#2c3e50" stroke-width="2" x1="25" x2="35" y1="20" y2="20"></line>
+                    </svg>
+                    <div class="circuit-component-name">Resistor</div>
+                </div>
+                <div class="circuit-component-card" data-component="capacitor" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <line stroke="#2c3e50" stroke-width="2" x1="5" x2="17" y1="20" y2="20"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="17" x2="17" y1="10" y2="30"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="23" x2="23" y1="10" y2="30"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="23" x2="35" y1="20" y2="20"></line>
+                    </svg>
+                    <div class="circuit-component-name">Capacitor</div>
+                </div>
+                <div class="circuit-component-card" data-component="inductor" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <path d="M 5 20 Q 10 10, 15 20 T 25 20 T 35 20" fill="none" stroke="#2c3e50" stroke-width="2">
+                        </path>
+                    </svg>
+                    <div class="circuit-component-name">Inductor</div>
+                </div>
+                <div class="circuit-component-card" data-component="battery" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <line stroke="#2c3e50" stroke-width="2" x1="5" x2="15" y1="20" y2="20"></line>
+                        <line stroke="#2c3e50" stroke-width="3" x1="15" x2="15" y1="12" y2="28"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="25" x2="25" y1="15" y2="25"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="25" x2="35" y1="20" y2="20"></line>
+                    </svg>
+                    <div class="circuit-component-name">Battery</div>
+                </div>
+                <div class="circuit-component-card" data-component="led" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <line stroke="#2c3e50" stroke-width="2" x1="5" x2="15" y1="20" y2="20"></line>
+                        <polygon fill="#e74c3c" points="15,10 15,30 25,20"></polygon>
+                        <line stroke="#2c3e50" stroke-width="2" x1="25" x2="25" y1="10" y2="30"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="25" x2="35" y1="20" y2="20"></line>
+                    </svg>
+                    <div class="circuit-component-name">LED</div>
+                </div>
+                <div class="circuit-component-card" data-component="switch" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <line stroke="#2c3e50" stroke-width="2" x1="5" x2="15" y1="20" y2="20"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="15" x2="30" y1="20" y2="10"></line>
+                        <circle cx="15" cy="20" fill="#2c3e50" r="2"></circle>
+                        <circle cx="30" cy="20" fill="#2c3e50" r="2"></circle>
+                        <line stroke="#2c3e50" stroke-width="2" x1="30" x2="35" y1="20" y2="20"></line>
+                    </svg>
+                    <div class="circuit-component-name">Switch</div>
+                </div>
+                <div class="circuit-component-card" data-component="ground" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <line stroke="#2c3e50" stroke-width="2" x1="20" x2="20" y1="5" y2="20"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="10" x2="30" y1="20" y2="20"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="13" x2="27" y1="25" y2="25"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="16" x2="24" y1="30" y2="30"></line>
+                    </svg>
+                    <div class="circuit-component-name">Ground</div>
+                </div>
+                <div class="circuit-component-card" data-component="bulb" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <line stroke="#2c3e50" stroke-width="2" x1="5" x2="10" y1="20" y2="20"></line>
+                        <circle cx="20" cy="20" fill="none" r="10" stroke="#2c3e50" stroke-width="2"></circle>
+                        <path d="M 15 25 L 15 30 M 25 25 L 25 30 M 13 30 L 27 30" fill="none" stroke="#2c3e50"
+                            stroke-width="2"></path>
+                        <line stroke="#2c3e50" stroke-width="2" x1="30" x2="35" y1="20" y2="20"></line>
+                    </svg>
+                    <div class="circuit-component-name">Light Bulb</div>
+                </div>
+                <div class="circuit-component-card" data-component="voltmeter" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <circle cx="20" cy="20" fill="none" r="12" stroke="#2c3e50" stroke-width="2"></circle>
+                        <text fill="#2c3e50" font-size="12" font-weight="bold" text-anchor="middle" x="20"
+                            y="25">V</text>
+                        <line stroke="#2c3e50" stroke-width="2" x1="5" x2="8" y1="20" y2="20"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="32" x2="35" y1="20" y2="20"></line>
+                    </svg>
+                    <div class="circuit-component-name">Voltmeter</div>
+                </div>
+                <div class="circuit-component-card" data-component="ammeter" draggable="true">
+                    <svg class="circuit-component-icon" style="width: 50px; height: 50px;" viewbox="0 0 40 40">
+                        <circle cx="20" cy="20" fill="none" r="12" stroke="#2c3e50" stroke-width="2"></circle>
+                        <text fill="#2c3e50" font-size="12" font-weight="bold" text-anchor="middle" x="20"
+                            y="25">A</text>
+                        <line stroke="#2c3e50" stroke-width="2" x1="5" x2="8" y1="20" y2="20"></line>
+                        <line stroke="#2c3e50" stroke-width="2" x1="32" x2="35" y1="20" y2="20"></line>
+                    </svg>
+                    <div class="circuit-component-name">Ammeter</div>
+                </div>
+            </div>
+            <button class="circuit-close-btn" id="_auto_6">Close</button>
+        </div>
+    </div>
+    <!-- ENGINEERING RULER -->
+    <div id="engRuler">
+        <div class="rotate-handle" id="rulerRotate">⟳</div>
+    </div>
+    <!-- MATH KEYBOARD PANEL -->
+    <div class="math-keyboard-panel" id="mathKeyboard">
+        <div class="math-input-bar">
+            <span style="font-size:0.8rem; font-weight:bold;">∑</span>
+            <input class="math-buffer" id="mathBuffer" placeholder="Type LaTeX..." type="text" />
+            <div class="math-preview" id="mathPreview"></div>
+            <button class="btn btn-secondary" id="_auto_7"
+                style="width:auto; padding:5px 15px; margin:0; background:var(--save-color); color:white;">Insert</button>
+            <button class="btn btn-secondary" id="_auto_8" style="width:auto; padding:5px 10px; margin:0;">▼</button>
+        </div>
+        <div class="math-tabs">
+            <button class="math-tab-btn active" id="_auto_9">Basic</button>
+            <button class="math-tab-btn" id="_auto_10">Trig</button>
+            <button class="math-tab-btn" id="_auto_11">Calculus</button>
+            <button class="math-tab-btn" id="_auto_12">Geometry</button>
+            <button class="math-tab-btn" id="_auto_13">Structure</button>
+        </div>
+        <div class="math-keys-grid" id="mathKeys"></div>
+    </div>
+    <!-- TRACE TABLE MODAL -->
+    <div class="floating-pane" id="traceModal" style="display:none; width: 300px; z-index: 1002;">
+        <h3 style="margin-bottom: 15px;">New Trace Table</h3>
+        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">Number of Variables:</p>
+        <input class="meta-value" id="traceVarCount" max="10" min="1" style="margin-bottom:15px;" type="number"
+            value="3" />
+        <div style="display:flex; gap:10px;">
+            <button class="tool-btn" id="_auto_14"
+                style="background: var(--save-color); color: white; justify-content: center; flex:1;">Insert</button>
+            <button class="tool-btn" id="_auto_15"
+                style="background: #eee; justify-content: center; flex:1;">Cancel</button>
+        </div>
+    </div>
+    <!-- CONSTANTS MODAL -->
+    <div class="floating-pane" id="constantModal" style="display:none; width: 300px; z-index: 1002;">
+        <h3 style="margin-bottom: 15px;">Insert Constant</h3>
+        <div style="margin-bottom:10px;">
+            <label style="font-size:0.8rem; color:#666; display:block; margin-bottom:5px;">Symbol (e.g. g, pi,
+                c)</label>
+            <input class="meta-value" id="constInput" placeholder="Type symbol..." type="text" />
+        </div>
+        <div style="margin-bottom:15px;">
+            <label style="font-size:0.8rem; color:#666; display:block; margin-bottom:5px;">Value (Editable)</label>
+            <input class="meta-value" id="constValue" placeholder="Value will appear here..." type="text" />
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button class="tool-btn" id="_auto_16"
+                style="background: var(--save-color); color: white; justify-content: center; flex:1;">Insert</button>
+            <button class="tool-btn" id="_auto_17"
+                style="background: #eee; justify-content: center; flex:1;">Cancel</button>
+        </div>
+    </div>
+    <!-- ANATOMY ATLAS MODAL -->
+    <div class="floating-pane" id="anatomyModal" style="display:none; width: 500px; max-width: 90vw; z-index: 2006;">
+        <h3 style="margin-bottom: 10px;">Anatomy Atlas</h3>
+        <div class="atlas-controls">
+            <button class="tool-btn" id="_auto_18" style="width:auto;">👤 Body</button>
+            <button class="tool-btn" id="_auto_19" style="width:auto;">🦷 Tooth</button>
+            <button class="tool-btn" id="_auto_20" style="width:auto;">🧠 Brain</button>
+        </div>
+        <div class="anatomy-container" id="anatomyContainer">
+            <!-- SVG injected here -->
+        </div>
+        <p style="font-size: 0.8rem; color: #666; margin-top: 10px; text-align: center;">Click a region to insert a
+            study header.</p>
+        <button class="tool-btn" id="_auto_21" style="margin-top: 10px; background: #eee;">Close</button>
+    </div>
+    <!-- PDF MODE SELECTION MODAL -->
+    <div class="floating-pane" id="pdfModeModal" style="display:none; width: 320px; z-index: 2005; text-align: center;">
+        <h3 style="margin-bottom: 10px;">📚 Import PDF</h3>
+        <p style="font-size:0.9rem; color:#666; margin-bottom:20px;">How would you like to use this file?</p>
+        <button class="tool-btn" id="_auto_22"
+            style="background: var(--template-color); color: white; justify-content: center; width:100%; margin-bottom:5px; font-weight:bold;">
+            🖍 Annotate on Paper
+        </button>
+        <p style="font-size:0.75rem; color:#888; margin-bottom: 15px;">Render slides as background to draw over them.
+        </p>
+        <button class="tool-btn" id="_auto_23"
+            style="background: var(--sidebar-bg); color: white; justify-content: center; width:100%; margin-bottom:5px; font-weight:bold;">
+            📖 Split Screen Reader
+        </button>
+        <p style="font-size:0.75rem; color:#888; margin-bottom: 15px;">Open PDF on the side while you take notes.</p>
+        <button class="tool-btn" id="_auto_24"
+            style="background: #eee; justify-content: center; width:100%;">Cancel</button>
+    </div>
+    <div class="text-bubble" id="textBubble">
+        <button class="bubble-btn" id="_auto_25">B</button>
+        <button class="bubble-btn" id="_auto_26">I</button>
+        <button class="bubble-btn" id="_auto_27">H1</button>
+        <button class="bubble-btn" id="_auto_28">H2</button>
+        <button class="bubble-btn" id="_auto_29">• List</button>
+        <button class="bubble-btn" id="_auto_30" style="background: var(--accent-color); color: white;"
+            title="Save to My References">⭐</button>
+    </div>
+    <aside class="sidebar" id="mainSidebar">
+
+        <!-- ─── USER PROFILE BAR ─── -->
+        <div id="userProfileBar" class="user-profile-bar"></div>
+
+        <style>
+            /* User profile bar in sidebar */
+            .user-profile-bar {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 14px;
+                background: rgba(0, 0, 0, 0.15);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+                min-height: 56px;
+            }
+
+            .up-avatar {
+                flex-shrink: 0;
+                line-height: 0;
+            }
+
+            .up-info {
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+            }
+
+            .up-name {
+                font-family: 'Caveat', cursive;
+                font-size: 1rem;
+                font-weight: 700;
+                color: #fff;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .up-guest-badge {
+                font-size: 0.65rem;
+                background: rgba(255, 255, 255, 0.15);
+                color: rgba(255, 255, 255, 0.7);
+                padding: 1px 5px;
+                border-radius: 3px;
+                font-family: sans-serif;
+                font-weight: normal;
+                vertical-align: middle;
+            }
+
+            .up-email {
+                font-size: 0.72rem;
+                color: rgba(255, 255, 255, 0.5);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                margin-top: 1px;
+            }
+
+            .up-actions {
+                display: flex;
+                gap: 4px;
+                flex-shrink: 0;
+            }
+
+            .up-btn {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 5px;
+                width: 28px;
+                height: 28px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                font-size: 0.85rem;
+                transition: background 0.15s;
+                padding: 0;
+            }
+
+            .up-btn:hover {
+                background: rgba(255, 255, 255, 0.18);
+            }
+
+            .up-logout:hover {
+                background: rgba(231, 76, 60, 0.4);
+            }
+
+            /* Share and Style buttons on sidebar note cards */
+            .chapter-share-btn,
+            .chapter-styled-btn {
+                background: transparent;
+                border: none;
+                font-size: 1rem;
+                cursor: pointer;
+                padding: 4px 5px;
+                border-radius: 5px;
+                opacity: 0;
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+                line-height: 1;
+            }
+
+            .chapter-item:hover .chapter-share-btn,
+            .chapter-item:hover .chapter-styled-btn {
+                opacity: 1;
+            }
+
+            .chapter-share-btn:hover {
+                background: rgba(41, 128, 185, 0.15);
+                transform: scale(1.1);
+            }
+
+            .chapter-styled-btn:hover {
+                background: rgba(155, 89, 182, 0.2);
+                box-shadow: 0 0 8px rgba(155, 89, 182, 0.6);
+                transform: scale(1.1);
+            }
+
+            .chapter-share-btn.published {
+                opacity: 0.7;
+                filter: saturate(0.5);
+            }
+
+            .chapter-share-btn.published:hover {
+                filter: saturate(1);
+                background: rgba(192, 57, 43, 0.15);
+            }
+        </style>
+
+        <div class="sidebar-header">
+            <div class="app-title">Academic Notebook</div>
+            <select class="category-filter" id="categoryFilter">
+                <option value="all">📁 All Notes</option>
+                <optgroup label="General">
+                    <option value="General">📝 General</option>
+                    <option value="Projects">🚀 Projects</option>
+                </optgroup>
+                <optgroup label="Computer Science">
+                    <option value="Algorithms">📐 Algorithms</option>
+                    <option value="Systems">⚙️ Systems</option>
+                </optgroup>
+                <optgroup label="Medical">
+                    <option value="Anatomy">🧠 Anatomy</option>
+                    <option value="Pathology">🦠 Pathology</option>
+                    <option value="Pharmacology">💊 Pharmacology</option>
+                    <option value="Clinical">🏥 Clinical</option>
+                </optgroup>
+                <optgroup label="Dentistry">
+                    <option value="Dental Anatomy">🦷 Dental Anatomy</option>
+                    <option value="Procedures">🛠️ Procedures</option>
+                    <option value="Dental Cases">🧾 Cases</option>
+                </optgroup>
+                <optgroup label="Engineering">
+                    <option value="Electrical">⚡ Electrical (EE)</option>
+                    <option value="Mechanical">⚙️ Mechanical (ME)</option>
+                    <option value="Civil">🏗 Civil (CE)</option>
+                    <option value="Electronics">📡 Electronics (ECE)</option>
+                    <option value="Mechatronics">🦾 Mechatronics</option>
+                    <option value="Industrial">🏭 Industrial</option>
+                </optgroup>
+            </select>
+            <div class="search-container">
+                <input class="search-input" id="sidebarSearch" placeholder="Search or #tag..." type="text" />
+            </div>
+        </div>
+        <div class="sidebar-scrollable">
+            <div class="sidebar-section pages-section" id="pagesSectionWrapper">
+                <div class="section-header" id="_auto_31">
+                    <span>📚 Notes</span>
+                    <span class="arrow" id="pagesArrow">▼</span>
+                </div>
+                <div class="section-content" id="pagesContent">
+                    <ul class="chapter-list" id="chapterList"></ul>
+                </div>
+            </div>
+            <!-- NEW: TAGS SECTION -->
+            <div class="sidebar-section tags-section" id="tagsSectionWrapper">
+                <div class="section-header" id="_auto_32">
+                    <span>🏷️ Tags</span>
+                    <span class="arrow" id="tagsArrow">▼</span>
+                </div>
+                <div class="section-content" id="tagsContent">
+                    <div class="tag-cloud" id="tagCloud"></div>
+                </div>
+            </div>
+            <!-- POMODORO TIMER SECTION -->
+            <div class="sidebar-section" id="pomodoroSectionWrapper">
+                <div class="section-header" id="_auto_33">
+                    <span>🍅 Study Timer</span>
+                    <span class="arrow" id="pomodoroArrow">▼</span>
+                </div>
+                <div class="section-content" id="pomodoroContent">
+                    <div class="pomodoro-container">
+                        <div class="pomodoro-mode" id="pomodoroMode">Focus Time</div>
+                        <div class="pomodoro-display" id="pomodoroDisplay">25:00</div>
+                        <div class="pomodoro-progress">
+                            <div class="pomodoro-progress-bar" id="pomodoroProgressBar"></div>
+                        </div>
+                        <div class="pomodoro-controls">
+                            <button class="pomodoro-btn" id="pomodoroStartBtn" title="Start focus session">▶️
+                                Start</button>
+                            <button class="pomodoro-btn" id="pomodoroPauseBtn" style="display:none;"
+                                title="Pause timer">⏸️ Pause</button>
+                            <button class="pomodoro-btn" id="_auto_34" title="Reset to 25 minutes">🔄
+                                Reset</button>
+                        </div>
+                        <div class="pomodoro-dnd-container">
+                            <label class="pomodoro-dnd-label" title="Block distractions during focus time">
+                                <input id="dndToggle" type="checkbox" />
+                                <span>🔇 Do Not Disturb</span>
+                            </label>
+                        </div>
+                        <div class="pomodoro-stats">
+                            <div class="pomodoro-stat-item">
+                                <span>Sessions</span>
+                                <span class="pomodoro-stat-value" id="pomodoroSessionCount">0</span>
+                            </div>
+                            <div class="pomodoro-stat-item">
+                                <span>Today</span>
+                                <span class="pomodoro-stat-value" id="pomodoroTodayCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- KNOWLEDGE BASE SECTION -->
+            <div class="sidebar-section" id="knowledgeBaseSectionWrapper">
+                <div class="section-header" id="_auto_35">
+                    <span>📚 Knowledge Base</span>
+                    <span class="arrow" id="knowledgeBaseArrow">▼</span>
+                </div>
+                <div class="section-content" id="knowledgeBaseContent">
+                    <div class="knowledge-base-container" id="knowledgeBaseContainer">
+                        <div style="font-size: 0.75rem; opacity: 0.7; text-align: center; padding: 10px;">
+                            Select a page to view relevant references
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- MY REFERENCES SECTION -->
+            <div class="sidebar-section" id="myReferencesSectionWrapper">
+                <div class="section-header" id="_auto_36">
+                    <span>⭐ My References</span>
+                    <span class="arrow" id="myReferencesArrow">▼</span>
+                </div>
+                <div class="section-content" id="myReferencesContent">
+                    <div class="my-refs-container" id="myReferencesContainer"></div>
+                </div>
+            </div>
+            <div class="sidebar-section tools-section">
+                <div class="section-header" id="_auto_37">
+                    <span>🛠️ Tools</span>
+                    <span class="arrow" id="toolsArrow">▼</span>
+                </div>
+                <div class="section-content" id="toolsContent">
+                    <div class="sidebar-actions">
+                        <button class="btn" id="installAppBtn">📲 Install App</button>
+                        <button class="btn" id="openLibraryPanelBtn" onclick="openLibraryPanel()"
+                            style="background:rgba(255,255,255,0.15); color:#ecf0f1;">📚 Note Library</button>
+                        <button class="btn btn-add" id="_auto_38">+ New Page</button>
+                        <button class="btn btn-secondary" id="_auto_39">👁️ Focus Mode</button>
+                        <button class="btn btn-secondary" id="_auto_40">🗂 Flashcards</button>
+                        <button class="btn btn-secondary" id="paperStyleBtn">📄 Page:
+                            Grid</button>
+                        <small
+                            style="opacity: 0.7; font-size: 0.75em; display: block; margin-top: -8px; margin-left: 4px; color: var(--sidebar-text);">Size
+                            &amp; Texture</small>
+                        <button class="btn btn-save-sidebar" id="_auto_42">🖨️ Save as PDF</button>
+                        <button class="btn btn-secondary" id="readModeBtn">🔓 Lock /
+                            Read</button>
+                        <button class="btn btn-secondary" id="_auto_43">ⓘ Page Details</button>
+                        <!-- UPDATED PDF TOOLS: CONSOLIDATED -->
+                        <button class="btn btn-secondary"
+                            style="position: relative; border: 1px solid var(--template-color);">
+                            📚 Load Lecture
+                            <input accept="application/pdf" id="_auto_44"
+                                style="position: absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"
+                                type="file" />
+                        </button>
+                        <button class="btn btn-secondary" style="position: relative;">
+                            📄 Import Background
+                            <input accept="image/*" id="_auto_45"
+                                style="position: absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"
+                                type="file" />
+                        </button>
+                        <button class="btn btn-sketch" id="sketchToggle">🎨 Sketch
+                            Mode</button>
+                        <button class="btn" id="_auto_46" style="background: #3498db; color: white;">📋
+                            Templates</button>
+                        <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                            <button class="btn btn-secondary" id="_auto_47" style="font-size: 0.8rem;">⬇ Export
+                                Backup</button>
+                            <button class="btn btn-secondary" style="font-size: 0.8rem; position: relative;">
+                                ⬆ Import Backup
+                                <input accept=".json,.html" id="importFile"
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;"
+                                    type="file" />
+                            </button>
+                            <button class="btn btn-danger" id="_auto_48">⚠ Wipe All Data</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><!-- End of sidebar-scrollable -->
+        <div class="storage-footer">
+            <div style="display:flex; justify-content:space-between;">
+                <span>Storage Used</span>
+                <span id="storageText">Checking...</span>
+            </div>
+            <div class="storage-bar-bg">
+                <div class="storage-bar-fill" id="storageBar"></div>
+            </div>
+        </div>
+    </aside>
+    <div class="tool-tray-container" id="trayContainer">
+        <div class="tool-tray">
+            <!-- Global Tools -->
+            <button class="tool-btn" id="voiceBtn"><span>🎤</span> Dictate</button>
+            <button class="tool-btn" id="eraserBtn"><span>🧼</span> Eraser</button>
+            <div class="tool-btn" style="position: relative;">
+                <span>🌈</span> Color
+                <input class="color-picker-input" id="customColorPicker" type="color" />
+            </div>
+            <hr style="opacity: 0.2;" />
+            <!-- PHASE 1 ADVANCED FEATURES -->
+            <button class="tool-btn" id="lassoBtn"><span>⭕</span> Lasso Select</button>
+            <button class="tool-btn" id="shapeRecBtn"><span>🟦</span> Shape
+                Fix</button>
+            <small style="opacity: 0.6; font-size: 0.7rem; margin: -5px 0 5px 5px; display: block;">Zoom: Fixed btns
+                bottom-right</small>
+            <hr style="opacity: 0.2;" />
+            <!-- PHASE 2 ADVANCED FEATURES -->
+            <button class="tool-btn" id="audioRecordBtn"><span>🎤</span> Record &amp;
+                Transcribe</button>
+            <hr style="opacity: 0.2;" />
+            <!-- Standard Block Tools -->
+            <button class="tool-btn" id="_auto_49"><span>🏷️</span> Title</button>
+            <button class="tool-btn" id="_auto_50"><span>📌</span> Note</button>
+            <button class="tool-btn" id="_auto_51"><span>✅</span> To-Do</button>
+            <!-- 1. CS TOOLBAR -->
+            <div id="tools-cs" style="display:none; flex-direction:column; gap:8px;">
+                <hr style="opacity: 0.2;" />
+                <button class="tool-btn" id="_auto_52"><span>&lt;&gt;</span> Code Block</button>
+                <!-- Code button removed here as requested -->
+                <button class="tool-btn" id="_auto_53"><span>🔢</span> Algorithm Step</button>
+                <button class="tool-btn" id="_auto_54"><span>O(n)</span> Complexity</button>
+                <button class="tool-btn" id="_auto_55"><span>📉</span> Trace Table</button>
+            </div>
+            <!-- 2. MEDICAL TOOLBAR -->
+            <div id="tools-med" style="display:none; flex-direction:column; gap:8px;">
+                <hr style="opacity: 0.2;" />
+                <button class="tool-btn" id="_auto_56"><span>🧘</span> Atlas</button>
+                <button class="tool-btn" id="_auto_57"><span>📍</span> Pin</button>
+                <button class="tool-btn" id="_auto_58"><span>🟡</span> Sx</button>
+                <button class="tool-btn" id="_auto_59"><span>🔴</span> Rx</button>
+                <button class="tool-btn" id="_auto_60"><span>⏳</span> Timeline</button>
+                <button class="tool-btn" id="_auto_61"><span>⚖️</span> Compare</button>
+            </div>
+            <!-- 3. ENGINEERING TOOLBAR -->
+            <div id="tools-eng" style="display:none; flex-direction:column; gap:8px;">
+                <hr style="opacity: 0.2;" />
+                <button class="tool-btn" id="mathModeBtn"><span>∑</span> Math Mode</button>
+                <button class="tool-btn" id="_auto_62"><span>📏</span> Ruler</button>
+                <button class="tool-btn" id="_auto_63"><span>∑</span> Eq Block</button>
+                <button class="tool-btn" id="_auto_64"><span>🤔</span> Assume</button>
+                <button class="tool-btn" id="_auto_65"><span>π</span> Constants</button>
+            </div>
+            <!-- Circuit Components Tool (only for Circuit Analysis) -->
+            <div id="tools-circuit" style="display:none; flex-direction:column; gap:8px;">
+                <hr style="opacity: 0.2;" />
+                <button class="tool-btn" id="circuitComponentsBtn">
+                    <span>⚡</span> Components
+                </button>
+            </div>
+            <button class="tool-btn" id="stickerBtn"><span>👁️</span> Sticker</button>
+            <button class="tool-btn" id="_auto_66"><span>📸</span> Photo</button>
+            <hr style="opacity: 0.2;" />
+            <button class="tool-btn" id="_auto_67" style="color: #e74c3c"><span>🗑️</span> Clear
+                Sketch</button>
+        </div>
+        <button class="tool-tray-toggle" id="trayToggle">◀</button>
+    </div>
+    <!-- WIDGET RAIL (collapsed strip + expandable widgets) -->
+    <div class="widget-rail collapsed" data-side="right" id="widgetRail">
+        <div class="widget-rail-handle" title="Drag to reposition">⋮⋮</div>
+        <button class="widget-rail-tab" id="widgetRailTab" title="Widgets">
+            <span class="widget-rail-tab-icon">🧩</span>
+        </button>
+        <div class="widget-rail-content">
+            <div class="widget-rail-header">
+                <span>Widgets</span>
+                <div class="widget-rail-header-actions">
+                    <button class="widget-gallery-btn" id="widgetGalleryBtn" title="Add Widget">＋</button>
+                    <button class="widget-rail-collapse" id="widgetRailCollapse" title="Collapse">»</button>
+                </div>
+            </div>
+            <div class="widget-list" id="widgetList"></div>
+        </div>
+        <!-- WIDGET GALLERY OVERLAY -->
+        <div class="widget-gallery-overlay" id="widgetGalleryOverlay" style="display:none">
+            <div class="widget-gallery-header">
+                <span>Add Widget</span>
+                <button class="widget-gallery-close" id="widgetGalleryClose">✕</button>
+            </div>
+            <div class="widget-gallery-grid" id="widgetGalleryGrid"></div>
+        </div>
+    </div>
+    <!-- MAIN CONTAINER FOR SPLIT LAYOUT -->
+    <div class="main-container" id="mainContainer">
+        <main class="workspace" id="workspace">
+            <div class="paper" id="paper">
+                <!-- PDF BACKGROUND LAYER -->
+                <div id="pdfBackground"></div>
+                <!-- MATH LAYER CONTAINER -->
+                <div id="mathLayer">
+                </div>
+                <canvas id="sketchCanvas"></canvas>
+                <div class="status-bar">
+                    <span class="save-status" id="saveStatus">All changes saved</span>
+                    <span class="word-count" id="wordCount">0 Words</span>
+                </div>
+                <div class="show-tools-btn" id="_auto_68">✎</div>
+                <div class="writing-tools" id="topTools">
+                    <div class="tool-opt active" data-tool="pen" id="_auto_69">🖊️</div>
+                    <div class="tool-opt" data-tool="pencil" id="_auto_70">✏️</div>
+                    <div class="tool-opt highlighter" data-tool="highlighter" id="_auto_71">🖌️</div>
+                    <div class="tool-opt" data-tool="marker" id="_auto_72">🖍️</div>
+                    <div class="tool-opt" data-tool="elegant" id="_auto_73">✒️</div>
+                    <div class="tool-opt" data-tool="brush" id="_auto_74">🎨</div>
+                    <div class="tool-opt" data-tool="chalk" id="_auto_75">📝</div>
+                    <div class="tool-divider" style="margin: 0 10px;"></div>
+                    <div class="tool-opt" id="_auto_76" style="font-weight:bold;">_</div>
+                    <div class="tool-divider sketch-only"></div>
+                    <div class="tool-opt sketch-only" id="_auto_77" title="Undo">↩️</div>
+                    <div class="tool-opt sketch-only" id="_auto_78" title="Redo">↪️</div>
+                </div>
+                <input accept="image/*" id="imageInput" style="display: none;" type="file" />
+                <input class="paper-title" id="pageTitle" placeholder="Page title…" type="text" />
+                <!-- NEW: Sequential Stream Container -->
+                <div id="sequentialStream">
+                    <!-- Content Area injected here by JS -->
+                </div>
+            </div>
+            <!-- NEW CONTROLS AT END OF STREAM (OUTSIDE PAPER) -->
+            <div id="streamControls">
+                <button class="btn-stream-add" id="_auto_79">
+                    ➕ Add Page to Stream
+                </button>
+            </div>
+        </main>
+        <!-- LECTURE PANE (RIGHT SPLIT) -->
+        <div class="lecture-pane" id="lecturePane">
+            <div class="lecture-header">
+                <span>📚 Lecture Reader</span>
+                <button class="bubble-btn" id="_auto_80">✖ Close</button>
+            </div>
+            <iframe class="lecture-frame" id="lectureFrame"></iframe>
+        </div>
+    </div>
+    <!-- METADATA MODAL -->
+    <div class="floating-pane" id="metadataModal" style="display:none; width: 300px;">
+        <h3 style="margin-bottom: 15px;">Page Details</h3>
+        <div class="meta-group">
+            <label class="meta-label">Tags</label>
+            <div class="tag-input-container" style="display:flex; gap:5px; margin-bottom:5px;">
+                <input class="meta-value" id="metaTagInput" placeholder="Add tag..." type="text" />
+                <button class="btn btn-secondary" id="_auto_81"
+                    style="width:auto; padding:5px 10px; margin:0;">+</button>
+            </div>
+            <div class="meta-tags" id="metaTagsList"></div>
+        </div>
+        <div class="meta-group">
+            <label class="meta-label">Discipline</label>
+            <select class="meta-value" disabled="" id="metaDiscipline">
+                <option value="cs">Computer Science</option>
+                <option value="medical">Medical</option>
+                <option value="engineering">Engineering</option>
+                <option value="general">General</option>
+            </select>
+        </div>
+        <div class="meta-group">
+            <label class="meta-label">Page Type</label>
+            <select class="meta-value" id="metaType">
+                <option value="note">General Note</option>
+                <option value="concept">Concept</option>
+                <option value="algorithm">Algorithm</option>
+                <option value="system">System Design</option>
+                <option value="project">Project</option>
+                <option value="whiteboard">Whiteboard</option>
+                <optgroup label="Medical">
+                    <option value="anatomy">Anatomy</option>
+                    <option value="disease">Disease Profile</option>
+                    <option value="drug">Drug Monograph</option>
+                    <option value="pathway">Pathway</option>
+                    <option value="clinical_case">Clinical Case</option>
+                    <option value="lab">Lab Interpretation</option>
+                </optgroup>
+                <optgroup label="Dentistry">
+                    <option value="dental_anatomy">Dental Anatomy</option>
+                    <option value="oral_pathology">Oral Pathology</option>
+                    <option value="dental_procedure">Procedure</option>
+                    <option value="dental_case">Dental Case</option>
+                    <option value="prostho_plan">Prostho Plan</option>
+                    <option value="endo_case">Endo Case</option>
+                    <option value="perio_case">Perio Case</option>
+                    <option value="oral_radiology">Oral Radiology</option>
+                </optgroup>
+                <!-- ENGINEERING -->
+                <optgroup label="Engineering">
+                    <option value="problem_solution">Problem Solution</option>
+                    <option value="circuit_analysis">Circuit Analysis</option>
+                    <option value="mechanical_system">Mechanical System</option>
+                    <option value="structural_analysis">Structural Analysis</option>
+                    <option value="control_system">Control System</option>
+                    <option value="process_flow">Process Flow</option>
+                    <option value="design_calculation">Design Calc</option>
+                    <option value="lab_experiment">Lab Experiment</option>
+                </optgroup>
+            </select>
+        </div>
+        <div class="meta-group">
+            <label class="meta-label">System / Course</label>
+            <input class="meta-value" id="metaSystem" placeholder="e.g. Cardio, Neuro..." type="text" />
+        </div>
+        <!-- DENTISTRY SPECIFIC METADATA -->
+        <div id="dentalMetaGroup"
+            style="display:none; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px;">
+            <div class="meta-group">
+                <label class="meta-label">Tooth # (FDI/Universal)</label>
+                <input class="meta-value" id="metaTooth" placeholder="e.g. 11, 46, #3..." type="text" />
+            </div>
+            <div class="meta-group">
+                <label class="meta-label">Quadrant</label>
+                <select class="meta-value" id="metaQuadrant">
+                    <option value="">None</option>
+                    <option value="UR">UR (1)</option>
+                    <option value="UL">UL (2)</option>
+                    <option value="LL">LL (3)</option>
+                    <option value="LR">LR (4)</option>
+                </select>
+            </div>
+            <div class="meta-group">
+                <label class="meta-label">Specialty</label>
+                <select class="meta-value" id="metaSpecialty">
+                    <option value="">General</option>
+                    <option value="Endo">Endodontics</option>
+                    <option value="Perio">Periodontics</option>
+                    <option value="Prostho">Prosthodontics</option>
+                    <option value="Ortho">Orthodontics</option>
+                    <option value="Surgery">Oral Surgery</option>
+                    <option value="Pedo">Pedodontics</option>
+                </select>
+            </div>
+        </div>
+        <!-- ENGINEERING SPECIFIC METADATA -->
+        <div id="engineeringMetaGroup"
+            style="display:none; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px;">
+            <div class="meta-group">
+                <label class="meta-label">Engineering Branch</label>
+                <select class="meta-value" id="metaEngBranch">
+                    <option value="Electrical">Electrical (EE)</option>
+                    <option value="Mechanical">Mechanical (ME)</option>
+                    <option value="Civil">Civil (CE)</option>
+                    <option value="Electronics">Electronics (ECE)</option>
+                    <option value="Mechatronics">Mechatronics</option>
+                    <option value="Industrial">Industrial</option>
+                    <option value="General">General</option>
+                </select>
+            </div>
+        </div>
+        <div class="meta-group">
+            <label class="meta-label">Difficulty</label>
+            <select class="meta-value" id="metaDifficulty">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+                <option value="exam">Exam Critical</option>
+            </select>
+        </div>
+        <div class="meta-group">
+            <label class="meta-label">Created At</label>
+            <div id="metaCreated" style="font-size:0.8rem; color:#666;"></div>
+        </div>
+        <button class="tool-btn" id="_auto_82" style="margin-top: 10px; background: #eee;">Close</button>
+    </div>
+    <!-- UPDATED TEMPLATE POPUP -->
+    <div class="floating-pane" id="templatePopup">
+        <h3 style="margin-bottom: 10px;">Select Template</h3>
+        <!-- Main Menu View -->
+        <div id="tmpl-main-view">
+            <button class="tool-btn" id="_auto_83"
+                style="justify-content:space-between; background: var(--cs-accent); color: white; border: none;">
+                <span>💻 Computer Science</span>
+                <span>▶</span>
+            </button>
+            <button class="tool-btn" id="_auto_84"
+                style="justify-content:space-between; background: var(--med-accent); color: white; border: none;">
+                <span>⚕️ Medical</span>
+                <span>▶</span>
+            </button>
+            <button class="tool-btn" id="_auto_85"
+                style="justify-content:space-between; background: var(--dent-accent); color: white; border: none;">
+                <span>🦷 Dentistry</span>
+                <span>▶</span>
+            </button>
+            <button class="tool-btn" id="_auto_86"
+                style="justify-content:space-between; background: var(--eng-accent); color: white; border: none;">
+                <span>⚙️ Engineering</span>
+                <span>▶</span>
+            </button>
+            <button class="tool-btn" id="_auto_87"
+                style="justify-content:space-between; background: var(--accent-color); color: white; border: none; font-weight: bold;">
+                <span>⚡ Advanced Templates</span>
+                <span>▶</span>
+            </button>
+            <hr style="width:100%; opacity:0.1; margin: 8px 0;" />
+            <button class="tool-btn" id="_auto_88">📄 Default Page</button>
+            <button class="tool-btn" id="_auto_89">♾️ Infinite Whiteboard</button>
+            <button class="tool-btn" id="_auto_90">📅 Meeting Notes</button>
+            <button class="tool-btn" id="_auto_91">📖 Daily Journal</button>
+            <button class="tool-btn" id="_auto_92">⚖️ Eisenhower Matrix</button>
+        </div>
+        <!-- Advanced Templates View -->
+        <div id="tmpl-advanced-view" style="display:none;">
+            <button class="tool-btn" id="_auto_93"
+                style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <div
+                style="background: rgba(231,76,60,0.1); padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem;">
+                <strong>⚠️ Advanced Templates</strong> enforce structure for deeper learning. Great for exam prep and
+                mastery!
+            </div>
+            <button class="tool-btn" id="_auto_94" style="border-left: 4px solid var(--cs-accent);">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">📝 Cornell Notes</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Lectures &amp; Active Recall</div>
+                </div>
+            </button>
+            <button class="tool-btn" id="_auto_95" style="border-left: 4px solid var(--template-color);">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">🔗 Zettelkasten</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Atomic Notes &amp; Linking</div>
+                </div>
+            </button>
+            <button class="tool-btn" id="_auto_96" style="border-left: 4px solid #95a5a6;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">📋 Outline Method</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Hierarchical Topics</div>
+                </div>
+            </button>
+            <button class="tool-btn" id="_auto_97" style="border-left: 4px solid #9b59b6;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">🧠 Mind Mapping</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Visual Connections</div>
+                </div>
+            </button>
+            <button class="tool-btn" id="_auto_98" style="border-left: 4px solid #16a085;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">📖 SQ3R Reading</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Active Reading Method</div>
+                </div>
+            </button>
+            <button class="tool-btn" id="_auto_99" style="border-left: 4px solid #e67e22;">
+                <div style="text-align: left;">
+                    <div style="font-weight: bold;">🎓 Feynman Technique</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7;">Deep Understanding</div>
+                </div>
+            </button>
+        </div>
+        <!-- CS Sub-Menu View -->
+        <div id="tmpl-cs-view" style="display:none;">
+            <button class="tool-btn" id="_auto_100"
+                style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <button class="tool-btn" id="_auto_101">📐 Algorithm Sheet</button>
+            <button class="tool-btn" id="_auto_102">🔌 Logic Gates Simulator</button>
+            <button class="tool-btn" id="_auto_103">⚙️ System Design</button>
+            <button class="tool-btn" id="_auto_104">💻 Code Study</button>
+            <button class="tool-btn" id="_auto_105">🚀 Project Log</button>
+        </div>
+        <!-- Medical Sub-Menu View -->
+        <div id="tmpl-med-view" style="display:none;">
+            <button class="tool-btn" id="_auto_106"
+                style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <button class="tool-btn" id="_auto_107">🧠 Anatomy Sheet</button>
+            <button class="tool-btn" id="_auto_108">🏥 Disease Profile</button>
+            <button class="tool-btn" id="_auto_109">💊 Drug Monograph</button>
+            <button class="tool-btn" id="_auto_110">🦵 Physiotherapy Case</button>
+            <button class="tool-btn" id="_auto_111">🧬 Pathway Breakdown</button>
+            <button class="tool-btn" id="_auto_112">🧪 Lab Interpretation</button>
+        </div>
+        <!-- Dentistry Sub-Menu View -->
+        <div id="tmpl-dentistry-view" style="display:none;">
+            <button class="tool-btn" id="_auto_113"
+                style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <button class="tool-btn" id="_auto_114">🦷 Dental Anatomy</button>
+            <button class="tool-btn" id="_auto_115">🧬 Oral Pathology</button>
+            <button class="tool-btn" id="_auto_116">🛠️ Procedure</button>
+            <button class="tool-btn" id="_auto_117">🧾 Dental Case</button>
+            <button class="tool-btn" id="_auto_118">🦷 Prostho Plan</button>
+            <button class="tool-btn" id="_auto_119">🦠 Endo Case</button>
+            <button class="tool-btn" id="_auto_120">🪥 Perio Case</button>
+            <button class="tool-btn" id="_auto_121">🩻 Oral Radiology</button>
+        </div>
+        <!-- Engineering Sub-Menu View -->
+        <div id="tmpl-eng-view" style="display:none;">
+            <button class="tool-btn" id="_auto_122"
+                style="background:#eee; margin-bottom:5px; justify-content: center;">◀ Back to Main</button>
+            <button class="tool-btn" id="_auto_123">📐 Problem Solution</button>
+            <button class="tool-btn" id="_auto_124">⚡ Circuit Analysis</button>
+            <button class="tool-btn" id="_auto_125">⚙️ Mechanical System</button>
+            <button class="tool-btn" id="_auto_126">🏗 Structural Analysis</button>
+            <button class="tool-btn" id="_auto_127">🎛 Control System</button>
+            <button class="tool-btn" id="_auto_128">🏭 Process Flow</button>
+            <button class="tool-btn" id="_auto_129">🧪 Lab Experiment</button>
+        </div>
+        <button class="tool-btn" id="_auto_130" style="margin-top: 10px; background: #eee;">Close</button>
+    </div>
+    <div class="toast" id="toast">Action Successful!</div>
+    <!-- Do Not Disturb Overlay -->
+    <div class="dnd-overlay" id="dndOverlay">
+        <div class="dnd-message">🍅 Focus Mode Active</div>
+        <div class="dnd-timer" id="dndTimer">25:00</div>
+        <div class="dnd-subtitle">Stay focused! All tools are locked.</div>
+        <button class="dnd-exit-btn" id="_auto_131">⏸️ Exit Focus</button>
+    </div>
+    <!-- MY REFERENCES MODAL -->
+    <div class="ref-modal-overlay" id="refModalOverlay">
+        <div class="ref-modal">
+            <div class="ref-modal-header">
+                <div class="ref-modal-title" id="refModalTitle">New Reference</div>
+                <button class="ref-modal-close" id="_auto_132">×</button>
+            </div>
+            <div class="ref-modal-body" id="refModalBody"></div>
+            <div class="ref-modal-footer" id="refModalFooter"></div>
+        </div>
+    </div>
+    <!-- ═══════════════════════════════════════════════════════════
+         EMBEDDED LIBRARY PANEL
+         Slide-in full-screen drawer — no separate page needed.
+         All state is shared with the main app (same window.LIBRARY,
+         window.AUTH, chapters array, etc.)
+    ═══════════════════════════════════════════════════════════ -->
+    <div id="libraryPanel" class="lib-panel" aria-hidden="true">
+
+        <!-- TOP BAR -->
+        <div class="lib-topbar">
+            <button class="lib-back-btn" onclick="closeLibraryPanel()" title="Back to Notebook">← Notebook</button>
+            <div class="lib-topbar-title">📚 Shared Note Library</div>
+            <label class="lib-import-btn" title="Import a shared .json note file">
+                ⬆ Import
+                <input type="file" accept=".json,.html" id="libImportFileInput" />
+            </label>
+        </div>
+
+        <!-- SCROLLABLE BODY -->
+        <div class="lib-body">
+            <div class="lib-page-wrapper">
+
+                <!-- Search + filter strip -->
+                <div class="lib-search-strip">
+                    <span class="lib-search-label">🔍 Search</span>
+                    <input class="lib-search-input" id="libSearchInput" type="text"
+                        placeholder="title, #tag, or author…" autocomplete="off" />
+                    <select class="lib-filter-select" id="libCategoryFilter">
+                        <option value="all">All categories</option>
+                        <option value="general">General</option>
+                        <option value="cs">Computer Science</option>
+                        <option value="medical">Medical</option>
+                        <option value="engineering">Engineering</option>
+                    </select>
+                    <span class="lib-result-count" id="libResultCount"></span>
+                </div>
+
+                <!-- Cards grid -->
+                <div class="lib-cards-grid" id="libCardsGrid"></div>
+
+                <!-- Empty state -->
+                <div class="lib-empty-state" id="libEmptyState" style="display:none;">
+                    <span class="lib-empty-icon">📭</span>
+                    <div class="lib-empty-title" id="libEmptyTitle">The library is empty</div>
+                    <div class="lib-empty-sub" id="libEmptySub">
+                        Click the 📤 share icon next to any note to publish it here.<br>
+                        Or import a shared .json file using the button above.
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- NOTE VIEW MODAL (inside the panel) -->
+        <div class="lib-modal-overlay" id="libViewModal" onclick="libHandleModalOverlayClick(event)">
+            <div class="lib-modal-paper">
+                <div class="lib-modal-lines"></div>
+                <div class="lib-modal-header">
+                    <div class="lib-modal-title" id="libModalTitle">—</div>
+                    <button class="lib-modal-close" onclick="libCloseModal()" title="Close">✕</button>
+                </div>
+                <div class="lib-modal-meta" id="libModalMeta"></div>
+                <div class="lib-modal-content-area" id="libModalContent"></div>
+                <div class="lib-modal-footer">
+                    <button class="lib-modal-btn lib-modal-btn-clone" onclick="libCloneCurrentEntry()">📋 Clone into
+                        Notebook</button>
+                    <button class="lib-modal-btn lib-modal-btn-download" onclick="libDownloadCurrentEntry()">⬇ Download
+                        .json</button>
+                    <button class="lib-modal-btn lib-modal-btn-close" onclick="libCloseModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div class="lib-toast" id="libToast"></div>
+    </div>
+
+    <!-- LIBRARY PANEL STYLES -->
+    <style>
+        /* ── Panel shell ── */
+        .lib-panel {
+            position: fixed;
+            inset: 0;
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            background: #d4c9b0;
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: 'Patrick Hand', cursive;
+        }
+
+        .lib-panel.lib-open {
+            transform: translateX(0);
+        }
+
+        /* ── Top bar ── */
+        .lib-topbar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 20px;
+            height: 52px;
+            background: #2c3e50;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        .lib-back-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-family: 'Caveat', cursive;
+            font-size: 1rem;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .lib-back-btn:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .lib-topbar-title {
+            font-family: 'Caveat', cursive;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            flex: 1;
+        }
+
+        .lib-import-btn {
+            background: rgba(39, 174, 96, 0.2);
+            border: 1px solid rgba(39, 174, 96, 0.4);
+            color: #2ecc71;
+            font-family: 'Caveat', cursive;
+            font-size: 1rem;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.15s;
+        }
+
+        .lib-import-btn:hover {
+            background: rgba(39, 174, 96, 0.3);
+        }
+
+        .lib-import-btn input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* ── Scrollable body ── */
+        .lib-body {
+            flex: 1;
+            overflow-y: auto;
+            background: #d4c9b0;
+        }
+
+        .lib-page-wrapper {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 0 20px 60px;
+        }
+
+        /* ── Search strip ── */
+        .lib-search-strip {
+            background: #f9f6ee;
+            border-radius: 3px 8px 8px 3px;
+            box-shadow: -4px 0 0 #b5a590, 2px 2px 12px rgba(0, 0, 0, 0.18);
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .lib-search-strip::before {
+            content: '';
+            position: absolute;
+            left: 36px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e8a9a9;
+            pointer-events: none;
+        }
+
+        .lib-search-label {
+            font-family: 'Caveat', cursive;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #4a5568;
+            white-space: nowrap;
+            padding-left: 14px;
+        }
+
+        .lib-search-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #d6cfc0;
+            padding: 6px 4px;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 1rem;
+            color: #2c3e50;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .lib-search-input:focus {
+            border-bottom-color: #2980b9;
+        }
+
+        .lib-search-input::placeholder {
+            color: #d6cfc0;
+            font-style: italic;
+        }
+
+        .lib-filter-select {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #d6cfc0;
+            padding: 6px 4px;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 0.9rem;
+            color: #4a5568;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .lib-result-count {
+            font-family: 'Kalam', cursive;
+            font-size: 0.82rem;
+            color: #718096;
+            white-space: nowrap;
+        }
+
+        /* ── Cards grid ── */
+        .lib-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        /* ── Note card ── */
+        .lib-note-card {
+            background: #f9f6ee;
+            border-radius: 3px 10px 10px 3px;
+            box-shadow: -4px 0 0 #b5a590, 2px 3px 14px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, box-shadow 0.2s;
+            animation: libFadeUp 0.3s ease both;
+        }
+
+        .lib-note-card:hover {
+            transform: translateY(-3px);
+            box-shadow: -4px 0 0 #b5a590, 3px 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .lib-note-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: repeating-linear-gradient(to bottom, transparent, transparent 23px,
+                    #d6cfc0 23px, #d6cfc0 24px);
+            background-position: 0 44px;
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        .lib-card-margin {
+            position: absolute;
+            left: 38px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e8a9a9;
+        }
+
+        .lib-card-body {
+            padding: 18px 18px 14px 50px;
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lib-card-title {
+            font-family: 'Caveat', cursive;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 6px;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+
+        .lib-card-snippet {
+            font-family: 'Kalam', cursive;
+            font-size: 0.82rem;
+            color: #4a5568;
+            line-height: 1.55;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .lib-card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+
+        .lib-card-tag {
+            background: rgba(41, 128, 185, 0.12);
+            color: #1a5276;
+            font-family: 'Kalam', cursive;
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(41, 128, 185, 0.2);
+        }
+
+        .lib-card-meta {
+            font-family: 'Kalam', cursive;
+            font-size: 0.72rem;
+            color: #718096;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .lib-card-meta-author {
+            font-weight: 700;
+            color: #4a5568;
+        }
+
+        .lib-card-actions {
+            display: flex;
+            gap: 6px;
+            padding: 10px 14px 12px 50px;
+            background: rgba(0, 0, 0, 0.03);
+            border-top: 1px solid #d6cfc0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lib-card-btn {
+            flex: 1;
+            padding: 6px 4px;
+            border: 1px solid #d6cfc0;
+            background: transparent;
+            border-radius: 5px;
+            font-family: 'Caveat', cursive;
+            font-size: 0.9rem;
+            color: #4a5568;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+
+        .lib-card-btn:hover {
+            background: #2c3e50;
+            color: #fff;
+            border-color: #2c3e50;
+        }
+
+        .lib-card-btn.lib-btn-clone:hover {
+            background: #27ae60;
+            border-color: #27ae60;
+            color: #fff;
+        }
+
+        .lib-card-btn.lib-btn-download:hover {
+            background: #2980b9;
+            border-color: #2980b9;
+            color: #fff;
+        }
+
+        .lib-card-btn.lib-btn-delete {
+            flex: 0;
+            padding: 6px 10px;
+            color: #c0392b;
+            border-color: transparent;
+        }
+
+        .lib-card-btn.lib-btn-delete:hover {
+            background: rgba(192, 57, 43, 0.1);
+            border-color: #c0392b;
+            color: #c0392b;
+        }
+
+        .lib-mine-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #2c3e50;
+            color: #fff;
+            font-family: 'Kalam', cursive;
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 8px;
+            z-index: 2;
+        }
+
+        /* ── Empty state ── */
+        .lib-empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: #f9f6ee;
+            border-radius: 3px 12px 12px 3px;
+            box-shadow: -4px 0 0 #b5a590, 2px 2px 12px rgba(0, 0, 0, 0.12);
+        }
+
+        .lib-empty-icon {
+            font-size: 3.5rem;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .lib-empty-title {
+            font-family: 'Caveat', cursive;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .lib-empty-sub {
+            font-family: 'Kalam', cursive;
+            font-size: 0.95rem;
+            color: #718096;
+            line-height: 1.6;
+        }
+
+        /* ── Note view modal (inside panel) ── */
+        .lib-modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(3px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s;
+        }
+
+        .lib-modal-overlay.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .lib-modal-paper {
+            background: #f9f6ee;
+            border-radius: 3px 12px 12px 3px;
+            box-shadow: -6px 0 0 #b5a590, 6px 6px 40px rgba(0, 0, 0, 0.35);
+            width: 100%;
+            max-width: 860px;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* cheat-sheet modal variant */
+        .lib-modal-overlay.lib-cheatsheet .lib-modal-paper {
+            border-radius: 4px;
+            box-shadow: 4px 8px 40px rgba(0, 0, 0, 0.35);
+        }
+
+        .lib-modal-paper::before {
+            content: '';
+            position: absolute;
+            left: 42px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e8a9a9;
+            pointer-events: none;
+        }
+
+        .lib-modal-overlay.lib-cheatsheet .lib-modal-paper::before {
+            display: none;
+        }
+
+        .lib-modal-lines {
+            position: absolute;
+            inset: 0;
+            background-image: repeating-linear-gradient(to bottom, transparent, transparent 31px,
+                    #d6cfc0 31px, #d6cfc0 32px);
+            background-position: 0 64px;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .lib-modal-overlay.lib-cheatsheet .lib-modal-lines {
+            display: none;
+        }
+
+        .lib-modal-header {
+            padding: 18px 24px 14px 56px;
+            border-bottom: 1px solid #d6cfc0;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .lib-modal-title {
+            font-family: 'Caveat', cursive;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #2c3e50;
+            flex: 1;
+            line-height: 1.2;
+        }
+
+        .lib-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.4rem;
+            cursor: pointer;
+            color: #718096;
+            padding: 2px 4px;
+            transition: color 0.15s;
+            flex-shrink: 0;
+        }
+
+        .lib-modal-close:hover {
+            color: #c0392b;
+        }
+
+        .lib-modal-meta {
+            padding: 8px 24px 10px 56px;
+            border-bottom: 1px solid #d6cfc0;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .lib-modal-content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 24px 24px 56px;
+            position: relative;
+            z-index: 1;
+            line-height: 1.8;
+            font-size: 0.95rem;
+            color: #2c3e50;
+        }
+
+        /* cheat-sheet grid paper on content */
+        .lib-modal-overlay.lib-cheatsheet .lib-modal-content-area {
+            background-color: #fffdf6;
+            background-image:
+                linear-gradient(#e1e1e1 1px, transparent 1px),
+                linear-gradient(90deg, #e1e1e1 1px, transparent 1px);
+            background-size: 25px 25px;
+            padding: 30px 36px 40px;
+        }
+
+        .lib-modal-content-area * {
+            max-width: 100%;
+        }
+
+        .lib-modal-content-area img {
+            border-radius: 6px;
+        }
+
+        .lib-modal-footer {
+            padding: 12px 20px 12px 56px;
+            border-top: 1px solid #d6cfc0;
+            display: flex;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lib-modal-btn {
+            padding: 8px 18px;
+            border-radius: 6px;
+            font-family: 'Caveat', cursive;
+            font-size: 1.05rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .lib-modal-btn-clone {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .lib-modal-btn-clone:hover {
+            background: #219a52;
+        }
+
+        .lib-modal-btn-download {
+            background: #2980b9;
+            color: #fff;
+        }
+
+        .lib-modal-btn-download:hover {
+            background: #1a6fa8;
+        }
+
+        .lib-modal-btn-close {
+            background: #d6cfc0;
+            color: #2c3e50;
+        }
+
+        .lib-modal-btn-close:hover {
+            background: #c4b9aa;
+        }
+
+        /* ── Cheat-sheet section cards (reused DS styles, scoped inside lib-modal) ── */
+        .lib-modal-content-area .algo-section {
+            background: #fff;
+            padding: 26px 28px 22px;
+            margin-bottom: 44px;
+            border-radius: 2px;
+            box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #dcdcdc;
+            position: relative;
+            overflow: hidden;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 1rem;
+            color: #2c3e50;
+            line-height: 1.65;
+        }
+
+        .lib-modal-content-area .algo-section::before {
+            content: '';
+            position: absolute;
+            top: -13px;
+            left: 44%;
+            width: 120px;
+            height: 34px;
+            background: rgba(255, 255, 255, 0.55);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+            transform: rotate(-2deg);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .lib-modal-content-area .algo-section:nth-child(even)::before {
+            left: 42%;
+            transform: rotate(1.5deg);
+            width: 110px;
+        }
+
+        .lib-modal-content-area .cs-note-header {
+            text-align: center;
+            margin: 0 0 44px;
+            transform: rotate(-0.8deg);
+        }
+
+        .lib-modal-content-area .cs-note-title {
+            font-family: 'Patrick Hand', cursive;
+            font-size: 2.4rem;
+            margin: 0 0 6px;
+            color: #c0392b;
+            text-decoration: underline;
+            text-decoration-style: wavy;
+            text-underline-offset: 4px;
+        }
+
+        .lib-modal-content-area .cs-note-sub {
+            font-family: 'Patrick Hand', cursive;
+            font-size: 0.92rem;
+            color: #7f8c8d;
+            margin: 0;
+        }
+
+        .lib-modal-content-area .cs-page-badge {
+            position: absolute;
+            top: -9px;
+            right: 14px;
+            background: #2c3e50;
+            color: #fff;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 0.68rem;
+            letter-spacing: 0.6px;
+            padding: 2px 11px;
+            border-radius: 10px;
+            z-index: 2;
+        }
+
+        .lib-modal-content-area .cs-tag-box {
+            float: right;
+            clear: right;
+            background: #fff9c4;
+            border: 1px solid #e6db74;
+            padding: 8px 13px;
+            border-radius: 0 14px 0 14px;
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.08);
+            font-family: 'Patrick Hand', cursive;
+            font-size: 0.8rem;
+            color: #2c3e50;
+            transform: rotate(2deg);
+            margin: 0 0 12px 18px;
+            max-width: 148px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .lib-modal-content-area .cs-section-title {
+            display: block;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 1.65rem;
+            color: #c0392b;
+            text-decoration: underline;
+            text-decoration-style: wavy;
+            text-underline-offset: 3px;
+            margin: 0 0 14px;
+            line-height: 1.25;
+        }
+
+        .lib-modal-content-area .cs-section-body h1,
+        .lib-modal-content-area .cs-section-body h2,
+        .lib-modal-content-area .cs-section-body h3 {
+            font-family: 'Patrick Hand', cursive !important;
+            color: #2980b9 !important;
+            border-bottom: 2px solid #2c3e50 !important;
+            display: inline-block !important;
+            margin-top: 18px !important;
+            margin-bottom: 10px !important;
+            font-size: 1.3rem !important;
+        }
+
+        .lib-modal-content-area .cs-section-body pre,
+        .lib-modal-content-area .cs-section-body code {
+            display: block !important;
+            background: #282c34 !important;
+            color: #abb2bf !important;
+            padding: 18px 20px !important;
+            border-radius: 6px !important;
+            overflow-x: auto !important;
+            font-family: 'Consolas', 'Monaco', monospace !important;
+            font-size: 0.9rem !important;
+            line-height: 1.55 !important;
+            white-space: pre !important;
+            border: 5px solid #4a3b2a !important;
+            box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55) !important;
+            margin: 14px 0 !important;
+        }
+
+        .lib-modal-content-area .cs-section-body p>code,
+        .lib-modal-content-area .cs-section-body li>code {
+            display: inline !important;
+            padding: 1px 6px !important;
+            border-radius: 3px !important;
+            font-size: 0.88em !important;
+            border-width: 2px !important;
+        }
+
+        /* ── Toast ── */
+        .lib-toast {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #2c3e50;
+            color: #fff;
+            font-family: 'Caveat', cursive;
+            font-size: 1.05rem;
+            padding: 10px 22px;
+            border-radius: 20px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+            z-index: 200;
+            white-space: nowrap;
+        }
+
+        .lib-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @keyframes libFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .lib-topbar-title {
+                font-size: 1.1rem;
+            }
+
+            .lib-search-strip {
+                flex-wrap: wrap;
+            }
+
+            .lib-modal-paper {
+                border-radius: 8px;
+            }
+
+            .lib-modal-paper::before {
+                display: none;
+            }
+
+            .lib-modal-header,
+            .lib-modal-meta,
+            .lib-modal-content-area,
+            .lib-modal-footer {
+                padding-left: 18px;
+            }
+        }
+    </style>
+    <!-- Circuit components functionality is in script.js -->
+</body>
+
+</html>

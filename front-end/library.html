@@ -930,7 +930,7 @@
 
     <!-- ───────── TOP BAR ───────── -->
     <nav class="topbar">
-        <a class="topbar-back" href="index.html">← Notebook</a>
+        <a class="topbar-back" href="app.html">← Notebook</a>
         <div class="topbar-title">📚 Shared Note Library</div>
         <div class="topbar-user" id="topbarUser"></div>
         <label class="btn-import" title="Import a shared .json note file">
@@ -1292,7 +1292,7 @@
             localStorage.setItem(pendingKey, JSON.stringify(clone));
 
             toast('📋 Cloned! Opening your notebook…');
-            setTimeout(() => window.location.href = 'index.html', 900);
+            setTimeout(() => window.location.href = 'app.html', 900);
         }
 
         function downloadEntry(id) {
