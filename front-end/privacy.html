@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" name="viewport" />
+    <title>Privacy Policy | Academic Notebook</title>
+    
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Kalam:wght@300;400;700&display=swap" rel="stylesheet" />
+    <link href="styles.css" rel="stylesheet" />
+    
+    <style>
+        body {
+            background-color: var(--workspace-bg, #fdfbf7);
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--ink-color, #2c3e50);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--sidebar-bg, #2c3e50);
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-family: 'Caveat', cursive;
+            font-size: 2rem;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+
+        h2 {
+            font-family: 'Kalam', cursive;
+            font-size: 1.8rem;
+            color: var(--sidebar-bg, #2c3e50);
+            border-bottom: 2px solid var(--grid-line, #e3e0d9);
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+
+        h2:first-of-type {
+            margin-top: 0;
+        }
+
+        p, li {
+            font-size: 1.05rem;
+            color: #444;
+            margin-bottom: 15px;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        .last-updated {
+            font-style: italic;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        a {
+            color: var(--accent-color, #3498db);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .nav-links a {
+            color: white;
+            margin-left: 20px;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1><a href="landing.html" style="color:white; text-decoration:none;">Academic Notebook</a></h1>
+        <nav class="nav-links">
+            <a href="landing.html">Home</a>
+            <a href="login.html">Login</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <h2>Privacy Policy</h2>
+        <p class="last-updated">Last Updated: March 2026</p>
+
+        <p>Welcome to Academic Notebook! We respect your privacy and are committed to protecting it. This Privacy Policy explains how we collect, use, and safeguard your information when you use our web application.</p>
+
+        <h2>1. Information We Collect</h2>
+        <p>We collect information to provide and improve our services to you:</p>
+        <ul>
+            <li><strong>Personal Account Information:</strong> When you register using an email/password or through Google OAuth, we collect your email address and display name.</li>
+            <li><strong>User Content (Notes & Data):</strong> The notes, drawings, flashcards, layouts, and files (like PDFs or images) you create or upload in the app.</li>
+            <li><strong>Usage Data:</strong> Basic analytics such as feature usage to help us improve the application.</li>
+        </ul>
+
+        <h2>2. How We Store Your Data</h2>
+        <p>A core philosophy of Academic Notebook is privacy-first storage:</p>
+        <ul>
+            <li><strong>Local Storage Priority:</strong> Most of your notebook data (including strokes, layouts, and unsaved notes) is stored <em>locally</em> on your device using IndexedDB and LocalStorage in your browser.</li>
+            <li><strong>Cloud Syncing:</strong> If you are logged in, your notes are securely synced to our servers so you can access them across multiple devices.</li>
+            <li><strong>Shared Library:</strong> Notes that you explicitly choose to 'Publish' are stored on our servers and made visible to other users. You can delete these at any time.</li>
+        </ul>
+
+        <h2>3. How We Use Your Information</h2>
+        <ul>
+            <li>To provide, operate, and maintain the notebook application.</li>
+            <li>To sync your data securely across your trusted devices.</li>
+            <li>To communicate with you regarding account updates or security notices.</li>
+            <li>To display your display name on notes you choose to publish to the Shared Library.</li>
+        </ul>
+
+        <h2>4. Data Sharing and Disclosure</h2>
+        <p>We do <strong>not</strong> sell your personal data to third parties. We may disclose your data only in the following circumstances:</p>
+        <ul>
+            <li><strong>With your consent:</strong> When you actively choose to 'Publish' a note to the shared library.</li>
+            <li><strong>Service Providers:</strong> We use secure, industry-standard third-party hosting services (like Vercel and MongoDB Atlas) to operate our backend infrastructure.</li>
+            <li><strong>Legal Requirements:</strong> If required to do so by law or in response to valid requests by public authorities.</li>
+        </ul>
+
+        <h2>5. Your Rights and Choices</h2>
+        <p>You have the right to access, update, or delete your personal information:</p>
+        <ul>
+            <li>You can edit your account details directly within the app.</li>
+            <li>You can choose to delete your account and all associated cloud-synced data at any time via the sidebar settings.</li>
+            <li>You can delete notes from the Shared Library at any time.</li>
+        </ul>
+
+        <h2>6. Security</h2>
+        <p>We implement robust security measures, including bcrypt for password hashing and secure token-based authentication (JWT), to protect your account. However, no electronic transmission over the internet or information storage technology can be guaranteed to be 100% secure.</p>
+
+        <h2>7. Contact Us</h2>
+        <p>If you have any questions or concerns about this Privacy Policy or our data practices, please contact us.</p>
+    </div>
+</body>
+</html>
