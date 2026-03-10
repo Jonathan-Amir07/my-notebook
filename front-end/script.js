@@ -12500,6 +12500,9 @@ function showToast(message, type = 'info') {
 // Make globally available
 window.showToast = showToast;
 
+// Initialize missing PageDetailsGesture
+new PageDetailsGesture();
+
 /* ==================== KEYBOARD SHORTCUTS ==================== */
 document.addEventListener('keydown', function(e) {
     // Only process shortcuts if Ctrl or Meta (Cmd on Mac) is pressed
@@ -12579,6 +12582,10 @@ function toggleShortcutsModal() {
                 '<li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">' +
                     '<span><b>Cmd/Ctrl + M</b></span>' +
                     '<span style="opacity: 0.8;">Toggle Sketch Mode</span>' +
+                '</li>' +
+                '<li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">' +
+                    '<span><b>Cmd/Ctrl + Click</b></span>' +
+                    '<span style="opacity: 0.8;">Open Page Details</span>' +
                 '</li>' +
                 '<li style="display: flex; justify-content: space-between; padding: 8px 0;">' +
                     '<span><b>Cmd/Ctrl + /</b></span>' +
