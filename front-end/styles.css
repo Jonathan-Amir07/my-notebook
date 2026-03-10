@@ -6210,3 +6210,66 @@ body.dark-mode .lasso-selected {
 .nb-toast.info {
     border-left-color: var(--cs-accent);
 }
+
+/* ==================== RICH EMPTY STATES ==================== */
+.nb-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 20px;
+    text-align: center;
+    color: var(--ink-color);
+    opacity: 0.7;
+    animation: fadeIn 0.4s ease;
+}
+
+.nb-empty-state-icon {
+    font-size: 3.5rem;
+    margin-bottom: 15px;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+}
+
+.nb-empty-state-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-family: 'Caveat', cursive;
+}
+
+.nb-empty-state-desc {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    max-width: 250px;
+    margin-bottom: 20px;
+    font-family: sans-serif;
+}
+
+.nb-empty-state-btn {
+    background: var(--save-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: 'Patrick Hand', cursive;
+    font-size: 1rem;
+    transition: transform 0.2s, background 0.2s;
+    box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
+}
+
+.nb-empty-state-btn:hover {
+    transform: translateY(-2px);
+    background: #219a52;
+}
+
+/* Specific overrides for sidebar and tags */
+.sidebar .nb-empty-state {
+    color: var(--sidebar-text);
+    padding: 20px 10px;
+}
+
+.sidebar .nb-empty-state-desc {
+    color: rgba(236, 240, 241, 0.7);
+}

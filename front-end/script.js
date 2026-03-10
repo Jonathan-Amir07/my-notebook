@@ -5054,9 +5054,17 @@ function generateFlashcards() {
 }
 
 window.renderCard = () => {
-    const card = flashcards[currentCardIndex];
     const cardEl = document.querySelector('.flashcard');
 
+    if (flashcards.length === 0) {
+        cardEl.classList.remove('flipped');
+        document.getElementById('fcQuestion').innerHTML = '<div class="nb-empty-state" style="margin-top:20px; color:var(--ink-color);"><div class="nb-empty-state-icon">📇</div><div class="nb-empty-state-title">No Flashcards Found</div><div class="nb-empty-state-desc" style="font-size:0.9rem;">Type "Question :: Answer" or use Headings in your notes to auto-generate cards.</div></div>';
+        document.getElementById('fcAnswer').innerText = '';
+        document.getElementById('fcCounter').innerText = '0 / 0';
+        return;
+    }
+
+    const card = flashcards[currentCardIndex];
     // Reset flip state
     cardEl.classList.remove('flipped');
 
@@ -6310,7 +6318,22 @@ window.renderSidebar = () => {
         return matchesSearch && matchesCat;
     });
 
-    filtered.forEach(ch => {
+    if (filtered.length === 0) {
+        const isSearch = searchStr !== '' || categoryFilter !== 'all';
+        const msg = isSearch ? "No notes matching your search or filter." : "Create your first note to get started.";
+        const icon = isSearch ? '🔍' : '📝';
+        const title = isSearch ? 'No Results' : "It's a bit empty here";
+        const btnHtml = !isSearch ? '<button class="nb-empty-state-btn" onclick="createNewChapter()">+ New Note</button>' : '';
+        
+        list.innerHTML = 
+            '<div class="nb-empty-state" style="margin-top:20px;">' +
+                '<div class="nb-empty-state-icon">' + icon + '</div>' +
+                '<div class="nb-empty-state-title">' + title + '</div>' +
+                '<div class="nb-empty-state-desc">' + msg + '</div>' +
+                btnHtml +
+            '</div>';
+    } else {
+        filtered.forEach(ch => {
         const li = document.createElement('li');
         li.className = `nav-item ${ch.id === currentId ? 'active' : ''}`;
 
@@ -6334,9 +6357,13 @@ window.renderSidebar = () => {
                     <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">🗑️</button>
                 `;
         list.appendChild(li);
-    });
+        });
+    }
 
-    renderTagsSidebar(); // Refresh tags sidebar when sidebar updates
+    // Refresh tags sidebar when sidebar updates
+    if (typeof renderTagsSidebar === 'function') {
+        renderTagsSidebar(); 
+    }
 };
 
 // ─── USER PROFILE WIDGET ─────────────────────────────────────────────────────
