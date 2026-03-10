@@ -12502,23 +12502,17 @@ window.showToast = showToast;
 
 /* ==================== KEYBOARD SHORTCUTS ==================== */
 document.addEventListener('keydown', function(e) {
-    // If the user is typing in an input, textarea or contenteditable element...
-    const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
-    
     // Only process shortcuts if Ctrl or Meta (Cmd on Mac) is pressed
     if (e.ctrlKey || e.metaKey) {
         
-        // If typing, only allow Save (Cmd+S) or Help (Cmd+/) shortcuts to prevent interfering with normal typing
-        if (isTyping && e.key.toLowerCase() !== 's' && e.key !== '/') {
-            return;
-        }
-
         switch (e.key.toLowerCase()) {
             case 'p':
                 e.preventDefault();
                 e.stopPropagation();
                 const searchInput = document.getElementById('sidebarSearch');
-                if (searchInput) searchInput.focus();
+                if (searchInput) {
+                    searchInput.focus();
+                }
                 // Optionally open sidebar if not open
                 const sidebar = document.getElementById('mainSidebar');
                 if (sidebar) sidebar.classList.add('open');
@@ -12545,6 +12539,7 @@ document.addEventListener('keydown', function(e) {
                 }
                 break;
             case '/':
+            case '\\':
                 e.preventDefault();
                 e.stopPropagation();
                 toggleShortcutsModal();
@@ -12570,7 +12565,7 @@ function toggleShortcutsModal() {
     });
 
     modal.innerHTML = 
-        '<div class="nb-shortcuts-modal floating-pane">' +
+        '<div class="nb-shortcuts-modal">' +
             '<h3 style="margin-bottom: 15px; font-family: Caveat, cursive; font-size: 1.5rem;">⌨️ Keyboard Shortcuts</h3>' +
             '<ul style="list-style: none; padding: 0; margin: 0; font-family: sans-serif; font-size: 0.9rem;">' +
                 '<li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">' +
