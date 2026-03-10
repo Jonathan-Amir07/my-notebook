@@ -12499,3 +12499,95 @@ function showToast(message, type = 'info') {
 
 // Make globally available
 window.showToast = showToast;
+
+/* ==================== KEYBOARD SHORTCUTS ==================== */
+document.addEventListener('keydown', function(e) {
+    // If the user is typing in an input, textarea or contenteditable element...
+    const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
+    
+    // Only process shortcuts if Ctrl or Meta (Cmd on Mac) is pressed
+    if (e.ctrlKey || e.metaKey) {
+        
+        // If typing, only allow Save (Cmd+S) or Help (Cmd+/) shortcuts to prevent interfering with normal typing
+        if (isTyping && e.key.toLowerCase() !== 's' && e.key !== '/') {
+            return;
+        }
+
+        switch (e.key.toLowerCase()) {
+            case 'p':
+                e.preventDefault();
+                const searchInput = document.getElementById('sidebarSearch');
+                if (searchInput) searchInput.focus();
+                // Optionally open sidebar if not open
+                const sidebar = document.getElementById('mainSidebar');
+                if (sidebar) sidebar.classList.add('open');
+                showToast('🔍 Search focused');
+                break;
+            case 's':
+                e.preventDefault();
+                if (typeof window.saveCurrentToCloud === 'function') {
+                    window.saveCurrentToCloud();
+                    showToast('💾 Saved manually');
+                } else if (typeof saveCurrentToCloud === 'function') {
+                    saveCurrentToCloud();
+                    showToast('💾 Saved manually');
+                }
+                break;
+            case 'm':
+                e.preventDefault();
+                if (typeof window.toggleSketchMode === 'function') {
+                    window.toggleSketchMode();
+                } else if (typeof toggleSketchMode === 'function') {
+                    toggleSketchMode();
+                }
+                break;
+            case '/':
+                e.preventDefault();
+                toggleShortcutsModal();
+                break;
+        }
+    }
+});
+
+function toggleShortcutsModal() {
+    let modal = document.getElementById('shortcutsModal');
+    if (modal) {
+        modal.remove();
+        return;
+    }
+
+    modal = document.createElement('div');
+    modal.id = 'shortcutsModal';
+    modal.className = 'nb-shortcuts-overlay';
+    
+    // Close when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) modal.remove();
+    });
+
+    modal.innerHTML = 
+        '<div class="nb-shortcuts-modal floating-pane">' +
+            '<h3 style="margin-bottom: 15px; font-family: Caveat, cursive; font-size: 1.5rem;">⌨️ Keyboard Shortcuts</h3>' +
+            '<ul style="list-style: none; padding: 0; margin: 0; font-family: sans-serif; font-size: 0.9rem;">' +
+                '<li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">' +
+                    '<span><b>Cmd/Ctrl + P</b></span>' +
+                    '<span style="opacity: 0.8;">Focus Search</span>' +
+                '</li>' +
+                '<li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">' +
+                    '<span><b>Cmd/Ctrl + S</b></span>' +
+                    '<span style="opacity: 0.8;">Save Current Page</span>' +
+                '</li>' +
+                '<li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">' +
+                    '<span><b>Cmd/Ctrl + M</b></span>' +
+                    '<span style="opacity: 0.8;">Toggle Sketch Mode</span>' +
+                '</li>' +
+                '<li style="display: flex; justify-content: space-between; padding: 8px 0;">' +
+                    '<span><b>Cmd/Ctrl + /</b></span>' +
+                    '<span style="opacity: 0.8;">Show/Hide this Modal</span>' +
+                '</li>' +
+            '</ul>' +
+            '<button class="tool-btn" style="width: 100%; justify-content: center; margin-top: 15px; background: #eee;" onclick="toggleShortcutsModal()">Close</button>' +
+        '</div>';
+    document.body.appendChild(modal);
+}
+window.toggleShortcutsModal = toggleShortcutsModal;
