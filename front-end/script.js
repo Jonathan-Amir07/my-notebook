@@ -12448,17 +12448,14 @@ function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     
     const toast = document.createElement('div');
-    toast.className = \`nb-toast \${type}\`;
+    toast.className = 'nb-toast ' + type;
     
     let icon = 'ℹ️';
     if (type === 'success') icon = '✅';
     if (type === 'error') icon = '❌';
     if (type === 'warning') icon = '⚠️';
     
-    toast.innerHTML = \`
-        <span class="nb-toast-icon">\${icon}</span>
-        <span class="nb-toast-msg">\${message}</span>
-    \`;
+    toast.innerHTML = '<span class="nb-toast-icon">' + icon + '</span><span class="nb-toast-msg">' + message + '</span>';
     
     container.appendChild(toast);
     
