@@ -4669,22 +4669,22 @@ function draw(e) {
 
     if (activeSketchTool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = 30;
+        ctx.lineWidth = 15;
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     } else if (activeSketchTool === 'highlighter') {
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)';
-        ctx.lineWidth = 20;
+        ctx.lineWidth = 10;
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     } else if (activeSketchTool === 'custom') {
         ctx.strokeStyle = customStrokeStyle;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     } else {
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50';
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
