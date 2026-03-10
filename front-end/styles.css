@@ -6292,10 +6292,10 @@ body.dark-mode .lasso-selected {
     top: 0 !important;
     right: 0 !important;
     width: 320px !important;
-    background: var(--bg-color);
-    color: var(--text-color);
+    background: var(--paper-bg);
+    color: var(--ink-color);
     border-radius: 12px;
     padding: 24px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--grid-line);
 }
