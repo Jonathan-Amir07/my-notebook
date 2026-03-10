@@ -4610,8 +4610,9 @@ function getCanvasCoordinates(inputEvent) {
     }
 
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const dpr = window.devicePixelRatio || 1;
+    const scaleX = (canvas.width / dpr) / rect.width;
+    const scaleY = (canvas.height / dpr) / rect.height;
     return {
         x: (clientX - rect.left) * scaleX,
         y: (clientY - rect.top) * scaleY
