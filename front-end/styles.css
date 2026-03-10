@@ -6157,3 +6157,56 @@ body.dark-mode .lasso-selected {
         opacity: 1;
     }
 }
+/* ==================== GLOBAL TOAST NOTIFICATIONS ==================== */
+#toast-container {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.nb-toast {
+    background: white;
+    color: var(--ink-color);
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Patrick Hand', cursive;
+    font-size: 1.1rem;
+    pointer-events: auto;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+    border-left: 5px solid var(--save-color);
+}
+
+.nb-toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.nb-toast.hide {
+    transform: translateX(120%);
+    opacity: 0;
+}
+
+.nb-toast-icon {
+    font-size: 1.3rem;
+}
+
+.nb-toast.error {
+    border-left-color: var(--accent-color);
+}
+.nb-toast.warning {
+    border-left-color: #f39c12;
+}
+.nb-toast.info {
+    border-left-color: var(--cs-accent);
+}

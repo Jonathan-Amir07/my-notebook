@@ -740,9 +740,9 @@ function libRenderCheatSheet(entry) {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 async function libCloneEntry(id) {
-    libToast('Cloning...');
+    showToast('Cloning...');
     const clone = await window.LIBRARY.buildClone(id);
-    if (!clone) { libToast('Note not found or you are not logged in'); return; }
+    if (!clone) { showToast('Note not found or you are not logged in'); return; }
 
     // Store pending clone — main app picks it up on next init (or immediately
     // since we're already on index.html)
@@ -751,7 +751,7 @@ async function libCloneEntry(id) {
         : 'nb_pending_clone';
     localStorage.setItem(pendingKey, JSON.stringify(clone));
 
-    libToast('📋 Cloned into your notebook!');
+    showToast('📋 Cloned into your notebook!');
     libCloseModal();
     closeLibraryPanel();
 
@@ -772,7 +772,7 @@ window.libCloneEntry = libCloneEntry;
 
 function libDownloadEntry(id) {
     window.LIBRARY.exportNote(id);
-    libToast('⬇ Downloading share file…');
+    showToast('⬇ Downloading share file…');
 }
 window.libDownloadEntry = libDownloadEntry;
 
@@ -780,17 +780,17 @@ async function libDeleteEntry(id) {
     if (!confirm('Are you sure you want to remove this note from the shared library?')) return;
     const libUser = window.api.auth.getCurrentUser();
     if (!libUser) {
-        libToast('❌ You must be logged in to delete notes.');
+        showToast('❌ You must be logged in to delete notes.');
         return;
     }
     const result = await window.LIBRARY.deleteEntry(id, libUser.id || libUser._id);
     if (result.ok) {
-        libToast('🗑 Removed from library');
+        showToast('🗑 Removed from library');
         libCloseModal();
         libRenderCards();
         if (typeof renderSidebar === 'function') renderSidebar();
     } else {
-        libToast('❌ ' + result.error);
+        showToast('❌ ' + result.error);
     }
 }
 window.libDeleteEntry = libDeleteEntry;
@@ -810,11 +810,11 @@ async function libHandleImport(e) {
                     tags: result.entry.tags,
                     frontEndData: result.entry
                 });
-                libToast('✅ HTML imported to Library!');
+                showToast('✅ HTML imported to Library!');
                 libRenderCards();
                 if (typeof renderSidebar === 'function') renderSidebar();
             } catch (err) {
-                libToast('❌ Failed to import HTML to Library');
+                showToast('❌ Failed to import HTML to Library');
                 console.error(err);
             }
         } else {
@@ -824,7 +824,7 @@ async function libHandleImport(e) {
                 : 'nb_pending_clone';
             localStorage.setItem(pendingKey, JSON.stringify(result.entry));
 
-            libToast('✅ Note imported into your Notebook!');
+            showToast('✅ Note imported into your Notebook!');
             libCloseModal();
             closeLibraryPanel();
 
@@ -836,12 +836,12 @@ async function libHandleImport(e) {
             }
         }
     } else {
-        libToast('❌ ' + result.error);
+        showToast('❌ ' + result.error);
     }
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
-function libToast(msg) {
+function showToast(msg) {
     const el = document.getElementById('libToast');
     if (!el) return;
     el.textContent = msg;
@@ -4958,10 +4958,10 @@ window.importData = (input) => {
                     await window.saveSharedNoteToSequence(importedData);
                 }
             } else {
-                alert("Invalid backup file format.");
+                showToast("Invalid backup file format.");
             }
         } catch (err) {
-            alert("Error reading file. Make sure it is a valid JSON backup or share file.");
+            showToast("Error reading file. Make sure it is a valid JSON backup or share file.");
             console.error(err);
         }
     };
@@ -12434,3 +12434,44 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () { var el = document.querySelector('#_auto_131'); if (el) el.addEventListener('click', function () { exitDnd() }); })();
     (function () { var el = document.querySelector('#_auto_132'); if (el) el.addEventListener('click', function () { closeRefModal() }); })();
 });
+
+/* ==================== GLOBAL TOAST NOTIFICATIONS ==================== */
+function createToastContainer() {
+    if (document.getElementById('toast-container')) return;
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+}
+
+function showToast(message, type = 'info') {
+    createToastContainer();
+    const container = document.getElementById('toast-container');
+    
+    const toast = document.createElement('div');
+    toast.className = \`nb-toast \${type}\`;
+    
+    let icon = 'ℹ️';
+    if (type === 'success') icon = '✅';
+    if (type === 'error') icon = '❌';
+    if (type === 'warning') icon = '⚠️';
+    
+    toast.innerHTML = \`
+        <span class="nb-toast-icon">\${icon}</span>
+        <span class="nb-toast-msg">\${message}</span>
+    \`;
+    
+    container.appendChild(toast);
+    
+    // Trigger animation
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 400); // Wait for transition to finish
+    }, 3000);
+}
+
+// Make globally available
+window.showToast = showToast;
