@@ -12516,6 +12516,7 @@ document.addEventListener('keydown', function(e) {
         switch (e.key.toLowerCase()) {
             case 'p':
                 e.preventDefault();
+                e.stopPropagation();
                 const searchInput = document.getElementById('sidebarSearch');
                 if (searchInput) searchInput.focus();
                 // Optionally open sidebar if not open
@@ -12525,6 +12526,7 @@ document.addEventListener('keydown', function(e) {
                 break;
             case 's':
                 e.preventDefault();
+                e.stopPropagation();
                 if (typeof window.saveCurrentToCloud === 'function') {
                     window.saveCurrentToCloud();
                     showToast('💾 Saved manually');
@@ -12535,6 +12537,7 @@ document.addEventListener('keydown', function(e) {
                 break;
             case 'm':
                 e.preventDefault();
+                e.stopPropagation();
                 if (typeof window.toggleSketchMode === 'function') {
                     window.toggleSketchMode();
                 } else if (typeof toggleSketchMode === 'function') {
@@ -12543,11 +12546,12 @@ document.addEventListener('keydown', function(e) {
                 break;
             case '/':
                 e.preventDefault();
+                e.stopPropagation();
                 toggleShortcutsModal();
                 break;
         }
     }
-});
+}, true); // Use capture phase to intercept before nested elements like Quills consume it
 
 function toggleShortcutsModal() {
     let modal = document.getElementById('shortcutsModal');
