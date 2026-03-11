@@ -4745,8 +4745,11 @@ window.redoSketch = () => {
 function drawSavedSketch(dataUrl) {
     const img = new Image();
     img.onload = () => {
+        const prevOp = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'source-over';
         ctx.clearRect(0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
         ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+        ctx.globalCompositeOperation = prevOp;
     };
     img.src = dataUrl;
 }
