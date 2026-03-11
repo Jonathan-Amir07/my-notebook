@@ -5701,6 +5701,7 @@ function saveSketchToCloud() {
     const chapter = chapters.find(c => c.id === currentId);
     if (chapter) {
         chapter.sketch = canvas.toDataURL();
+        sketchData = chapter.sketch;
         saveChapterToDB(chapter);
     }
 }
