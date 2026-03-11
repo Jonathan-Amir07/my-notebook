@@ -12147,6 +12147,11 @@ async function initApp() {
             showToast(`⚠️ ${err.message} - check console for details`);
         }
 
+        // Launch onboarding tour for first-time users
+        if (!localStorage.getItem('nb_onboarded')) {
+            setTimeout(() => { if (typeof startTour === 'function') startTour(); }, 800);
+        }
+
     } catch (err) {
         console.error('Critical error initializing app:', err);
         showToast('⚠️ Some features may not work correctly');
@@ -12722,6 +12727,157 @@ function saveSortOrder() {
         saveChapterToDB(ch).catch(err => console.warn('sortOrder save failed', err));
     });
 }
+
+/* ==================== ONBOARDING TOUR ==================== */
+(function () {
+    const TOUR_STEPS = [
+        {
+            target: '#mainSidebar',
+            title: '📚 Your Notes Live Here',
+            desc: 'Create, organize, search and drag-reorder your notes. Right-click any note for quick actions like rename, duplicate, and export.'
+        },
+        {
+            target: '.tool-bar',
+            title: '🖊️ Writing Tools',
+            desc: 'Pick your style — pen, pencil, marker, highlighter, brush, or chalk. Each one changes how your text looks and feels.'
+        },
+        {
+            target: '#sequentialStream',
+            title: '📝 The Editor',
+            desc: 'Your infinite workspace. Type, paste images, add equations with the math keyboard, or insert interactive circuit diagrams.'
+        },
+        {
+            target: '#_auto_130',
+            title: '📋 Templates',
+            desc: 'Quick-start with Cornell Notes, Zettelkasten, algorithms, medical anatomy, dental procedures, engineering circuits, and more.'
+        },
+        {
+            target: '#sketchCanvas',
+            title: '✏️ Sketch Mode',
+            desc: 'Toggle with Ctrl+M to draw diagrams, annotate, and sketch directly on your notes. Use the eraser, undo/redo, and different brush styles.'
+        }
+    ];
+
+    let _overlay, _spotlight, _tooltip, _stepIdx = 0;
+
+    function createTourDOM() {
+        // Overlay
+        _overlay = document.createElement('div');
+        _overlay.className = 'tour-overlay';
+        document.body.appendChild(_overlay);
+
+        // Spotlight
+        _spotlight = document.createElement('div');
+        _spotlight.className = 'tour-spotlight';
+        document.body.appendChild(_spotlight);
+
+        // Tooltip
+        _tooltip = document.createElement('div');
+        _tooltip.className = 'tour-tooltip';
+        document.body.appendChild(_tooltip);
+    }
+
+    function positionSpotlight(targetEl) {
+        const rect = targetEl.getBoundingClientRect();
+        const pad = 8;
+        _spotlight.style.top    = (rect.top - pad) + 'px';
+        _spotlight.style.left   = (rect.left - pad) + 'px';
+        _spotlight.style.width  = (rect.width + pad * 2) + 'px';
+        _spotlight.style.height = (rect.height + pad * 2) + 'px';
+    }
+
+    function positionTooltip(targetEl) {
+        const rect = targetEl.getBoundingClientRect();
+        const ttWidth = 320;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        let x, y;
+
+        // Try to place to the right of the element
+        if (rect.right + ttWidth + 24 < vw) {
+            x = rect.right + 20;
+            y = rect.top;
+        }
+        // Otherwise place below
+        else if (rect.bottom + 200 < vh) {
+            x = Math.max(16, rect.left);
+            y = rect.bottom + 16;
+        }
+        // Otherwise place to the left
+        else {
+            x = Math.max(16, rect.left - ttWidth - 20);
+            y = rect.top;
+        }
+
+        // Keep in viewport
+        if (y + 250 > vh) y = vh - 270;
+        if (y < 10) y = 10;
+
+        _tooltip.style.left = x + 'px';
+        _tooltip.style.top  = y + 'px';
+    }
+
+    function showStep(idx) {
+        _stepIdx = idx;
+        const step = TOUR_STEPS[idx];
+        const target = document.querySelector(step.target);
+
+        if (!target) {
+            // Skip missing targets
+            if (idx < TOUR_STEPS.length - 1) { showStep(idx + 1); return; }
+            endTour(); return;
+        }
+
+        // Make sure element is visible (open sidebar if needed)
+        if (step.target === '#mainSidebar') {
+            const sidebar = document.getElementById('mainSidebar');
+            if (sidebar) sidebar.classList.add('open');
+        }
+
+        positionSpotlight(target);
+        positionTooltip(target);
+
+        const isLast = idx === TOUR_STEPS.length - 1;
+        const dots = TOUR_STEPS.map((_, i) =>
+            `<div class="tour-dot ${i === idx ? 'active' : ''}"></div>`
+        ).join('');
+
+        _tooltip.innerHTML =
+            `<h3>${step.title}</h3>` +
+            `<p>${step.desc}</p>` +
+            `<div class="tour-actions">` +
+                `<button class="tour-btn tour-btn-skip" id="tourSkip">${isLast ? '' : 'Skip'}</button>` +
+                `<div class="tour-dots">${dots}</div>` +
+                `<button class="tour-btn tour-btn-next" id="tourNext">${isLast ? 'Get Started! 🚀' : 'Next →'}</button>` +
+            `</div>`;
+
+        document.getElementById('tourNext').addEventListener('click', () => {
+            if (isLast) { endTour(); return; }
+            showStep(idx + 1);
+        });
+        document.getElementById('tourSkip').addEventListener('click', () => endTour());
+    }
+
+    function endTour() {
+        if (_overlay)   _overlay.remove();
+        if (_spotlight)  _spotlight.remove();
+        if (_tooltip)   _tooltip.remove();
+        localStorage.setItem('nb_onboarded', '1');
+        showToast('🎉 Welcome to Academic Notebook!', 'success');
+    }
+
+    window.startTour = function () {
+        createTourDOM();
+        showStep(0);
+    };
+
+    // Allow re-triggering from console or a settings menu
+    window.resetTour = function () {
+        localStorage.removeItem('nb_onboarded');
+        showToast('Tour reset — reload the page to see it again');
+    };
+})();
 
 // Initialize missing PageDetailsGesture
 new PageDetailsGesture();
