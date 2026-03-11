@@ -6341,3 +6341,57 @@ body.dark-mode .skeleton-box {
 .skeleton-p { height: 16px; width: 100%; margin-bottom: 12px; }
 .skeleton-p.short { width: 85%; }
 .skeleton-p.medium { width: 92%; }
+
+/* --- CONTEXT MENU --- */
+@keyframes ctxMenuIn {
+    from { opacity: 0; transform: scale(0.92) translateY(-4px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+#nbContextMenu {
+    display: none;
+    position: fixed;
+    z-index: 99999;
+    min-width: 190px;
+    background: rgba(30, 40, 55, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 6px 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+    font-family: 'Patrick Hand', cursive;
+    font-size: 0.92rem;
+    color: #ecf0f1;
+    animation: ctxMenuIn 0.15s ease forwards;
+    transform-origin: top left;
+    user-select: none;
+}
+
+#nbContextMenu.visible { display: block; }
+
+.nb-ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+    white-space: nowrap;
+}
+
+.nb-ctx-item:hover { background: rgba(52, 152, 219, 0.35); color: #fff; }
+.nb-ctx-item.danger:hover { background: rgba(231, 76, 60, 0.35); color: #ff8a80; }
+
+.nb-ctx-item .ctx-icon {
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.nb-ctx-separator {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 5px 0;
+}

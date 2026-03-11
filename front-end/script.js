@@ -10199,7 +10199,15 @@ window.renderSidebar = () => {
 function renderChapterItem(ch, list) {
     const li = document.createElement('li');
     li.className = 'chapter-item';
+    li.dataset.cid = ch.id;
     if (ch.id === currentId) li.classList.add('active');
+
+    // Right-click context menu
+    li.addEventListener('contextmenu', (e) => {
+        if (typeof window.showContextMenu === 'function') {
+            window.showContextMenu(e, ch.id);
+        }
+    });
 
     // Create content wrapper
     const contentDiv = document.createElement('div');
@@ -12512,6 +12520,145 @@ function showToast(message, type = 'info') {
 
 // Make globally available
 window.showToast = showToast;
+
+/* ==================== RIGHT-CLICK CONTEXT MENU ==================== */
+(function () {
+    // Create singleton menu element
+    const menu = document.createElement('div');
+    menu.id = 'nbContextMenu';
+    document.body.appendChild(menu);
+
+    let _activeChapterId = null;
+
+    function hide() {
+        menu.classList.remove('visible');
+        _activeChapterId = null;
+    }
+
+    // Dismiss on outside click or Escape
+    document.addEventListener('click', hide, true);
+    document.addEventListener('contextmenu', function (e) {
+        // If click is not on a chapter-item, hide
+        if (!e.target.closest('.chapter-item')) hide();
+    }, true);
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') hide();
+    });
+    // Hide on sidebar scroll
+    const sidebarScrollable = document.querySelector('.sidebar-scrollable');
+    if (sidebarScrollable) sidebarScrollable.addEventListener('scroll', hide);
+
+    function buildMenu(chapterId) {
+        menu.innerHTML = '';
+        const actions = [
+            { icon: '✏️', label: 'Rename',    cls: '',       fn: () => { hide(); renameChapterInline(chapterId); } },
+            { icon: '👯', label: 'Duplicate', cls: '',       fn: () => { hide(); duplicateChapter(chapterId); } },
+            { sep: true },
+            { icon: '📥', label: 'Export JSON', cls: '',     fn: () => { hide(); exportChapterJSON(chapterId); } },
+            { sep: true },
+            { icon: '🗑️', label: 'Delete',   cls: 'danger', fn: () => { hide(); window.deleteChapter(chapterId); } },
+        ];
+
+        actions.forEach(a => {
+            if (a.sep) {
+                const sep = document.createElement('div');
+                sep.className = 'nb-ctx-separator';
+                menu.appendChild(sep);
+                return;
+            }
+            const item = document.createElement('div');
+            item.className = 'nb-ctx-item ' + (a.cls || '');
+            item.innerHTML = `<span class="ctx-icon">${a.icon}</span><span>${a.label}</span>`;
+            item.addEventListener('click', (e) => { e.stopPropagation(); a.fn(); });
+            menu.appendChild(item);
+        });
+    }
+
+    window.showContextMenu = function (e, chapterId) {
+        e.preventDefault();
+        e.stopPropagation();
+        _activeChapterId = chapterId;
+        buildMenu(chapterId);
+
+        // Position menu — nudge inward if it would overflow viewport
+        const vw = window.innerWidth, vh = window.innerHeight;
+        let x = e.clientX, y = e.clientY;
+        menu.classList.add('visible');
+        const rect = menu.getBoundingClientRect();
+        if (x + rect.width > vw - 8)  x = vw - rect.width - 8;
+        if (y + rect.height > vh - 8) y = vh - rect.height - 8;
+        menu.style.left = x + 'px';
+        menu.style.top  = y + 'px';
+    };
+})();
+
+// Duplicate a chapter
+window.duplicateChapter = async function (id) {
+    const ch = chapters.find(c => c.id === id);
+    if (!ch) return;
+    const copy = JSON.parse(JSON.stringify(ch));
+    copy.id = 'ch_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    copy.title = (ch.title || 'Untitled') + ' (Copy)';
+    copy.lastEdited = new Date().toISOString();
+    chapters.unshift(copy);
+    await saveChapterToDB(copy);
+    renderSidebar();
+    showToast('👯 Duplicated: ' + copy.title, 'success');
+};
+
+// Inline rename — makes the title editable in the sidebar
+window.renameChapterInline = function (id) {
+    const li = document.querySelector(`.chapter-item[data-cid="${id}"]`);
+    if (!li) { showToast('Switch to this note first to rename'); return; }
+    const titleEl = li.querySelector('.chapter-item-title');
+    if (!titleEl) return;
+
+    titleEl.contentEditable = 'true';
+    titleEl.focus();
+    // Select all text
+    const range = document.createRange();
+    range.selectNodeContents(titleEl);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+
+    function commit() {
+        titleEl.contentEditable = 'false';
+        const ch = chapters.find(c => c.id === id);
+        if (ch) {
+            ch.title = titleEl.textContent.trim() || 'Untitled';
+            ch.lastEdited = new Date().toISOString();
+            saveChapterToDB(ch);
+            // Update the main title input if this is the active chapter
+            if (id === currentId) {
+                const pageTitleEl = document.getElementById('pageTitle');
+                if (pageTitleEl) pageTitleEl.value = ch.title;
+            }
+            showToast('✏️ Renamed', 'success');
+        }
+        renderSidebar();
+    }
+
+    titleEl.addEventListener('blur', commit, { once: true });
+    titleEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); }
+        if (e.key === 'Escape') { titleEl.textContent = chapters.find(c => c.id === id)?.title || ''; titleEl.blur(); }
+    }, { once: true });
+};
+
+// Export a chapter as a JSON file
+window.exportChapterJSON = function (id) {
+    const ch = chapters.find(c => c.id === id);
+    if (!ch) return;
+    const blob = new Blob([JSON.stringify(ch, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = (ch.title || 'note').replace(/[^a-z0-9]/gi, '_') + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📥 Exported: ' + (ch.title || 'note'), 'success');
+};
+
 
 // Initialize missing PageDetailsGesture
 new PageDetailsGesture();
