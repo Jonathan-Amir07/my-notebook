@@ -10209,6 +10209,55 @@ function renderChapterItem(ch, list) {
         }
     });
 
+    // ── Drag-and-Drop reordering ──────────────────────────────────────────
+    li.draggable = true;
+
+    li.addEventListener('dragstart', (e) => {
+        window._dndDragId = ch.id;
+        // Use setTimeout so the browser renders the ghost before we dim
+        setTimeout(() => li.classList.add('dragging'), 0);
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    li.addEventListener('dragend', () => {
+        li.classList.remove('dragging');
+        // Clean up any leftover drag-over highlights
+        document.querySelectorAll('.chapter-item.drag-over')
+            .forEach(el => el.classList.remove('drag-over'));
+    });
+
+    li.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        // Highlight only this target
+        document.querySelectorAll('.chapter-item.drag-over')
+            .forEach(el => el.classList.remove('drag-over'));
+        if (window._dndDragId !== ch.id) li.classList.add('drag-over');
+    });
+
+    li.addEventListener('dragleave', () => {
+        li.classList.remove('drag-over');
+    });
+
+    li.addEventListener('drop', (e) => {
+        e.preventDefault();
+        li.classList.remove('drag-over');
+        const draggedId = window._dndDragId;
+        if (!draggedId || draggedId === ch.id) return;
+
+        // Reorder the chapters array
+        const fromIdx = chapters.findIndex(c => c.id === draggedId);
+        const toIdx   = chapters.findIndex(c => c.id === ch.id);
+        if (fromIdx === -1 || toIdx === -1) return;
+
+        const [moved] = chapters.splice(fromIdx, 1);
+        chapters.splice(toIdx, 0, moved);
+
+        // Persist order
+        saveSortOrder();
+        renderSidebar();
+    });
+
     // Create content wrapper
     const contentDiv = document.createElement('div');
     contentDiv.className = 'chapter-item-content';
@@ -12012,8 +12061,13 @@ async function initApp() {
         // Load all chapters from database
         chapters = await loadAllChapters();
 
-        // Sort chapters by last edited (most recent first)
-        chapters.sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
+        // Sort by manual sortOrder first; fall back to lastEdited for un-ordered notes
+        chapters.sort((a, b) => {
+            if (a.sortOrder != null && b.sortOrder != null) return a.sortOrder - b.sortOrder;
+            if (a.sortOrder != null) return -1;
+            if (b.sortOrder != null) return 1;
+            return new Date(b.lastEdited) - new Date(a.lastEdited);
+        });
 
         // If no chapters exist, create a default one
         if (chapters.length === 0) {
@@ -12659,6 +12713,15 @@ window.exportChapterJSON = function (id) {
     showToast('📥 Exported: ' + (ch.title || 'note'), 'success');
 };
 
+// Persist the current in-memory order of chapters to the database
+// Called after every drag-and-drop reorder
+function saveSortOrder() {
+    chapters.forEach((ch, i) => {
+        ch.sortOrder = i;
+        // Fire-and-forget — don't block the UI
+        saveChapterToDB(ch).catch(err => console.warn('sortOrder save failed', err));
+    });
+}
 
 // Initialize missing PageDetailsGesture
 new PageDetailsGesture();

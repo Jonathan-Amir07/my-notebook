@@ -6395,3 +6395,22 @@ body.dark-mode .skeleton-box {
     background: rgba(255, 255, 255, 0.1);
     margin: 5px 0;
 }
+
+/* --- DRAG AND DROP --- */
+.chapter-item[draggable="true"] {
+    cursor: grab;
+}
+
+.chapter-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.chapter-item.dragging {
+    opacity: 0.38;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.chapter-item.drag-over {
+    border-top: 2px solid #3498db;
+}
