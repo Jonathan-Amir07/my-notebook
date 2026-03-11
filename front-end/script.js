@@ -4534,7 +4534,8 @@ function resizeCanvas() {
     const paper = document.getElementById('paper');
     const dpr = window.devicePixelRatio || 1;
 
-    if (canvas.width !== paper.offsetWidth * dpr || canvas.height !== paper.offsetHeight * dpr) {
+    if (Math.abs(canvas.width - paper.offsetWidth * dpr) > 2 || 
+        Math.abs(canvas.height - paper.offsetHeight * dpr) > 2) {
         canvas.width = paper.offsetWidth * dpr;
         canvas.height = paper.offsetHeight * dpr;
         ctx.scale(dpr, dpr);
