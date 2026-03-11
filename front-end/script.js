@@ -4610,12 +4610,9 @@ function getCanvasCoordinates(inputEvent) {
     }
 
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const scaleX = (canvas.width / dpr) / rect.width;
-    const scaleY = (canvas.height / dpr) / rect.height;
     return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY
+        x: clientX - rect.left,
+        y: clientY - rect.top
     };
 }
 
@@ -4634,6 +4631,10 @@ function startDrawing(e) {
 
     if (!isSketchMode || isReadMode) return;
     if (e.type === 'touchstart') e.preventDefault();
+
+    // Ensure intrinsic canvas resolution matches its stretched CSS size
+    // to prevent pixelation if the page grew since last window resize.
+    resizeCanvas(true);
 
     saveStateToStack();
     drawing = true;
