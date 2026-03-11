@@ -12018,6 +12018,10 @@ async function initApp() {
             loadChapter(chapters[0].id);
         }
 
+        // Remove loading skeletons once content is ready
+        const streamSkeleton = document.querySelector('#sequentialStream .loader-skeleton');
+        if (streamSkeleton) streamSkeleton.remove();
+
         // Setup drag and drop for images
         setupDragAndDrop();
 

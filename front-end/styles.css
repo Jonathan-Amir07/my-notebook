@@ -6299,3 +6299,45 @@ body.dark-mode .lasso-selected {
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     border: 1px solid var(--grid-line);
 }
+
+/* ==================== LOADING SKELETONS ==================== */
+@keyframes shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+}
+
+.skeleton-box {
+    animation: shimmer 2s infinite linear;
+    background: linear-gradient(to right, rgba(0,0,0,0.05) 4%, rgba(0,0,0,0.1) 25%, rgba(0,0,0,0.05) 36%);
+    background-size: 1000px 100%;
+    border-radius: 4px;
+}
+
+body.dark-mode .skeleton-box {
+    background: linear-gradient(to right, rgba(255,255,255,0.05) 4%, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.05) 36%);
+    background-size: 1000px 100%;
+}
+
+.skeleton-sidebar-item {
+    margin: 8px 12px;
+    padding: 12px;
+    background: rgba(0,0,0,0.02);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.skeleton-sidebar-title { height: 16px; width: 80%; }
+.skeleton-sidebar-date { height: 12px; width: 40%; }
+
+.skeleton-content-area {
+    padding: 20px 40px;
+    max-width: 850px;
+    margin: 0 auto;
+}
+
+.skeleton-h1 { height: 40px; width: 60%; margin-bottom: 24px; border-radius: 8px; }
+.skeleton-p { height: 16px; width: 100%; margin-bottom: 12px; }
+.skeleton-p.short { width: 85%; }
+.skeleton-p.medium { width: 92%; }

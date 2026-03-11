@@ -465,7 +465,13 @@
                     <span class="arrow" id="pagesArrow">▼</span>
                 </div>
                 <div class="section-content" id="pagesContent">
-                    <ul class="chapter-list" id="chapterList"></ul>
+                    <ul class="chapter-list" id="chapterList">
+                        <!-- Skeletons (removed by JS once loaded) -->
+                        <li class="skeleton-sidebar-item"><div class="skeleton-box skeleton-sidebar-title"></div><div class="skeleton-box skeleton-sidebar-date"></div></li>
+                        <li class="skeleton-sidebar-item"><div class="skeleton-box skeleton-sidebar-title" style="width:60%"></div><div class="skeleton-box skeleton-sidebar-date"></div></li>
+                        <li class="skeleton-sidebar-item"><div class="skeleton-box skeleton-sidebar-title" style="width:75%"></div><div class="skeleton-box skeleton-sidebar-date"></div></li>
+                        <li class="skeleton-sidebar-item"><div class="skeleton-box skeleton-sidebar-title" style="width:50%"></div><div class="skeleton-box skeleton-sidebar-date"></div></li>
+                    </ul>
                 </div>
             </div>
             <!-- NEW: TAGS SECTION -->
@@ -733,7 +739,15 @@
                 <input class="paper-title" id="pageTitle" placeholder="Page title…" type="text" />
                 <!-- NEW: Sequential Stream Container -->
                 <div id="sequentialStream">
-                    <!-- Content Area injected here by JS -->
+                    <!-- Skeletons (removed by JS) -->
+                    <div class="skeleton-content-area loader-skeleton">
+                        <div class="skeleton-box skeleton-h1"></div>
+                        <div class="skeleton-box skeleton-p"></div>
+                        <div class="skeleton-box skeleton-p"></div>
+                        <div class="skeleton-box skeleton-p medium"></div>
+                        <div class="skeleton-box skeleton-p"></div>
+                        <div class="skeleton-box skeleton-p short"></div>
+                    </div>
                 </div>
             </div>
             <!-- NEW CONTROLS AT END OF STREAM (OUTSIDE PAPER) -->
