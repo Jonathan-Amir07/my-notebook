@@ -6736,3 +6736,115 @@ body.dark-mode .skeleton-box {
 
 .appear-pattern-btn:hover { background: rgba(52, 152, 219, 0.3); }
 .appear-pattern-btn.active { background: rgba(52, 152, 219, 0.4); border-color: #3498db; }
+
+/* ===================================================
+   CONSISTENT GLASSMORPHISM — unified design language
+   =================================================== */
+
+/* ── CSS Design Token ── */
+:root {
+    --glass-bg:      rgba(255, 255, 255, 0.72);
+    --glass-border:  rgba(255, 255, 255, 0.4);
+    --glass-shadow:  0 8px 32px rgba(0, 0, 0, 0.14);
+    --glass-blur:    blur(16px) saturate(1.6);
+    --glass-dark-bg: rgba(25, 35, 50, 0.82);
+}
+
+body.dark-mode {
+    --glass-bg:      rgba(25, 35, 50, 0.82);
+    --glass-border:  rgba(255, 255, 255, 0.1);
+    --glass-shadow:  0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Writing Tools Tray ── */
+.tool-tray {
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+/* ── Floating Panes (Math palette, Page Details, etc.) ── */
+.floating-pane {
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+/* ── Toast Notifications ── */
+.toast {
+    background: var(--glass-dark-bg) !important;
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+    border-radius: 12px !important;
+}
+
+/* ── Keyboard Shortcuts Modal ── */
+.nb-shortcuts-overlay .nb-shortcuts-modal,
+.nb-shortcuts-modal {
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: var(--glass-shadow) !important;
+    border-radius: 16px !important;
+}
+
+/* ── Templates Panel ── */
+#templatesPanel {
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+/* ── Page Details / Metadata Modal ── */
+#metadataModal, .metadata-modal {
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: var(--glass-shadow) !important;
+}
+
+/* ── Onboarding Tour Tooltip ── */
+.tour-tooltip {
+    background: var(--glass-dark-bg) !important;
+    backdrop-filter: blur(14px) saturate(1.5);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* ── Undo / Redo Bar (already glass, ensure consistency) ── */
+.undo-redo-bar {
+    background: var(--glass-dark-bg) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ── Text Selection Bubble ── */
+#textBubble {
+    background: var(--glass-dark-bg) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ── Smooth hover transitions on tool buttons ── */
+.tool-btn, .btn, .btn-secondary {
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease !important;
+}
+
+.tool-btn:hover {
+    background: rgba(52, 152, 219, 0.12) !important;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2) !important;
+}
