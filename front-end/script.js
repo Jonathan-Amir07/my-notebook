@@ -5190,6 +5190,71 @@ window.createNewChapter = async (title, tags) => {
     setTimeout(() => showEmptyPageHints(), 300);
 };
 
+// Auto-generate a Welcome Demo document for new users
+window.createWelcomeDemo = async () => {
+    // Helper to safely render math if katex is loaded
+    const renderMath = (latex, isDisplay = false) => {
+        if (window.katex) {
+            try { return katex.renderToString(latex, { throwOnError: false, displayMode: isDisplay }); }
+            catch(e) {}
+        }
+        return `<span style="font-family:monospace;">${latex}</span>`;
+    };
+
+    const math1 = renderMath('E = mc^2', false);
+    const math2 = renderMath('f(x) = \\int_{-\\infty}^\\infty \\hat f(\\xi)\\,e^{2 \\pi i \\xi x} \\,d\\xi', true);
+
+    const content = `
+        <div class="content-block text-block" style="max-width: 800px; line-height: 1.6;">
+            <h2 style="font-family: 'Caveat', cursive; font-size: 2.2rem; color: #3498db;">👋 Welcome to Academic Notebook!</h2>
+            <p>This is your infinite workspace. You can type freely, add drawings, and insert complex equations.</p>
+            <p><br></p>
+            <h3 style="font-family: 'Caveat', cursive; font-size: 1.8rem;">1. Math &amp; Science</h3>
+            <p>We support full LaTeX equation rendering. For example, inline math looks like this: <span class="math-block" contenteditable="false" data-latex="E = mc^2" style="padding:0 5px; cursor:pointer;" onclick="editMathBlock(this)">${math1}</span>, and block math looks like this:</p>
+            <div style="text-align:center; margin: 20px 0;"><span class="math-block" contenteditable="false" data-latex="f(x) = \\int_{-\\infty}^\\infty \\hat f(\\xi)\\,e^{2 \\pi i \\xi x} \\,d\\xi" style="padding:0 5px; cursor:pointer;" onclick="editMathBlock(this)">${math2}</span></div>
+            <p><em>(Tip: Click any equation to edit its LaTeX!)</em></p>
+            <p><br></p>
+            <h3 style="font-family: 'Caveat', cursive; font-size: 1.8rem;">2. Sketch &amp; Draw</h3>
+            <p>Press <strong>Ctrl + M</strong> (or Cmd + M) to toggle <strong>Sketch Mode</strong>. You can draw diagrams right over your text! Try it now using the pen, highlighter, or chalk tools from the toolbar.</p>
+            <p><br></p>
+            <h3 style="font-family: 'Caveat', cursive; font-size: 1.8rem;">3. Quick Actions</h3>
+            <p>Right-click this note in the sidebar on the left to explore the Context Menu. You can Rename, Duplicate, or Export notes easily. And yes, you can drag and drop notes to reorder them!</p>
+            <p><br></p>
+            <p><em>Happy studying! 🚀</em></p>
+        </div>
+    `;
+
+    const id = "ch_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    
+    const demoChapter = {
+        id: id,
+        title: "👋 Welcome to Academic Notebook",
+        category: "General",
+        tags: ["Welcome", "Tutorial"],
+        content: content,
+        tool: 'pen',
+        sketch: null,
+        paperStyle: 'grid',
+        sortOrder: 0,
+        lastEdited: new Date().toISOString(),
+        metadata: {
+            discipline: 'general',
+            type: window.PAGE_TYPES ? window.PAGE_TYPES.NOTE : 'note',
+            difficulty: 'easy',
+            topics: ['Getting Started'],
+            system: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        }
+    };
+
+    chapters.unshift(demoChapter);
+    await saveChapterToDB(demoChapter);
+    localStorage.setItem('nb_demo_created', '1');
+    loadChapter(demoChapter.id);
+    renderSidebar();
+};
+
 // UX Enhancement: Empty Page Guidance (shows hints on truly empty pages)
 window.showEmptyPageHints = () => {
     const content = document.getElementById('sequentialStream');
@@ -12112,9 +12177,13 @@ async function initApp() {
             return new Date(b.lastEdited) - new Date(a.lastEdited);
         });
 
-        // If no chapters exist, create a default one
+        // If no chapters exist, check if we should create demo or default
         if (chapters.length === 0) {
-            createNewChapter();
+            if (!localStorage.getItem('nb_demo_created')) {
+                await createWelcomeDemo();
+            } else {
+                createNewChapter();
+            }
         } else {
             // Render sidebar with existing chapters
             renderSidebar();
