@@ -6569,3 +6569,170 @@ body.dark-mode .skeleton-box {
     cursor: default;
     pointer-events: none;
 }
+
+/* ===========================
+   PAPER THEMES & APPEARANCE
+   =========================== */
+
+/* Each theme sets: paper-bg, pattern-color, margin-color, ink-color (optional) */
+
+/* ── Theme: Standard (default) uses :root values ── */
+.paper-theme-standard {
+    --paper-bg: #fdfbf7;
+    --pattern-color: rgba(0, 0, 0, 0.08);
+    --margin-color: transparent;
+}
+
+/* ── Theme: Legal Pad ── */
+.paper-theme-legal {
+    --paper-bg: #fefde0;
+    --pattern-color: rgba(30, 100, 200, 0.15);
+    --margin-color: rgba(220, 60, 60, 0.5);
+}
+
+/* ── Theme: Engineering (pale green) ── */
+.paper-theme-engineering {
+    --paper-bg: #eef6ee;
+    --pattern-color: rgba(30, 120, 60, 0.18);
+    --margin-color: transparent;
+}
+
+/* ── Theme: Blueprint (navy) ── */
+.paper-theme-blueprint {
+    --paper-bg: #1a2c52;
+    --pattern-color: rgba(100, 200, 255, 0.2);
+    --margin-color: transparent;
+    --ink-color: #cfe8ff;
+    --pen-color: #cfe8ff;
+    --pencil-color: #a8cfeb;
+}
+
+/* ── Theme: Dark (charcoal) ── */
+.paper-theme-dark {
+    --paper-bg: #23272e;
+    --pattern-color: rgba(255, 255, 255, 0.06);
+    --margin-color: transparent;
+    --ink-color: #e8eaf0;
+    --pen-color: #e8eaf0;
+    --pencil-color: #9da3af;
+}
+
+/* Update pattern classes to use --pattern-color variable */
+#paper.grid-texture {
+    background-color: var(--paper-bg, #fdfbf7);
+    background-image:
+        linear-gradient(var(--pattern-color, rgba(0,0,0,0.08)) 1px, transparent 1px),
+        linear-gradient(90deg, var(--pattern-color, rgba(0,0,0,0.08)) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+#paper.lined-texture {
+    background-color: var(--paper-bg, #fdfbf7);
+    background-image: repeating-linear-gradient(
+        transparent,
+        transparent 29px,
+        var(--pattern-color, rgba(0,0,0,0.1)) 29px,
+        var(--pattern-color, rgba(0,0,0,0.1)) 30px
+    );
+}
+
+#paper.dotted-texture {
+    background-color: var(--paper-bg, #fdfbf7);
+    background-image: radial-gradient(circle, var(--pattern-color, rgba(0,0,0,0.15)) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+#paper.plain-texture {
+    background-color: var(--paper-bg, #fdfbf7);
+    background-image: none;
+}
+
+/* Legal pad red margin line (via pseudo-element on the paper) */
+#paper.paper-theme-legal::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 60px;
+    width: 2px;
+    background: var(--margin-color, transparent);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Paper needs position:relative for the pseudo-element */
+#paper {
+    position: relative;
+}
+
+/* Pass ink/pen color vars into content area */
+#paper.paper-theme-blueprint .content-area,
+#paper.paper-theme-dark .content-area {
+    color: var(--ink-color);
+}
+
+/* ── Appearance Popover ── */
+#paperAppearancePopover {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    width: 220px;
+    background: rgba(30, 40, 55, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    font-family: 'Patrick Hand', cursive;
+    color: #ecf0f1;
+    animation: ctxMenuIn 0.15s ease;
+}
+
+#paperAppearancePopover h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.55;
+    margin: 0 0 8px 0;
+    font-family: sans-serif;
+}
+
+.appear-theme-row,
+.appear-pattern-row {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.appear-theme-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2.5px solid transparent;
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+    flex-shrink: 0;
+}
+
+.appear-theme-swatch:hover { transform: scale(1.15); }
+.appear-theme-swatch.active { border-color: #3498db; }
+
+.appear-pattern-btn {
+    flex: 1;
+    min-width: 40px;
+    padding: 5px 4px;
+    border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: 7px;
+    background: rgba(255,255,255,0.06);
+    color: #ecf0f1;
+    font-size: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+    font-family: 'Patrick Hand', cursive;
+}
+
+.appear-pattern-btn:hover { background: rgba(52, 152, 219, 0.3); }
+.appear-pattern-btn.active { background: rgba(52, 152, 219, 0.4); border-color: #3498db; }

@@ -4370,27 +4370,133 @@ window.toggleFocusMode = () => {
     }
 };
 
-// Paper texture cycling
-let currentPaperStyle = 0;
-const paperStyles = ['grid-texture', 'lined-texture', 'dotted-texture', 'plain-texture'];
-const paperNames = ['Grid', 'Lines', 'Dots', 'Plain'];
+// Paper Appearance System — Themes (color) + Patterns (geometry), independent and per-note
 
-window.cyclePaperStyle = () => {
+const PAPER_THEMES = [
+    { key: 'standard',    label: 'Standard',    color: '#fdfbf7', border: '#b0a898' },
+    { key: 'legal',       label: 'Legal',       color: '#fefde0', border: '#b8b540' },
+    { key: 'engineering', label: 'Engineering', color: '#eef6ee', border: '#5a9e5a' },
+    { key: 'blueprint',   label: 'Blueprint',   color: '#1a2c52', border: '#4a9ecf' },
+    { key: 'dark',        label: 'Dark',        color: '#23272e', border: '#555e6e' },
+];
+
+const PAPER_PATTERNS = [
+    { key: 'grid-texture',   label: '⊞ Grid' },
+    { key: 'lined-texture',  label: '≡ Lines' },
+    { key: 'dotted-texture', label: '⁚ Dots' },
+    { key: 'plain-texture',  label: '○ Plain' },
+];
+
+function applyPaperAppearance(themeKey, patternKey, save = true) {
     const paper = document.getElementById('paper');
+    if (!paper) return;
+
+    // Remove all theme classes
+    PAPER_THEMES.forEach(t => paper.classList.remove('paper-theme-' + t.key));
+    // Remove all pattern classes
+    PAPER_PATTERNS.forEach(p => paper.classList.remove(p.key));
+
+    // Apply new theme + pattern
+    if (themeKey) paper.classList.add('paper-theme-' + themeKey);
+    if (patternKey) paper.classList.add(patternKey);
+
+    // Save to current chapter
+    if (save && currentId) {
+        const ch = chapters.find(c => c.id === currentId);
+        if (ch) {
+            ch.paperTheme   = themeKey;
+            ch.paperPattern = patternKey;
+            saveChapterToDB(ch).catch(()=>{});
+        }
+    }
+
+    // Update button label
     const btn = document.getElementById('paperStyleBtn');
+    const theme = PAPER_THEMES.find(t => t.key === themeKey) || PAPER_THEMES[0];
+    if (btn) btn.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${theme.color};border:1.5px solid ${theme.border};margin-right:5px;vertical-align:middle;"></span>📄 Appearance`;
+}
 
-    // Remove all texture classes
-    paperStyles.forEach(style => paper.classList.remove(style));
+window.togglePaperStylePopover = (e) => {
+    e && e.stopPropagation();
+    let pop = document.getElementById('paperAppearancePopover');
 
-    // Cycle to next style
-    currentPaperStyle = (currentPaperStyle + 1) % paperStyles.length;
+    if (pop && pop.style.display === 'block') {
+        pop.style.display = 'none';
+        return;
+    }
 
-    // Apply new style
-    paper.classList.add(paperStyles[currentPaperStyle]);
-    btn.textContent = `📄 Page: ${paperNames[currentPaperStyle]}`;
+    // Build popover if not present
+    if (!pop) {
+        pop = document.createElement('div');
+        pop.id = 'paperAppearancePopover';
+        document.body.appendChild(pop);
+    }
 
-    showToast(`Applied ${paperNames[currentPaperStyle]} to entire page`);
+    // Get current chapter values
+    const ch = chapters.find(c => c.id === currentId) || {};
+    const curTheme   = ch.paperTheme   || 'standard';
+    const curPattern = ch.paperPattern || 'grid-texture';
+
+    pop.innerHTML =
+        '<h4>Theme</h4>' +
+        '<div class="appear-theme-row">' +
+            PAPER_THEMES.map(t =>
+                `<div class="appear-theme-swatch ${t.key === curTheme ? 'active' : ''}"
+                    style="background:${t.color};border-color:${t.key === curTheme ? '#3498db' : t.border};"
+                    title="${t.label}"
+                    onclick="applyPaperAppearance('${t.key}', document.getElementById('paper').className.match(/[\\w]+-texture/)?.[0] || 'grid-texture'); updateAppearPopoverState();"></div>`
+            ).join('') +
+        '</div>' +
+        '<h4>Pattern</h4>' +
+        '<div class="appear-pattern-row">' +
+            PAPER_PATTERNS.map(p =>
+                `<button class="appear-pattern-btn ${p.key === curPattern ? 'active' : ''}"
+                    onclick="applyPaperAppearance(document.getElementById('paper').className.match(/paper-theme-([\\w]+)/)?.[1] || 'standard', '${p.key}'); updateAppearPopoverState();"
+                    >${p.label}</button>`
+            ).join('') +
+        '</div>';
+
+    // Position popover above the button
+    const btn = document.getElementById('paperStyleBtn');
+    const rect = btn ? btn.getBoundingClientRect() : { left: 80, top: 400, height: 34 };
+    pop.style.display = 'block';
+    const popH = 200;
+    let top = rect.top - popH - 8;
+    if (top < 10) top = rect.bottom + 8;
+    pop.style.left = (rect.left + 8) + 'px';
+    pop.style.top  = top + 'px';
+
+    // Close on outside click
+    const closeHandler = (ev) => {
+        if (!pop.contains(ev.target) && ev.target.id !== 'paperStyleBtn') {
+            pop.style.display = 'none';
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 10);
 };
+
+window.updateAppearPopoverState = () => {
+    const pop = document.getElementById('paperAppearancePopover');
+    if (!pop || pop.style.display !== 'block') return;
+    const paper = document.getElementById('paper');
+    const curTheme   = PAPER_THEMES.find(t => paper.classList.contains('paper-theme-' + t.key))?.key || 'standard';
+    const curPattern = PAPER_PATTERNS.find(p => paper.classList.contains(p.key))?.key || 'grid-texture';
+    pop.querySelectorAll('.appear-theme-swatch').forEach((el, i) => {
+        el.classList.toggle('active', PAPER_THEMES[i].key === curTheme);
+        el.style.borderColor = PAPER_THEMES[i].key === curTheme ? '#3498db' : PAPER_THEMES[i].border;
+    });
+    pop.querySelectorAll('.appear-pattern-btn').forEach((el, i) => {
+        el.classList.toggle('active', PAPER_PATTERNS[i].key === curPattern);
+    });
+};
+
+// Keep cyclePaperStyle alias for backwards compat (context menu etc.)
+window.cyclePaperStyle = window.togglePaperStylePopover;
+
+// Expose applyPaperAppearance globally
+window.applyPaperAppearance = applyPaperAppearance;
+
 
 window.toggleReadMode = () => {
     isReadMode = !isReadMode;
@@ -10754,6 +10860,13 @@ function executeLoadChapterLogic(chapter, id) {
         document.getElementById('paper').classList.remove('infinite');
     }
 
+    // Restore per-note paper appearance (theme + pattern)
+    applyPaperAppearance(
+        chapter.paperTheme   || 'standard',
+        chapter.paperPattern || 'grid-texture',
+        false  // don't re-save, we are just restoring
+    );
+
     // Restore sketch data if exists
     if (chapter.sketchData) {
         setTimeout(() => {
@@ -12537,7 +12650,7 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () { var el = document.querySelector('#_auto_38'); if (el) el.addEventListener('click', function () { createNewChapter() }); })();
     (function () { var el = document.querySelector('#_auto_39'); if (el) el.addEventListener('click', function () { toggleFocusMode() }); })();
     (function () { var el = document.querySelector('#_auto_40'); if (el) el.addEventListener('click', function () { startFlashcardMode() }); })();
-    (function () { var el = document.querySelector('#paperStyleBtn'); if (el) el.addEventListener('click', function () { cyclePaperStyle() }); })();
+    (function () { var el = document.querySelector('#paperStyleBtn'); if (el) el.addEventListener('click', function (e) { togglePaperStylePopover(e); }); })();
     (function () { var el = document.querySelector('#_auto_42'); if (el) el.addEventListener('click', function () { window.print() }); })();
     (function () { var el = document.querySelector('#readModeBtn'); if (el) el.addEventListener('click', function () { toggleReadMode() }); })();
     (function () { var el = document.querySelector('#_auto_43'); if (el) el.addEventListener('click', function () { openMetadataModal() }); })();
