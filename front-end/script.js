@@ -5164,6 +5164,28 @@ window.createNewChapter = async (title, tags) => {
     loadChapter(newChapter.id);
     renderSidebar();
 
+    // Push undo action for chapter creation
+    if (typeof pushUndo === 'function') {
+        const createdId = newChapter.id;
+        pushUndo({
+            type: 'chapter-create',
+            label: 'Create "' + (newChapter.title || 'Untitled') + '"',
+            undo: async () => {
+                const idx = chapters.findIndex(c => c.id === createdId);
+                if (idx !== -1) chapters.splice(idx, 1);
+                deleteChapterFromDB(createdId).catch(() => {});
+                if (chapters.length > 0) loadChapter(chapters[0].id);
+                renderSidebar();
+            },
+            redo: async () => {
+                chapters.unshift(newChapter);
+                await saveChapterToDB(newChapter);
+                loadChapter(newChapter.id);
+                renderSidebar();
+            }
+        });
+    }
+
     // UX Enhancement: Show empty page guidance for new pages
     setTimeout(() => showEmptyPageHints(), 300);
 };
@@ -10459,12 +10481,33 @@ window._checkPendingClone = checkPendingClone;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Delete a chapter (OPTIMIZED)
+// Delete a chapter (OPTIMIZED + UNDO)
 window.deleteChapter = async (id) => {
     const chapterIndex = chapters.findIndex(c => c.id === id);
     if (chapterIndex === -1) return;
 
     const chapter = chapters[chapterIndex];
+    const snapshot = JSON.parse(JSON.stringify(chapter));
+    const savedIndex = chapterIndex;
+
+    // Push undo action BEFORE deleting
+    if (typeof pushUndo === 'function') {
+        pushUndo({
+            type: 'chapter-delete',
+            label: 'Delete "' + (chapter.title || 'Untitled') + '"',
+            undo: async () => {
+                chapters.splice(savedIndex, 0, snapshot);
+                await saveChapterToDB(snapshot);
+                renderSidebar();
+            },
+            redo: async () => {
+                const idx = chapters.findIndex(c => c.id === snapshot.id);
+                if (idx !== -1) chapters.splice(idx, 1);
+                deleteChapterFromDB(snapshot.id).catch(() => {});
+                renderSidebar();
+            }
+        });
+    }
 
     // Remove from array (faster than filter for single item)
     chapters.splice(chapterIndex, 1);
@@ -12877,6 +12920,77 @@ function saveSortOrder() {
         localStorage.removeItem('nb_onboarded');
         showToast('Tour reset — reload the page to see it again');
     };
+})();
+
+/* ==================== UNIVERSAL UNDO / REDO ==================== */
+(function () {
+    const MAX_STACK = 50;
+    const _undoStack = [];
+    const _redoStack = [];
+
+    // ── Floating UI bar ──
+    const bar = document.createElement('div');
+    bar.className = 'undo-redo-bar';
+    bar.innerHTML =
+        '<button class="undo-redo-btn disabled" id="globalUndoBtn" title="Undo (Ctrl+Z)">↩</button>' +
+        '<button class="undo-redo-btn disabled" id="globalRedoBtn" title="Redo (Ctrl+Y)">↪</button>';
+    document.body.appendChild(bar);
+
+    function refreshButtons() {
+        const ub = document.getElementById('globalUndoBtn');
+        const rb = document.getElementById('globalRedoBtn');
+        if (ub) ub.classList.toggle('disabled', _undoStack.length === 0);
+        if (rb) rb.classList.toggle('disabled', _redoStack.length === 0);
+    }
+
+    // ── Core API ──
+    window.pushUndo = function (action) {
+        _undoStack.push(action);
+        if (_undoStack.length > MAX_STACK) _undoStack.shift();
+        _redoStack.length = 0; // clear redo on new action
+        refreshButtons();
+    };
+
+    window.globalUndo = function () {
+        if (_undoStack.length === 0) return;
+        const action = _undoStack.pop();
+        try { action.undo(); } catch (e) { console.warn('Undo failed', e); }
+        _redoStack.push(action);
+        refreshButtons();
+        showToast('↩ Undo: ' + (action.label || action.type));
+    };
+
+    window.globalRedo = function () {
+        if (_redoStack.length === 0) return;
+        const action = _redoStack.pop();
+        try { action.redo(); } catch (e) { console.warn('Redo failed', e); }
+        _undoStack.push(action);
+        refreshButtons();
+        showToast('↪ Redo: ' + (action.label || action.type));
+    };
+
+    // Button clicks
+    document.getElementById('globalUndoBtn').addEventListener('click', () => globalUndo());
+    document.getElementById('globalRedoBtn').addEventListener('click', () => globalRedo());
+
+    // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Y) ──
+    // Only intercept when focus is NOT inside a contentEditable (let browser handle text undo)
+    document.addEventListener('keydown', function (e) {
+        if (!e.ctrlKey && !e.metaKey) return;
+
+        const active = document.activeElement;
+        const inEditor = active && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+
+        if (e.key === 'z' && !e.shiftKey && !inEditor) {
+            e.preventDefault();
+            globalUndo();
+        } else if ((e.key === 'y' || (e.key === 'z' && e.shiftKey)) && !inEditor) {
+            e.preventDefault();
+            globalRedo();
+        }
+    }, true);
+
+    refreshButtons();
 })();
 
 // Initialize missing PageDetailsGesture
