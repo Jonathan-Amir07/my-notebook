@@ -13246,6 +13246,13 @@ document.addEventListener('keydown', function(e) {
                     toggleSketchMode();
                 }
                 break;
+            case 'k':
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof window.toggleCommandPalette === 'function') {
+                    window.toggleCommandPalette();
+                }
+                break;
             case '/':
             case '\\':
                 e.preventDefault();
@@ -13292,6 +13299,10 @@ function toggleShortcutsModal() {
                     '<span><b>Cmd/Ctrl + Click</b></span>' +
                     '<span style="opacity: 0.8;">Open Page Details</span>' +
                 '</li>' +
+                '<li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">' +
+                    '<span><b>Cmd/Ctrl + K</b></span>' +
+                    '<span style="opacity: 0.8;">Command Palette</span>' +
+                '</li>' +
                 '<li style="display: flex; justify-content: space-between; padding: 8px 0;">' +
                     '<span><b>Cmd/Ctrl + /</b></span>' +
                     '<span style="opacity: 0.8;">Show/Hide this Modal</span>' +
@@ -13302,3 +13313,191 @@ function toggleShortcutsModal() {
     document.body.appendChild(modal);
 }
 window.toggleShortcutsModal = toggleShortcutsModal;
+
+/* ==================== COMMAND PALETTE (Ctrl+K) ==================== */
+function initCommandPalette() {
+    const overlay = document.getElementById('cmdPaletteOverlay');
+    const input = document.getElementById('cmdPaletteInput');
+    const resultsContainer = document.getElementById('cmdPaletteResults');
+    if (!overlay || !input || !resultsContainer) return;
+
+    let searchIndex = [];
+    let selectedIndex = 0;
+
+    // Static commands
+    const staticCommands = [
+        { id: 'cmd_new', title: 'New Page', category: 'Action', icon: '📄', execute: () => { createNewChapter(); } },
+        { id: 'cmd_focus', title: 'Toggle Focus Mode', category: 'Action', icon: '🍅', execute: () => { toggleFocusMode(); } },
+        { id: 'cmd_dark', title: 'Toggle Dark Mode', category: 'Action', icon: '🌙', execute: () => { toggleDarkMode(); } },
+        { id: 'cmd_pdf', title: 'Export to PDF', category: 'Action', icon: '🖨️', execute: () => { window.print(); } },
+        { id: 'cmd_sketch', title: 'Toggle Sketch Mode', category: 'Tool', icon: '✏️', execute: () => { window.toggleSketchMode(); } },
+        { id: 'cmd_math', title: 'Insert Math Block', category: 'Tool', icon: '∑', execute: () => { addMathBlock(); } },
+        { id: 'cmd_flashcard', title: 'Flashcards', category: 'Tool', icon: '🗂️', execute: () => { startFlashcardMode(); } },
+        { id: 'cmd_templates', title: 'Open Templates', category: 'Tool', icon: '📋', execute: () => { 
+            const panel = document.getElementById('templatesPanel');
+            if(panel) panel.classList.toggle('open');
+        } },
+        { id: 'cmd_lib', title: 'Open Library', category: 'Tool', icon: '📚', execute: () => { 
+            const panel = document.getElementById('libraryPanel');
+            if(panel) panel.classList.add('lib-open');
+        } },
+        { id: 'cmd_appearance', title: 'Change Appearance', category: 'Tool', icon: '🎨', execute: () => { togglePaperStylePopover(); } },
+        // Ink colors
+        { id: 'cmd_ink_blue', title: 'Switch to Blue Ink', category: 'Ink', icon: '🔵', execute: () => { selectWritingTool('pen'); setPencilColor('#3498db'); } },
+        { id: 'cmd_ink_red', title: 'Switch to Red Ink', category: 'Ink', icon: '🔴', execute: () => { selectWritingTool('pen'); setPencilColor('#e74c3c'); } },
+        { id: 'cmd_ink_green', title: 'Switch to Green Ink', category: 'Ink', icon: '🟢', execute: () => { selectWritingTool('pen'); setPencilColor('#2ecc71'); } },
+        { id: 'cmd_ink_black', title: 'Switch to Black Ink', category: 'Ink', icon: '⚫', execute: () => { selectWritingTool('pen'); setPencilColor('#1a1a1a'); } },
+    ];
+
+    function buildIndex() {
+        // Start with static commands
+        let index = [...staticCommands];
+        // Add all current chapters (Notes)
+        if (typeof chapters !== 'undefined') {
+            chapters.forEach(ch => {
+                index.push({
+                    id: 'note_' + ch.id,
+                    title: ch.title || 'Untitled',
+                    category: 'Note',
+                    icon: '📝',
+                    execute: () => { loadChapter(ch.id); }
+                });
+            });
+        }
+        return index;
+    }
+
+    function renderResults(query) {
+        let filtered = searchIndex;
+        if (query) {
+            const lowerQuery = query.toLowerCase();
+            filtered = searchIndex.filter(item => 
+                item.title.toLowerCase().includes(lowerQuery) || 
+                item.category.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        // Keep bounds
+        if (selectedIndex >= filtered.length) selectedIndex = Math.max(0, filtered.length - 1);
+        if (selectedIndex < 0) selectedIndex = 0;
+
+        // Group by category for visual clarity
+        const grouped = {};
+        filtered.forEach(item => {
+            if (!grouped[item.category]) grouped[item.category] = [];
+            grouped[item.category].push(item);
+        });
+
+        let html = '';
+        let globalIndex = 0;
+        
+        if (filtered.length === 0) {
+            html = '<div style="padding: 20px; text-align: center; opacity: 0.5;">No results found</div>';
+        } else {
+            for (const category in grouped) {
+                html += `<div class="cmd-result-category">${category}</div>`;
+                grouped[category].forEach(item => {
+                    const isSelected = (globalIndex === selectedIndex) ? 'selected' : '';
+                    html += `
+                        <div class="cmd-result-item ${isSelected}" data-index="${globalIndex}">
+                            <span class="icon">${item.icon}</span>
+                            <span class="label">${item.title}</span>
+                            <span class="hint">${item.category === 'Note' ? 'Jump to' : 'Run'}</span>
+                        </div>
+                    `;
+                    // Attach the item back to a global map for execution
+                    item._globalIndex = globalIndex;
+                    globalIndex++;
+                });
+            }
+        }
+        resultsContainer.innerHTML = html;
+
+        // Scroll selected item into view safely
+        const selectedEl = resultsContainer.querySelector('.cmd-result-item.selected');
+        if (selectedEl) {
+            selectedEl.scrollIntoView({ block: 'nearest' });
+        }
+
+        // Attach click handlers
+        resultsContainer.querySelectorAll('.cmd-result-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const idx = parseInt(el.getAttribute('data-index'));
+                executeResult(filtered[idx]);
+            });
+            el.addEventListener('mouseenter', () => {
+                selectedIndex = parseInt(el.getAttribute('data-index'));
+                renderResults(input.value);
+            });
+        });
+    }
+
+    function executeResult(item) {
+        if (!item) return;
+        closePalette();
+        try {
+            item.execute();
+        } catch(e) { console.error('Command failed', e); }
+    }
+
+    function closePalette() {
+        overlay.style.display = 'none';
+        input.value = '';
+        input.blur();
+    }
+
+    window.toggleCommandPalette = () => {
+        if (overlay.style.display === 'flex') {
+            closePalette();
+            return;
+        }
+        searchIndex = buildIndex();
+        selectedIndex = 0;
+        input.value = '';
+        overlay.style.display = 'flex';
+        input.focus();
+        renderResults('');
+    };
+
+    // Events
+    input.addEventListener('input', (e) => {
+        selectedIndex = 0;
+        renderResults(e.target.value);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const query = input.value;
+        const lowerQuery = query.toLowerCase();
+        const filtered = query ? searchIndex.filter(item => 
+            item.title.toLowerCase().includes(lowerQuery) || 
+            item.category.toLowerCase().includes(lowerQuery)
+        ) : searchIndex;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, filtered.length - 1);
+            renderResults(query);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, 0);
+            renderResults(query);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (filtered.length > 0) {
+                executeResult(filtered[selectedIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closePalette();
+        }
+    });
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closePalette();
+        }
+    });
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', initCommandPalette);

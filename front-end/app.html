@@ -1020,6 +1020,20 @@
         <button class="tool-btn" id="_auto_130" style="margin-top: 10px; background: #eee;">Close</button>
     </div>
     <div class="toast" id="toast">Action Successful!</div>
+
+    <!-- COMMAND PALETTE (Ctrl+K) -->
+    <div class="cmd-palette-overlay" id="cmdPaletteOverlay">
+        <div class="cmd-palette-modal">
+            <div class="cmd-palette-header">
+                <span class="cmd-palette-icon">🔍</span>
+                <input type="text" id="cmdPaletteInput" class="cmd-palette-input" placeholder="Type a command or search notes..." autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="cmd-palette-results" id="cmdPaletteResults">
+                <!-- Results injected via JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Do Not Disturb Overlay -->
     <div class="dnd-overlay" id="dndOverlay">
         <div class="dnd-message">🍅 Focus Mode Active</div>
