@@ -5763,6 +5763,7 @@ function loadChapter(id) {
         // Scoped Save Logic
         editor.oninput = () => {
             markUnsaved();
+            updateWordCount(); // Live word count update
             item.content = editor.innerHTML;
             item.lastEdited = new Date().toISOString();
             debounceSave(item);
@@ -5775,6 +5776,7 @@ function loadChapter(id) {
             currentId = item.id; // Update current context to focused page
             document.getElementById('pageTitle').value = item.title; // Update title bar
             renderSidebar(); // Update sidebar highlight
+            updateWordCount(); // Update word count for focused page
         };
 
         block.appendChild(editor);
@@ -5889,7 +5891,9 @@ window.saveCurrentToCloud = () => {
 };
 
 function updateWordCount() {
-    const text = document.getElementById('sequentialStream').innerText || "";
+    // Priority: use currently focused page block for "on each page" count
+    const activeBlock = document.querySelector('.sequence-editor-block.active-focus .content-area');
+    const text = activeBlock ? activeBlock.innerText : (document.getElementById('sequentialStream').innerText || "");
     const count = text.trim().split(/\s+/).filter(w => w.length > 0).length;
     document.getElementById('wordCount').innerText = count + " Words";
 }
