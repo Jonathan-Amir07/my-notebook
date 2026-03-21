@@ -5891,12 +5891,38 @@ window.saveCurrentToCloud = () => {
 };
 
 function updateWordCount() {
-    // Priority: use currently focused page block for "on each page" count
-    const activeBlock = document.querySelector('.sequence-editor-block.active-focus .content-area');
-    const text = activeBlock ? activeBlock.innerText : (document.getElementById('sequentialStream').innerText || "");
-    const count = text.trim().split(/\s+/).filter(w => w.length > 0).length;
-    document.getElementById('wordCount').innerText = count + " Words";
+    try {
+        let text = "";
+        const activeBlock = document.querySelector('.sequence-editor-block.active-focus .content-area');
+        
+        if (activeBlock) {
+            text = activeBlock.textContent || "";
+        } else {
+            const stream = document.getElementById('sequentialStream');
+            text = stream ? (stream.textContent || "") : "";
+        }
+        
+        // Split by whitespace and remove empty strings or purely punctuation words
+        const words = text.trim().split(/\s+/).filter(w => {
+            const clean = w.replace(/[^a-zA-Z0-9]/g, '');
+            return clean.length > 0;
+        });
+        
+        const wcEl = document.getElementById('wordCount');
+        if (wcEl) {
+            wcEl.innerText = words.length + (words.length === 1 ? " Word" : " Words");
+        }
+    } catch (e) {
+        console.error("Word Counter Error:", e);
+    }
 }
+
+// Ensure it updates globally on any input inside the stream
+document.addEventListener('input', function(e) {
+    if (e.target && e.target.closest && e.target.closest('.content-area')) {
+        updateWordCount();
+    }
+});
 
 function saveSketchToCloud() {
     const chapter = chapters.find(c => c.id === currentId);
