@@ -6508,17 +6508,86 @@ window.applyTemplate = async (key) => {
     resizeCanvas();
 };
 
+/* ==================== GLOBAL FULL-TEXT SEARCH ENGINE ==================== */
+window.searchNotes = (query) => {
+    if (!query) {
+        // Return everything with an empty snippet
+        return chapters.map(ch => {
+            const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+            const basicSnippet = cleanContent.substring(0, 50) + (cleanContent.length > 50 ? '...' : '');
+            return { ...ch, _matchSnippet: basicSnippet };
+        });
+    }
+
+    const lowerQuery = query.toLowerCase();
+    const results = [];
+
+    for (let i = 0; i < chapters.length; i++) {
+        const ch = chapters[i];
+        let isMatch = false;
+        let snippetMarkup = '';
+
+        const titleMatch = (ch.title || '').toLowerCase().includes(lowerQuery);
+        const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(lowerQuery.replace('#', '')));
+
+        // If title/tag matches, we still want a snippet, but standard
+        if (titleMatch || tagMatch) {
+            isMatch = true;
+            const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+            snippetMarkup = cleanContent.substring(0, 50) + (cleanContent.length > 50 ? '...' : '');
+        }
+
+        // Deep content search
+        const rawContent = (ch.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+        const contentLower = rawContent.toLowerCase();
+        const hitIndex = contentLower.indexOf(lowerQuery);
+
+        if (hitIndex !== -1) {
+            isMatch = true;
+            
+            // Extract a window of text
+            const windowSize = 35;
+            let start = Math.max(0, hitIndex - windowSize);
+            let end = Math.min(rawContent.length, hitIndex + query.length + windowSize);
+            
+            // Try to snap to word boundaries
+            if (start > 0) start = rawContent.indexOf(' ', start) + 1 || start;
+            if (end < rawContent.length) {
+                let nextSpace = rawContent.indexOf(' ', end);
+                end = nextSpace === -1 ? rawContent.length : nextSpace;
+            }
+
+            let extract = rawContent.substring(start, end).trim();
+            
+            // Safely highlight the exact query ignoring case
+            const reg = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+            extract = extract.replace(reg, match => `<b>${match}</b>`);
+
+            if (start > 0) extract = '...' + extract;
+            if (end < rawContent.length) extract = extract + '...';
+
+            snippetMarkup = extract;
+        }
+
+        if (isMatch) {
+            results.push({ ...ch, _matchSnippet: snippetMarkup });
+        }
+    }
+
+    return results;
+};
+
 window.renderSidebar = () => {
     const list = document.getElementById('chapterList');
-    const searchStr = document.getElementById('sidebarSearch').value.toLowerCase();
+    const searchInput = document.getElementById('sidebarSearch');
+    const searchStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const categoryFilter = document.getElementById('categoryFilter').value;
     list.innerHTML = '';
 
-    const filtered = chapters.filter(ch => {
-        const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
-        const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
-        const matchesSearch = titleMatch || tagMatch;
+    // Use our new global deep search engine
+    let searchResults = window.searchNotes(searchStr);
 
+    const filtered = searchResults.filter(ch => {
         // Smart Filtering based on Discipline or Category
         let matchesCat = true;
         if (categoryFilter !== 'all') {
@@ -6547,7 +6616,7 @@ window.renderSidebar = () => {
             }
         }
 
-        return matchesSearch && matchesCat;
+        return matchesCat;
     });
 
     if (filtered.length === 0) {
@@ -6566,29 +6635,32 @@ window.renderSidebar = () => {
             '</div>';
     } else {
         filtered.forEach(ch => {
-        const li = document.createElement('li');
-        li.className = `nav-item ${ch.id === currentId ? 'active' : ''}`;
+            const li = document.createElement('li');
+            li.className = `nav-item ${ch.id === currentId ? 'active' : ''}`;
 
-        const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, '');
-        let snippet = cleanContent.substring(0, 60) + (cleanContent.length > 60 ? '...' : '');
+            const displaySnippetHTML = searchStr 
+                ? `<div class="search-snippet">${ch._matchSnippet}</div>`
+                : `<div class="nav-item-snippet">${ch._matchSnippet}</div>`;
 
-        let tagsHtml = (ch.tags || []).map(t => `<span class="tag-mini">#${t}</span>`).join('');
-        let catBadge = '';
-        const disp = ch.metadata?.discipline || ch.category;
-        if (disp && disp !== 'general' && categoryFilter === 'all') {
-            catBadge = `<div class="cat-badge">${disp.toUpperCase()}</div>`;
-        }
+            let tagsHtml = (ch.tags || []).map(t => `<span class="tag-mini">#${t}</span>`).join('');
+            let catBadge = '';
+            const disp = ch.metadata?.discipline || ch.category;
+            if (disp && disp !== 'general' && categoryFilter === 'all') {
+                catBadge = `<div class="cat-badge">${disp.toUpperCase()}</div>`;
+            }
 
-        li.innerHTML = `
-                    <div class="nav-info" onclick="loadChapter('${ch.id}')">
-                        <div class="nav-item-title">${ch.title || 'Untitled'}</div>
-                        <div class="nav-item-snippet">${snippet}</div>
-                        <div style="margin-top:4px; display:flex;">${tagsHtml}</div>
-                        ${catBadge}
-                    </div>
-                    <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">🗑️</button>
-                `;
-        list.appendChild(li);
+            const escapedSearchQuery = searchStr.replace(/'/g, "\\'");
+
+            li.innerHTML = `
+                        <div class="nav-info" onclick="loadChapter('${ch.id}', '${escapedSearchQuery}')">
+                            <div class="nav-item-title">${ch.title || 'Untitled'}</div>
+                            ${displaySnippetHTML}
+                            <div style="margin-top:4px; display:flex;">${tagsHtml}</div>
+                            ${catBadge}
+                        </div>
+                        <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">🗑️</button>
+                    `;
+            list.appendChild(li);
         });
     }
 
@@ -10737,13 +10809,13 @@ window.deleteChapter = async (id) => {
 
 
 
-// Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM WITH FLIP ANIMATION)
-window.loadChapter = (id) => {
+// Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM WITH FLIP ANIMATION AND SEARCH HIGHLIGHTING)
+window.loadChapter = (id, highlightQuery = '') => {
     const chapter = chapters.find(c => c.id === id);
     if (!chapter) return;
 
-    // Do nothing if already on the exact same chapter
-    if (currentId === id) return;
+    // Do nothing if already on the exact same chapter (unless highlighting)
+    if (currentId === id && !highlightQuery) return;
 
     // Trigger page flip animation
     const paper = document.getElementById('paper');
@@ -10762,7 +10834,7 @@ window.loadChapter = (id) => {
 
         // Wait for half the flip (250ms based on CSS) before swapping content
         setTimeout(() => {
-            executeLoadChapterLogic(chapter, id);
+            executeLoadChapterLogic(chapter, id, highlightQuery);
 
             // Swap to flip-in animation
             paper.classList.remove('anim-page-turn');
@@ -10771,16 +10843,35 @@ window.loadChapter = (id) => {
             // Cleanup animation classes after it finishes
             setTimeout(() => {
                 paper.classList.remove('anim-page-enter');
+                applyHitHighlights(highlightQuery);
             }, 250);
         }, 250);
     } else {
         // Fallback if no paper element exists
-        executeLoadChapterLogic(chapter, id);
+        executeLoadChapterLogic(chapter, id, highlightQuery);
+        setTimeout(() => applyHitHighlights(highlightQuery), 100);
     }
 };
 
+// Extremely safe hit highlighting native API trigger
+function applyHitHighlights(query) {
+    if (!query) return;
+    try {
+        // Use browser native window.find to jump to first occurrence naturally
+        // without breaking DOM structure like manual tags could
+        const found = window.find(query, false, false, true, false, false, false);
+        if (found) {
+            // Found highlight is active, clear it smoothly after 2 seconds
+            const selection = window.getSelection();
+            setTimeout(() => {
+                selection.removeAllRanges();
+            }, 2000);
+        }
+    } catch(e) {}
+}
+
 // Core logic detached to allow animation wrapping
-function executeLoadChapterLogic(chapter, id) {
+function executeLoadChapterLogic(chapter, id, highlightQuery = '') {
     currentId = id;
 
     // Get the primary tag of this chapter
@@ -13320,6 +13411,7 @@ function toggleShortcutsModal() {
 window.toggleShortcutsModal = toggleShortcutsModal;
 
 /* ==================== COMMAND PALETTE (Ctrl+K) ==================== */
+/* ==================== COMMAND PALETTE (Ctrl+K) ==================== */
 function initCommandPalette() {
     const overlay = document.getElementById('cmdPaletteOverlay');
     const input = document.getElementById('cmdPaletteInput');
@@ -13354,33 +13446,51 @@ function initCommandPalette() {
         { id: 'cmd_ink_black', title: 'Switch to Black Ink', category: 'Ink', icon: '⚫', execute: () => { selectWritingTool('pen'); setPencilColor('#1a1a1a'); } },
     ];
 
-    function buildIndex() {
-        // Start with static commands
+    function buildIndex(queryText) {
+        // Start with static commands that match the query
         let index = [...staticCommands];
-        // Add all current chapters (Notes)
-        if (typeof chapters !== 'undefined') {
-            chapters.forEach(ch => {
-                index.push({
-                    id: 'note_' + ch.id,
-                    title: ch.title || 'Untitled',
-                    category: 'Note',
-                    icon: '📝',
-                    execute: () => { loadChapter(ch.id); }
-                });
-            });
-        }
-        return index;
-    }
-
-    function renderResults(query) {
-        let filtered = searchIndex;
-        if (query) {
-            const lowerQuery = query.toLowerCase();
-            filtered = searchIndex.filter(item => 
+        const lowerQuery = queryText ? queryText.toLowerCase() : '';
+        if (lowerQuery) {
+            index = index.filter(item => 
                 item.title.toLowerCase().includes(lowerQuery) || 
                 item.category.toLowerCase().includes(lowerQuery)
             );
         }
+
+        // Use global searchNotes engine to find matching notes
+        let noteResults = [];
+        if (typeof window.searchNotes === 'function') {
+            noteResults = window.searchNotes(queryText).map(ch => ({
+                id: 'note_' + ch.id,
+                title: ch.title || 'Untitled',
+                category: 'Note',
+                icon: '📝',
+                snippet: ch._matchSnippet,
+                execute: () => { loadChapter(ch.id, queryText); }
+            }));
+            
+            // Limit deep search note results to 15 max to keep palette snappy
+            noteResults = noteResults.slice(0, 15);
+        } else if (typeof chapters !== 'undefined') {
+            // Safe fallback
+            chapters.forEach(ch => {
+                if (!lowerQuery || (ch.title||'').toLowerCase().includes(lowerQuery)) {
+                    noteResults.push({
+                        id: 'note_' + ch.id,
+                        title: ch.title || 'Untitled',
+                        category: 'Note',
+                        icon: '📝',
+                        execute: () => { loadChapter(ch.id); }
+                    });
+                }
+            });
+        }
+        
+        return index.concat(noteResults);
+    }
+
+    function renderResults(query) {
+        let filtered = buildIndex(query);
 
         // Keep bounds
         if (selectedIndex >= filtered.length) selectedIndex = Math.max(0, filtered.length - 1);
@@ -13403,10 +13513,14 @@ function initCommandPalette() {
                 html += `<div class="cmd-result-category">${category}</div>`;
                 grouped[category].forEach(item => {
                     const isSelected = (globalIndex === selectedIndex) ? 'selected' : '';
+                    const snippetHtml = (item.category === 'Note' && query && item.snippet) 
+                        ? `<span class="cmd-result-snippet">${item.snippet}</span>` : '';
+
                     html += `
                         <div class="cmd-result-item ${isSelected}" data-index="${globalIndex}">
                             <span class="icon">${item.icon}</span>
                             <span class="label">${item.title}</span>
+                            ${snippetHtml}
                             <span class="hint">${item.category === 'Note' ? 'Jump to' : 'Run'}</span>
                         </div>
                     `;
@@ -13417,6 +13531,7 @@ function initCommandPalette() {
             }
         }
         resultsContainer.innerHTML = html;
+        searchIndex = filtered; // save to global scope of this engine so keydown executes correct item
 
         // Scroll selected item into view safely
         const selectedEl = resultsContainer.querySelector('.cmd-result-item.selected');
@@ -13456,7 +13571,6 @@ function initCommandPalette() {
             closePalette();
             return;
         }
-        searchIndex = buildIndex();
         selectedIndex = 0;
         input.value = '';
         overlay.style.display = 'flex';
@@ -13471,25 +13585,19 @@ function initCommandPalette() {
     });
 
     input.addEventListener('keydown', (e) => {
-        const query = input.value;
-        const lowerQuery = query.toLowerCase();
-        const filtered = query ? searchIndex.filter(item => 
-            item.title.toLowerCase().includes(lowerQuery) || 
-            item.category.toLowerCase().includes(lowerQuery)
-        ) : searchIndex;
-
+        // searchIndex is correctly populated in renderResults
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            selectedIndex = Math.min(selectedIndex + 1, filtered.length - 1);
-            renderResults(query);
+            selectedIndex = Math.min(selectedIndex + 1, searchIndex.length - 1);
+            renderResults(input.value);
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             selectedIndex = Math.max(selectedIndex - 1, 0);
-            renderResults(query);
+            renderResults(input.value);
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (filtered.length > 0) {
-                executeResult(filtered[selectedIndex]);
+            if (searchIndex.length > 0) {
+                executeResult(searchIndex[selectedIndex]);
             }
         } else if (e.key === 'Escape') {
             e.preventDefault();
