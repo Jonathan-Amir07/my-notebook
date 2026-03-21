@@ -5153,7 +5153,6 @@ function generateFlashcards() {
                 // Skip empty text nodes if possible, but innerText handles it
                 if (node.innerText.trim()) {
                     // Don't include lines that were already caught by "::" logic to avoid dupes?
-                    // For simplicity, we include them unless they are identical.
                     if (!node.innerText.includes('::')) {
                         currentA += node.innerText + '\n';
                     }
@@ -5161,7 +5160,7 @@ function generateFlashcards() {
             }
         }
 
-        // Push last card
+        // Push last card for this editor
         if (currentQ && currentA.trim()) {
             flashcards.push({ q: currentQ, a: currentA.trim() });
         }
@@ -6401,167 +6400,123 @@ window.applyTemplate = async (key) => {
                             </div>
                             <div style="font-size:0.85rem; margin-bottom:10px; opacity:0.8;">What couldn't you explain simply?</div>
                             <div class="feynman-gap-item" contenteditable="true">Gap 1: </div>
-                            <div class="feyn/* ==================== GLOBAL FULL-TEXT SEARCH ENGINE ==================== */
-window.searchNotes = (query) => {
-    if (!query) {
-        // Return everything with an empty snippet
-        return chapters.map(ch => {
-            const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
-            const basicSnippet = cleanContent.substring(0, 50) + (cleanContent.length > 50 ? '...' : '');
-            return { ...ch, _matchSnippet: basicSnippet };
-        });
+                            <div class="feynman-gap-item" contenteditable="true">Gap 2: </div>
+                        </div>
+                        
+                        <div class="feynman-step locked" id="feynmanStep4">
+                            <div class="feynman-step-header">
+                                <div class="feynman-step-number">4</div>
+                                <div class="feynman-step-title">📖 Review & Simplify</div>
+                            </div>
+                            <div contenteditable="true" style="min-height:150px; padding:12px; background:rgba(46,204,113,0.05); border-radius:5px;">
+                                Return to source material, address gaps, refine your explanation...
+                            </div>
+                            <div class="feynman-iteration">Iteration #<span id="feynmanIterationCount">1</span></div>
+                        </div>
+                    </div>`,
+            type: PAGE_TYPES.FEYNMAN
+        }
+    };
+
+    const selected = temps[key];
+    if (selected) {
+        document.getElementById('pageTitle').value = selected.title;
+
+        // Apply to the ACTIVE chapter's content area
+        const activeBlock = document.getElementById(`page-block-${currentId}`);
+        const contentArea = activeBlock ? activeBlock.querySelector('.content-area') : document.querySelector('.content-area');
+        if (contentArea) {
+            contentArea.innerHTML = selected.content;
+        }
+
+        if (selected.isWhiteboard) {
+            chapter.isWhiteboard = true;
+            document.getElementById('paper').classList.add('infinite');
+        } else {
+            chapter.isWhiteboard = false;
+            document.getElementById('paper').classList.remove('infinite');
+        }
+
+        let disc = 'general';
+        if (['algo', 'codeStudy', 'sysDesign', 'project', 'logicGates'].includes(key)) disc = 'cs';
+        if (['anatomy', 'disease', 'drug', 'physio', 'pathway', 'lab'].includes(key)) disc = 'medical';
+        if (['dental_anatomy', 'oral_pathology', 'dental_procedure', 'dental_case', 'prostho_plan', 'endo_case', 'perio_case', 'oral_radiology'].includes(key)) disc = 'medical';
+        if (['prob_sol', 'circuit', 'mech_sys', 'struct', 'control', 'process', 'lab_exp'].includes(key)) disc = 'engineering';
+
+        // Advanced templates can be used in any discipline
+        if (['cornell', 'zettelkasten', 'outline', 'mindmap', 'sq3r', 'feynman'].includes(key)) {
+            // Keep existing discipline or set to general
+            disc = chapter.metadata?.discipline || 'general';
+        }
+
+        chapter.metadata.discipline = disc;
+        chapter.metadata.type = selected.type || PAGE_TYPES.NOTE;
+
+        if (disc === 'engineering') {
+            if (key === 'circuit' || key === 'control') chapter.metadata.branch = 'Electrical';
+            else if (key === 'mech_sys') chapter.metadata.branch = 'Mechanical';
+            else if (key === 'struct') chapter.metadata.branch = 'Civil';
+            else if (key === 'process') chapter.metadata.branch = 'Industrial';
+            else chapter.metadata.branch = 'General';
+        }
+
+        await saveChapterToDB(chapter);
+        renderSidebar();
+        updateToolVisibility(chapter);
+
+        // Initialize Logic Gates Simulator if this template was selected
+        if (key === 'logicGates') {
+            setTimeout(() => initLogicGatesSimulator(), 100);
+        }
+
+        // Initialize advanced template features
+        if (['cornell', 'zettelkasten', 'sq3r', 'feynman'].includes(key)) {
+            setTimeout(() => {
+                const cornellNotes = document.getElementById('cornellNotes');
+                if (cornellNotes) cornellNotes.addEventListener('input', checkCornellNotesLength);
+
+                const zettelContent = document.getElementById('zettelContent');
+                if (zettelContent) checkZettelWordCount();
+
+                const feynmanSimple = document.getElementById('feynmanSimple');
+                if (feynmanSimple) feynmanSimple.addEventListener('input', checkFeynmanReadability);
+            }, 100);
+        }
+
+        // Initialize outline template
+        if (key === 'outline') {
+            setTimeout(() => {
+                if (typeof initOutlineTemplate === 'function') {
+                    initOutlineTemplate();
+                }
+            }, 100);
+        }
+
+        // Initialize mindmap template
+        if (key === 'mindmap') {
+            setTimeout(() => {
+                if (typeof initMindmapTemplate === 'function') {
+                    initMindmapTemplate();
+                }
+            }, 100);
+        }
+
+        // Circuit symbols tray will be toggled via Components button
+        // No auto-initialization needed
     }
-
-    const lowerQuery = query.toLowerCase();
-    const results = [];
-
-    for (let i = 0; i < chapters.length; i++) {
-        const ch = chapters[i];
-        let isMatch = false;
-        let snippetMarkup = '';
-
-        const titleMatch = (ch.title || '').toLowerCase().includes(lowerQuery);
-        const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(lowerQuery.replace('#', '')));
-
-        // If title/tag matches, we still want a snippet, but standard
-        if (titleMatch || tagMatch) {
-            isMatch = true;
-            const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
-            snippetMarkup = cleanContent.substring(0, 50) + (cleanContent.length > 50 ? '...' : '');
-        }
-
-        // Deep content search
-        const rawContent = (ch.content || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
-        const contentLower = rawContent.toLowerCase();
-        const hitIndex = contentLower.indexOf(lowerQuery);
-
-        if (hitIndex !== -1) {
-            isMatch = true;
-            
-            // Extract a window of text
-            const windowSize = 35;
-            let start = Math.max(0, hitIndex - windowSize);
-            let end = Math.min(rawContent.length, hitIndex + query.length + windowSize);
-            
-            // Try to snap to word boundaries
-            if (start > 0) start = rawContent.indexOf(' ', start) + 1 || start;
-            if (end < rawContent.length) {
-                let nextSpace = rawContent.indexOf(' ', end);
-                end = nextSpace === -1 ? rawContent.length : nextSpace;
-            }
-
-            let extract = rawContent.substring(start, end).trim();
-            
-            // Safely highlight the exact query ignoring case
-            const reg = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-            extract = extract.replace(reg, match => `<b>${match}</b>`);
-
-            if (start > 0) extract = '...' + extract;
-            if (end < rawContent.length) extract = extract + '...';
-
-            snippetMarkup = extract;
-        }
-
-        if (isMatch) {
-            results.push({ ...ch, _matchSnippet: snippetMarkup });
-        }
-    }
-
-    return results;
+    toggleTemplates();
+    resizeCanvas();
 };
 
 window.renderSidebar = () => {
     const list = document.getElementById('chapterList');
-    const searchInput = document.getElementById('sidebarSearch');
-    const searchStr = searchInput ? searchInput.value.trim() : '';
+    const searchStr = document.getElementById('sidebarSearch').value.toLowerCase();
     const categoryFilter = document.getElementById('categoryFilter').value;
     list.innerHTML = '';
 
-    // Use our new global deep search engine
-    let searchResults = window.searchNotes(searchStr);
-
-    const filtered = searchResults.filter(ch => {
-        // Smart Filtering based on Discipline or Category
-        let matchesCat = true;
-        if (categoryFilter !== 'all') {
-            if (['Algorithms', 'Systems', 'Projects'].includes(categoryFilter)) {
-                matchesCat = (ch.category === categoryFilter);
-                if (ch.metadata?.type === PAGE_TYPES.ALGORITHM && categoryFilter === 'Algorithms') matchesCat = true;
-                if (ch.metadata?.type === PAGE_TYPES.SYSTEM && categoryFilter === 'Systems') matchesCat = true;
-                if (ch.metadata?.type === PAGE_TYPES.PROJECT && categoryFilter === 'Projects') matchesCat = true;
-            } else if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter)) {
-                if (ch.metadata?.discipline !== 'medical') return false;
-                if (categoryFilter === 'Anatomy' && ch.metadata?.type !== PAGE_TYPES.ANATOMY) matchesCat = false;
-                if (categoryFilter === 'Pathology' && ch.metadata?.type !== PAGE_TYPES.DISEASE) matchesCat = false;
-                if (categoryFilter === 'Pharmacology' && ch.metadata?.type !== PAGE_TYPES.DRUG) matchesCat = false;
-                if (categoryFilter === 'Clinical' && ![PAGE_TYPES.CLINICAL_CASE, PAGE_TYPES.LAB].includes(ch.metadata?.type)) matchesCat = false;
-            } else if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter)) {
-                if (ch.metadata?.discipline !== 'medical') return false;
-                if (categoryFilter === 'Dental Anatomy' && ch.metadata?.type !== PAGE_TYPES.DENTAL_ANATOMY) matchesCat = false;
-                if (categoryFilter === 'Procedures' && ![PAGE_TYPES.DENTAL_PROCEDURE, PAGE_TYPES.PROSTHO_PLAN].includes(ch.metadata?.type)) matchesCat = false;
-                if (categoryFilter === 'Dental Cases' && ![PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.ENDO_CASE, PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY, PAGE_TYPES.ORAL_PATHOLOGY].includes(ch.metadata?.type)) matchesCat = false;
-
-            } else if (['Electrical', 'Mechanical', 'Civil', 'Electronics', 'Mechatronics', 'Industrial'].includes(categoryFilter)) {
-                if (ch.metadata?.discipline !== 'engineering') return false;
-                if (ch.metadata?.branch !== categoryFilter) matchesCat = false;
-            } else if (categoryFilter === 'General') {
-                matchesCat = ch.metadata?.discipline === 'general';
-            }
-        }
-
-        return matchesCat;
-    });
-
-    if (filtered.length === 0) {
-        const isSearch = searchStr !== '' || categoryFilter !== 'all';
-        const msg = isSearch ? "No notes matching your search or filter." : "Create your first note to get started.";
-        const icon = isSearch ? '🔍' : '📝';
-        const title = isSearch ? 'No Results' : "It's a bit empty here";
-        const btnHtml = !isSearch ? '<button class="nb-empty-state-btn" onclick="createNewChapter()">+ New Note</button>' : '';
-        
-        list.innerHTML = 
-            '<div class="nb-empty-state" style="margin-top:20px;">' +
-                '<div class="nb-empty-state-icon">' + icon + '</div>' +
-                '<div class="nb-empty-state-title">' + title + '</div>' +
-                '<div class="nb-empty-state-desc">' + msg + '</div>' +
-                btnHtml +
-            '</div>';
-    } else {
-        filtered.forEach(ch => {
-            const li = document.createElement('li');
-            li.className = `nav-item ${ch.id === currentId ? 'active' : ''}`;
-
-            const displaySnippetHTML = searchStr 
-                ? `<div class="search-snippet">${ch._matchSnippet}</div>`
-                : `<div class="nav-item-snippet">${ch._matchSnippet}</div>`;
-
-            let tagsHtml = (ch.tags || []).map(t => `<span class="tag-mini">#${t}</span>`).join('');
-            let catBadge = '';
-            const disp = ch.metadata?.discipline || ch.category;
-            if (disp && disp !== 'general' && categoryFilter === 'all') {
-                catBadge = `<div class="cat-badge">${disp.toUpperCase()}</div>`;
-            }
-
-            const escapedSearchQuery = searchStr.replace(/'/g, "\\'");
-
-            li.innerHTML = `
-                        <div class="nav-info" onclick="loadChapter('${ch.id}', '${escapedSearchQuery}')">
-                            <div class="nav-item-title">${ch.title || 'Untitled'}</div>
-                            ${displaySnippetHTML}
-                            <div style="margin-top:4px; display:flex;">${tagsHtml}</div>
-                            ${catBadge}
-                        </div>
-                        <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">🗑️</button>
-                    `;
-            list.appendChild(li);
-        });
-    }
-
-    // Refresh tags sidebar when sidebar updates
-    if (typeof renderTagsSidebar === 'function') {
-        renderTagsSidebar(); 
-    }
-};eplace('#', '')));
+    const filtered = chapters.filter(ch => {
+        const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
+        const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
         const matchesSearch = titleMatch || tagMatch;
 
         // Smart Filtering based on Discipline or Category
@@ -10782,13 +10737,13 @@ window.deleteChapter = async (id) => {
 
 
 
-// Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM WITH FLIP ANIMATION AND SEARCH HIGHLIGHTING)
-window.loadChapter = (id, highlightQuery = '') => {
+// Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM WITH FLIP ANIMATION)
+window.loadChapter = (id) => {
     const chapter = chapters.find(c => c.id === id);
     if (!chapter) return;
 
-    // Do nothing if already on the exact same chapter (unless highlighting)
-    if (currentId === id && !highlightQuery) return;
+    // Do nothing if already on the exact same chapter
+    if (currentId === id) return;
 
     // Trigger page flip animation
     const paper = document.getElementById('paper');
@@ -10807,7 +10762,7 @@ window.loadChapter = (id, highlightQuery = '') => {
 
         // Wait for half the flip (250ms based on CSS) before swapping content
         setTimeout(() => {
-            executeLoadChapterLogic(chapter, id, highlightQuery);
+            executeLoadChapterLogic(chapter, id);
 
             // Swap to flip-in animation
             paper.classList.remove('anim-page-turn');
@@ -10816,35 +10771,16 @@ window.loadChapter = (id, highlightQuery = '') => {
             // Cleanup animation classes after it finishes
             setTimeout(() => {
                 paper.classList.remove('anim-page-enter');
-                applyHitHighlights(highlightQuery);
             }, 250);
         }, 250);
     } else {
         // Fallback if no paper element exists
-        executeLoadChapterLogic(chapter, id, highlightQuery);
-        setTimeout(() => applyHitHighlights(highlightQuery), 100);
+        executeLoadChapterLogic(chapter, id);
     }
 };
 
-// Extremely safe hit highlighting native API trigger
-function applyHitHighlights(query) {
-    if (!query) return;
-    try {
-        // Use browser native window.find to jump to first occurrence naturally
-        // without breaking DOM structure like manual tags could
-        const found = window.find(query, false, false, true, false, false, false);
-        if (found) {
-            // Found highlight is active, clear it smoothly after 2 seconds
-            const selection = window.getSelection();
-            setTimeout(() => {
-                selection.removeAllRanges();
-            }, 2000);
-        }
-    } catch(e) {}
-}
-
 // Core logic detached to allow animation wrapping
-function executeLoadChapterLogic(chapter, id, highlightQuery) {
+function executeLoadChapterLogic(chapter, id) {
     currentId = id;
 
     // Get the primary tag of this chapter
@@ -13418,51 +13354,33 @@ function initCommandPalette() {
         { id: 'cmd_ink_black', title: 'Switch to Black Ink', category: 'Ink', icon: '⚫', execute: () => { selectWritingTool('pen'); setPencilColor('#1a1a1a'); } },
     ];
 
-    function buildIndex(queryText) {
-        // Start with static commands that match the query
+    function buildIndex() {
+        // Start with static commands
         let index = [...staticCommands];
-        const lowerQuery = queryText ? queryText.toLowerCase() : '';
-        if (lowerQuery) {
-            index = index.filter(item => 
+        // Add all current chapters (Notes)
+        if (typeof chapters !== 'undefined') {
+            chapters.forEach(ch => {
+                index.push({
+                    id: 'note_' + ch.id,
+                    title: ch.title || 'Untitled',
+                    category: 'Note',
+                    icon: '📝',
+                    execute: () => { loadChapter(ch.id); }
+                });
+            });
+        }
+        return index;
+    }
+
+    function renderResults(query) {
+        let filtered = searchIndex;
+        if (query) {
+            const lowerQuery = query.toLowerCase();
+            filtered = searchIndex.filter(item => 
                 item.title.toLowerCase().includes(lowerQuery) || 
                 item.category.toLowerCase().includes(lowerQuery)
             );
         }
-
-        // Use global searchNotes engine to find matching notes
-        let noteResults = [];
-        if (typeof window.searchNotes === 'function') {
-            noteResults = window.searchNotes(queryText).map(ch => ({
-                id: 'note_' + ch.id,
-                title: ch.title || 'Untitled',
-                category: 'Note',
-                icon: '📝',
-                snippet: ch._matchSnippet,
-                execute: () => { loadChapter(ch.id, queryText); }
-            }));
-            
-            // Limit deep search note results to 15 max to keep palette snappy
-            noteResults = noteResults.slice(0, 15);
-        } else if (typeof chapters !== 'undefined') {
-            // Safe fallback
-            chapters.forEach(ch => {
-                if (!lowerQuery || (ch.title||'').toLowerCase().includes(lowerQuery)) {
-                    noteResults.push({
-                        id: 'note_' + ch.id,
-                        title: ch.title || 'Untitled',
-                        category: 'Note',
-                        icon: '📝',
-                        execute: () => { loadChapter(ch.id); }
-                    });
-                }
-            });
-        }
-        
-        return index.concat(noteResults);
-    }
-
-    function renderResults(query) {
-        let filtered = buildIndex(query);
 
         // Keep bounds
         if (selectedIndex >= filtered.length) selectedIndex = Math.max(0, filtered.length - 1);
@@ -13485,14 +13403,10 @@ function initCommandPalette() {
                 html += `<div class="cmd-result-category">${category}</div>`;
                 grouped[category].forEach(item => {
                     const isSelected = (globalIndex === selectedIndex) ? 'selected' : '';
-                    const snippetHtml = (item.category === 'Note' && query && item.snippet) 
-                        ? `<span class="cmd-result-snippet">${item.snippet}</span>` : '';
-
                     html += `
                         <div class="cmd-result-item ${isSelected}" data-index="${globalIndex}">
                             <span class="icon">${item.icon}</span>
                             <span class="label">${item.title}</span>
-                            ${snippetHtml}
                             <span class="hint">${item.category === 'Note' ? 'Jump to' : 'Run'}</span>
                         </div>
                     `;
@@ -13503,7 +13417,6 @@ function initCommandPalette() {
             }
         }
         resultsContainer.innerHTML = html;
-        searchIndex = filtered; // save to global scope of this engine so keydown executes correct item
 
         // Scroll selected item into view safely
         const selectedEl = resultsContainer.querySelector('.cmd-result-item.selected');
@@ -13543,6 +13456,7 @@ function initCommandPalette() {
             closePalette();
             return;
         }
+        searchIndex = buildIndex();
         selectedIndex = 0;
         input.value = '';
         overlay.style.display = 'flex';
@@ -13557,19 +13471,25 @@ function initCommandPalette() {
     });
 
     input.addEventListener('keydown', (e) => {
-        // searchIndex is correctly populated in renderResults
+        const query = input.value;
+        const lowerQuery = query.toLowerCase();
+        const filtered = query ? searchIndex.filter(item => 
+            item.title.toLowerCase().includes(lowerQuery) || 
+            item.category.toLowerCase().includes(lowerQuery)
+        ) : searchIndex;
+
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            selectedIndex = Math.min(selectedIndex + 1, searchIndex.length - 1);
-            renderResults(input.value);
+            selectedIndex = Math.min(selectedIndex + 1, filtered.length - 1);
+            renderResults(query);
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             selectedIndex = Math.max(selectedIndex - 1, 0);
-            renderResults(input.value);
+            renderResults(query);
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (searchIndex.length > 0) {
-                executeResult(searchIndex[selectedIndex]);
+            if (filtered.length > 0) {
+                executeResult(filtered[selectedIndex]);
             }
         } else if (e.key === 'Escape') {
             e.preventDefault();
