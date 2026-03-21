@@ -1009,8 +1009,9 @@ class LassoSelector {
             }
         }
 
-        // Disable contenteditable
+        // Disable contenteditable and ensure items are block-wrapped
         document.querySelectorAll('.content-area').forEach(el => {
+            this._ensureBlockWrapping(el);
             el.setAttribute('data-lasso-prev-editable', el.contentEditable);
             el.contentEditable = 'false';
         });
@@ -1064,6 +1065,52 @@ class LassoSelector {
 
         const btn = document.getElementById('lassoBtn');
         if (btn) btn.classList.remove('active');
+    }
+
+    /**
+     * Ensures all text nodes and inline elements at the top level of the content area
+     * are wrapped in <p> tags so they are detectable as block-level selectable elements.
+     */
+    _ensureBlockWrapping(area) {
+        if (!area) return;
+        let nodesToWrap = [];
+        const finalizeWrap = () => {
+            if (nodesToWrap.length > 0) {
+                const p = document.createElement('p');
+                // Use the first node in the sequence to find the insertion point
+                const firstNode = nodesToWrap[0];
+                if (firstNode.parentNode) {
+                    firstNode.parentNode.insertBefore(p, firstNode);
+                    nodesToWrap.forEach(node => {
+                        p.appendChild(node);
+                    });
+                }
+                nodesToWrap = [];
+            }
+        };
+
+        // We use childNodes to see text nodes as well as element nodes
+        const nodes = Array.from(area.childNodes);
+        const blockTags = ['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'UL', 'OL', 'TABLE', 'PRE', 'HR', 'SECTION', 'ARTICLE'];
+
+        nodes.forEach(node => {
+            const isBlockElement = node.nodeType === 1 && blockTags.includes(node.tagName.toUpperCase());
+            const isLassoUI = node.nodeType === 1 && (node.classList.contains('rd-image-wrapper') || node.classList.contains('uploaded-container'));
+
+            if (isBlockElement || isLassoUI) {
+                // If we encounter a block, wrap whatever inline stuff we collected before it
+                finalizeWrap();
+            } else {
+                // Ignore empty whitespace-only text nodes at the very start or between blocks
+                if (node.nodeType === 3 && !node.textContent.trim() && nodesToWrap.length === 0) {
+                    return;
+                }
+                nodesToWrap.push(node);
+            }
+        });
+
+        // Wrap any remaining nodes at the end
+        finalizeWrap();
     }
 
     // ================================================================
