@@ -10407,25 +10407,21 @@ window.renderSidebar = () => {
     const list = document.getElementById('chapterList');
     if (!list) return;
 
-    const searchStr = (document.getElementById('sidebarSearch')?.value || '').toLowerCase();
+    const searchStr = (document.getElementById('sidebarSearch')?.value || '').trim();
     const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
 
     list.innerHTML = '';
 
-    // Filter chapters
-    const filtered = chapters.filter(ch => {
-        const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
-        const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
-        const matchesSearch = titleMatch || tagMatch;
+    // Use the global full-text search engine to get matches with snippets
+    const searchResults = window.searchNotes ? window.searchNotes(searchStr) : chapters;
 
-        if (!matchesSearch) return false;
-
+    // Further filter by category
+    const filtered = searchResults.filter(ch => {
         if (categoryFilter === 'all') return true;
 
         const disc = ch.metadata?.discipline;
         const branch = ch.metadata?.branch;
 
-        // Match category filter
         if (categoryFilter === 'General' && disc === 'general') return true;
         if (categoryFilter === 'Projects' && ch.metadata?.type === 'project') return true;
         if (categoryFilter === 'Algorithms' && disc === 'cs') return true;
@@ -10439,35 +10435,33 @@ window.renderSidebar = () => {
         return false;
     });
 
-    // Group chapters by their first tag (for better organization)
+    // Group chapters by their first tag
     const grouped = {};
     const untagged = [];
 
     filtered.forEach(ch => {
         if (ch.tags && ch.tags.length > 0) {
             const primaryTag = ch.tags[0];
-            if (!grouped[primaryTag]) {
-                grouped[primaryTag] = [];
-            }
+            if (!grouped[primaryTag]) grouped[primaryTag] = [];
             grouped[primaryTag].push(ch);
         } else {
             untagged.push(ch);
         }
     });
 
+    const escapedQuery = searchStr.replace(/'/g, "\\'");
+
+    const renderItem = (ch) => renderChapterItem(ch, list, searchStr ? ch._matchSnippet : null, escapedQuery);
+
     // Render grouped chapters (by tag) with visual separation
     const sortedTags = Object.keys(grouped).sort();
     sortedTags.forEach((tag, index) => {
-        // Add visual separator between tag groups (except before first group)
         if (index > 0) {
             const separator = document.createElement('li');
             separator.style.cssText = 'height: 15px; list-style: none; pointer-events: none;';
             list.appendChild(separator);
         }
-
-        grouped[tag].forEach(ch => {
-            renderChapterItem(ch, list);
-        });
+        grouped[tag].forEach(ch => renderItem(ch));
     });
 
     // Add separator before untagged if there are tagged items
@@ -10477,13 +10471,13 @@ window.renderSidebar = () => {
         list.appendChild(separator);
     }
 
-    // Render untagged chapters at the end
-    untagged.forEach(ch => {
-        renderChapterItem(ch, list);
-    });
+    untagged.forEach(ch => renderItem(ch));
 
     if (filtered.length === 0) {
-        list.innerHTML = '<li style="opacity: 0.5; text-align: center; padding: 20px;">No pages found</li>';
+        const isSearch = searchStr !== '' || categoryFilter !== 'all';
+        list.innerHTML = isSearch
+            ? '<li style="opacity: 0.5; text-align: center; padding: 20px;">No pages found</li>'
+            : '<li style="opacity: 0.5; text-align: center; padding: 20px;">Create your first note!</li>';
     }
 
     // Update tag cloud
@@ -10491,7 +10485,7 @@ window.renderSidebar = () => {
 };
 
 // Helper function to render a single chapter item
-function renderChapterItem(ch, list) {
+function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
     const li = document.createElement('li');
     li.className = 'chapter-item';
     li.dataset.cid = ch.id;
@@ -10509,14 +10503,12 @@ function renderChapterItem(ch, list) {
 
     li.addEventListener('dragstart', (e) => {
         window._dndDragId = ch.id;
-        // Use setTimeout so the browser renders the ghost before we dim
         setTimeout(() => li.classList.add('dragging'), 0);
         e.dataTransfer.effectAllowed = 'move';
     });
 
     li.addEventListener('dragend', () => {
         li.classList.remove('dragging');
-        // Clean up any leftover drag-over highlights
         document.querySelectorAll('.chapter-item.drag-over')
             .forEach(el => el.classList.remove('drag-over'));
     });
@@ -10524,7 +10516,6 @@ function renderChapterItem(ch, list) {
     li.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        // Highlight only this target
         document.querySelectorAll('.chapter-item.drag-over')
             .forEach(el => el.classList.remove('drag-over'));
         if (window._dndDragId !== ch.id) li.classList.add('drag-over');
@@ -10540,7 +10531,6 @@ function renderChapterItem(ch, list) {
         const draggedId = window._dndDragId;
         if (!draggedId || draggedId === ch.id) return;
 
-        // Reorder the chapters array
         const fromIdx = chapters.findIndex(c => c.id === draggedId);
         const toIdx   = chapters.findIndex(c => c.id === ch.id);
         if (fromIdx === -1 || toIdx === -1) return;
@@ -10548,7 +10538,6 @@ function renderChapterItem(ch, list) {
         const [moved] = chapters.splice(fromIdx, 1);
         chapters.splice(toIdx, 0, moved);
 
-        // Persist order
         saveSortOrder();
         renderSidebar();
     });
@@ -10556,13 +10545,21 @@ function renderChapterItem(ch, list) {
     // Create content wrapper
     const contentDiv = document.createElement('div');
     contentDiv.className = 'chapter-item-content';
-    contentDiv.onclick = () => loadChapter(ch.id);
+    contentDiv.onclick = () => loadChapter(ch.id, escapedQuery);
 
     // Title
     const titleDiv = document.createElement('div');
     titleDiv.className = 'chapter-item-title';
     titleDiv.textContent = ch.title || 'Untitled';
     contentDiv.appendChild(titleDiv);
+
+    // Search snippet (shown only during active search)
+    if (matchSnippet) {
+        const snippetDiv = document.createElement('div');
+        snippetDiv.className = 'search-snippet';
+        snippetDiv.innerHTML = matchSnippet;
+        contentDiv.appendChild(snippetDiv);
+    }
 
     // Add tags if present
     if (ch.tags && ch.tags.length > 0) {
@@ -13539,17 +13536,25 @@ function initCommandPalette() {
             selectedEl.scrollIntoView({ block: 'nearest' });
         }
 
-        // Attach click handlers
-        resultsContainer.querySelectorAll('.cmd-result-item').forEach(el => {
-            el.addEventListener('click', () => {
-                const idx = parseInt(el.getAttribute('data-index'));
-                executeResult(filtered[idx]);
-            });
-            el.addEventListener('mouseenter', () => {
-                selectedIndex = parseInt(el.getAttribute('data-index'));
-                renderResults(input.value);
-            });
-        });
+        // Attach click + hover handlers via event delegation to avoid re-render race conditions
+        resultsContainer.onclick = (e) => {
+            const item = e.target.closest('.cmd-result-item');
+            if (!item) return;
+            const idx = parseInt(item.getAttribute('data-index'));
+            executeResult(filtered[idx]);
+        };
+        resultsContainer.onmousemove = (e) => {
+            const item = e.target.closest('.cmd-result-item');
+            if (!item) return;
+            const idx = parseInt(item.getAttribute('data-index'));
+            if (idx !== selectedIndex) {
+                selectedIndex = idx;
+                // Highlight without full re-render to avoid breaking click
+                resultsContainer.querySelectorAll('.cmd-result-item').forEach((el, i) => {
+                    el.classList.toggle('selected', i === selectedIndex);
+                });
+            }
+        };
     }
 
     function executeResult(item) {
