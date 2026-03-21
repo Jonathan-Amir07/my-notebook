@@ -21,6 +21,23 @@
             height: auto !important;
         }
 
+        /* Custom scrollbar for better clarity */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--sidebar-bg, #2c3e50);
+            border-radius: 10px;
+            border: 3px solid #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-color, #e74c3c);
+        }
+
         .header {
             background: var(--sidebar-bg, #2c3e50);
             color: white;
@@ -29,6 +46,9 @@
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         .header h1 {
