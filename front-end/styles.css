@@ -7110,3 +7110,58 @@ body.dark-mode .internal-link.missing:hover { background: rgba(243, 156, 18, 0.1
     font-weight: 500;
     font-size: 0.95rem;
 }
+
+/* ===========================
+   GLOBAL FULL-TEXT SEARCH
+   =========================== */
+
+.search-snippet {
+    font-size: 0.75rem;
+    color: var(--ink-color);
+    opacity: 0.6;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.search-snippet b {
+    color: #e67e22; /* Highlight match in orange */
+    font-weight: 600;
+    opacity: 1; /* override snippet opacity */
+}
+
+body.dark-mode .search-snippet b {
+    color: #f39c12;
+}
+
+/* For Command Palette results */
+.cmd-result-snippet {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-left: auto;
+    max-width: 40%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    padding-left: 10px;
+}
+
+.cmd-result-snippet b {
+    color: #e67e22;
+    font-weight: 600;
+}
+
+body.dark-mode .cmd-result-snippet b {
+    color: #f39c12;
+}
+
+/* Highlighting searched text within the content area */
+mark.search-highlight {
+    background-color: rgba(241, 196, 15, 0.4);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 2px;
+}
