@@ -5157,6 +5157,10 @@ function generateFlashcards() {
                     if (!node.innerText.includes('::')) {
                         currentA += node.innerText + '\n';
                     }
+                }
+            }
+        }
+
         // Push last card
         if (currentQ && currentA.trim()) {
             flashcards.push({ q: currentQ, a: currentA.trim() });
