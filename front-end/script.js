@@ -5157,9 +5157,6 @@ function generateFlashcards() {
                     if (!node.innerText.includes('::')) {
                         currentA += node.innerText + '\n';
                     }
-                }
-            }
-        }
         // Push last card
         if (currentQ && currentA.trim()) {
             flashcards.push({ q: currentQ, a: currentA.trim() });
@@ -10909,6 +10906,11 @@ function executeLoadChapterLogic(chapter, id) {
             }
         }, 100);
     }
+
+    // Render Backlinks (Linked Mentions) for this active page
+    if (typeof window.renderBacklinks === 'function') {
+        setTimeout(window.renderBacklinks, 50);
+    }
 };
 
 // Save current chapter to database
@@ -13501,3 +13503,311 @@ function initCommandPalette() {
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', initCommandPalette);
+
+/* ==================== BI-DIRECTIONAL LINKING ([[) ==================== */
+function initBiDirectionalLinking() {
+    const suggester = document.getElementById('linkSuggesterPopover');
+    const resultsContainer = document.getElementById('linkSuggesterResults');
+    if (!suggester || !resultsContainer) return;
+
+    let isActive = false;
+    let query = '';
+    let selectedIndex = 0;
+    let currentRange = null;
+
+    // Listen for keystrokes in any content editable
+    document.addEventListener('keyup', (e) => {
+        const target = e.target;
+        if (!target.classList || !target.classList.contains('content-area')) return;
+
+        // If active, intercept navigation
+        if (isActive) {
+            if (e.key === 'Escape') {
+                closeSuggester();
+                return;
+            }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+                // Handled in keydown below to prevent default cursor movement
+                return;
+            }
+
+            // Update query
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            
+            // Extract text from the start of the text node up to cursor
+            let text = range.startContainer.textContent || '';
+            let cursorIndex = range.startOffset;
+            let beforeCursor = text.substring(0, cursorIndex);
+
+            // Find the last occurrence of [[
+            const lastBracket = beforeCursor.lastIndexOf('[[');
+            if (lastBracket !== -1) {
+                query = beforeCursor.substring(lastBracket + 2);
+                renderSuggestions();
+            } else {
+                closeSuggester();
+            }
+            return;
+        }
+
+        // Trigger check: Did they just type [[ ?
+        if (e.key === '[') {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            let text = range.startContainer.textContent || '';
+            let beforeCursor = text.substring(0, range.startOffset);
+            
+            if (beforeCursor.endsWith('[[')) {
+                openSuggester(range);
+            }
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (!isActive) return;
+        const target = e.target;
+        if (!target.classList || !target.classList.contains('content-area')) return;
+
+        const visibleItems = resultsContainer.querySelectorAll('.link-suggester-item');
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, visibleItems.length - 1);
+            updateSelection();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, 0);
+            updateSelection();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (visibleItems.length > 0) {
+                insertLink(visibleItems[selectedIndex].dataset.title, visibleItems[selectedIndex].dataset.id);
+            } else if (query.trim().length > 0) {
+                // Create new page flow
+                insertLink(query.trim(), 'new');
+            }
+        }
+    });
+
+    function openSuggester(range) {
+        isActive = true;
+        query = '';
+        selectedIndex = 0;
+        currentRange = range.cloneRange();
+
+        // Position popover relative to the cursor position
+        const rect = range.getBoundingClientRect();
+        suggester.style.display = 'flex';
+        // Add a slight vertical offset and account for scroll
+        suggester.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+        suggester.style.left = (rect.left + window.scrollX) + 'px';
+
+        renderSuggestions();
+    }
+
+    function closeSuggester() {
+        isActive = false;
+        suggester.style.display = 'none';
+        currentRange = null;
+    }
+
+    function renderSuggestions() {
+        let html = '';
+        const lowerQuery = query.toLowerCase();
+        
+        // Filter chapters
+        let matches = [];
+        if (typeof chapters !== 'undefined') {
+            matches = chapters.filter(ch => 
+                (ch.title || 'Untitled').toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        if (matches.length === 0) {
+            if (query.trim().length > 0) {
+                html = `<div class="link-suggester-item selected" data-id="new" data-title="${query}">
+                            Create new page: "<b>${query}</b>"
+                        </div>`;
+            } else {
+                html = '<div style="padding: 8px 12px; opacity: 0.5; font-size: 0.8rem;">Type to search notes...</div>';
+            }
+        } else {
+            // Sort to prioritize exact starting matches, then alphabetical
+            matches.sort((a,b) => {
+                const aT = (a.title||'').toLowerCase();
+                const bT = (b.title||'').toLowerCase();
+                if(aT.startsWith(lowerQuery) && !bT.startsWith(lowerQuery)) return -1;
+                if(!aT.startsWith(lowerQuery) && bT.startsWith(lowerQuery)) return 1;
+                return aT.localeCompare(bT);
+            });
+
+            matches.slice(0, 15).forEach((ch, idx) => { // limit to top 15
+                const title = ch.title || 'Untitled';
+                html += `<div class="link-suggester-item ${idx === selectedIndex ? 'selected' : ''}" data-id="${ch.id}" data-title="${title}">
+                            📄 ${title}
+                        </div>`;
+            });
+        }
+        
+        const count = matches.length === 0 ? (query.trim().length > 0 ? 1 : 0) : Math.min(15, matches.length);
+        if (selectedIndex >= count && count > 0) selectedIndex = count - 1;
+        resultsContainer.innerHTML = html;
+        updateSelection();
+    }
+
+    function updateSelection() {
+        const items = resultsContainer.querySelectorAll('.link-suggester-item');
+        items.forEach((el, idx) => {
+            if (idx === selectedIndex) {
+                el.classList.add('selected');
+                el.scrollIntoView({ block: 'nearest' });
+            } else {
+                el.classList.remove('selected');
+            }
+        });
+    }
+
+    function insertLink(title, targetId) {
+        if (!currentRange) return;
+        
+        const selection = window.getSelection();
+        const cursorRange = selection.getRangeAt(0);
+
+        // Find standard text node up to cursor and replace the [[ match
+        let textNode = cursorRange.startContainer;
+        if (textNode.nodeType === 3) {
+            let text = textNode.textContent;
+            let beforeCursor = text.substring(0, cursorRange.startOffset);
+            const startIdx = beforeCursor.lastIndexOf('[[');
+            if (startIdx !== -1) {
+                // Delete the [[...
+                const deleteRange = document.createRange();
+                deleteRange.setStart(textNode, startIdx);
+                deleteRange.setEnd(textNode, cursorRange.startOffset);
+                deleteRange.deleteContents();
+                
+                // Insert the span
+                const missingClass = targetId === 'new' ? 'missing' : '';
+                const idAttr = targetId !== 'new' ? `data-id="${targetId}"` : `data-new-title="${title}"`;
+                
+                const span = document.createElement('span');
+                span.className = `internal-link ${missingClass}`;
+                span.innerHTML = title;
+                span.setAttribute('contenteditable', 'false');
+                span.dataset.linkType = 'internal'; // helpful flag
+                
+                if (targetId !== 'new') {
+                    span.dataset.id = targetId;
+                } else {
+                    span.dataset.newTitle = title;
+                }
+                
+                deleteRange.insertNode(span);
+
+                // Move cursor after the inserted span
+                deleteRange.setStartAfter(span);
+                deleteRange.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(deleteRange);
+
+                // Add a zero-width space or normal space to continue typing cleanly
+                const spaceNode = document.createTextNode('\u200B ')
+                deleteRange.insertNode(spaceNode);
+                deleteRange.setStartAfter(spaceNode);
+                deleteRange.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(deleteRange);
+            }
+        }
+        
+        closeSuggester();
+        markUnsaved();
+        saveCurrentToCloud();
+    }
+
+    // Handle clicking on links anywhere in the document
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('.internal-link');
+        if (link) {
+            e.preventDefault();
+            const targetId = link.dataset.id;
+            const newTitle = link.dataset.newTitle;
+
+            if (targetId) {
+                // Instantly save current then flip
+                saveCurrentToCloud();
+                loadChapter(targetId);
+            } else if (newTitle) {
+                // Create new unlinked page flow
+                createNewChapter(newTitle).then(newId => {
+                    if (newId) {
+                        link.classList.remove('missing');
+                        link.dataset.id = newId;
+                        delete link.dataset.newTitle;
+                        saveCurrentToCloud();
+                        // Loading the newly created chapter already happens internally
+                    }
+                });
+            }
+        } else if (isActive && !suggester.contains(e.target)) {
+            closeSuggester();
+        }
+    });
+}
+
+// Global backlinks rendering function
+window.renderBacklinks = () => {
+    if (!currentId) return;
+    const currentChapter = chapters.find(c => c.id === currentId);
+    if (!currentChapter) return;
+    
+    const backlinks = [];
+    const searchA = `data-id="${currentId}"`;
+
+    chapters.forEach(ch => {
+        if (ch.id === currentId) return; // Skip self
+        if (!ch.content) return;
+        
+        // Super simple reliable check: does their HTML contain a link to our ID?
+        if (ch.content.includes(searchA)) {
+            backlinks.push({ id: ch.id, title: ch.title || 'Untitled' });
+        }
+    });
+
+    // Remove old backlinks container in the active block
+    const activeBlock = document.getElementById(`page-block-${currentId}`);
+    if (!activeBlock) return;
+    
+    let existing = activeBlock.querySelector('.backlinks-container');
+    if (existing) existing.remove();
+
+    if (backlinks.length === 0) return;
+
+    // Inject new backlinks panel at the end of the block (outside the content-area so it doesn't get saved into content!)
+    const contentArea = activeBlock.querySelector('.content-area');
+    if (!contentArea) return;
+
+    const html = `
+        <div class="backlinks-container" contenteditable="false">
+            <div class="backlinks-title">🔗 Linked Mentions <span>(${backlinks.length})</span></div>
+            <div class="backlinks-list">
+                ${backlinks.map(bl => `
+                    <div class="backlink-item" onclick="saveCurrentToCloud(); loadChapter('${bl.id}')">
+                        <span class="backlink-item-icon">📄</span>
+                        <span class="backlink-item-title">${bl.title}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    // It must NOT be inside contentArea. We put it after contentArea inside the page-block.
+    contentArea.insertAdjacentHTML('afterend', html);
+};
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', initBiDirectionalLinking);
