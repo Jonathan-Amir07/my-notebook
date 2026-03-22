@@ -2876,6 +2876,7 @@ body.split-mode .lecture-pane {
 #pdfViewerPages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: auto;
     background: #1e1e2e;
     padding: 20px 0;
     display: flex;
@@ -2895,8 +2896,6 @@ body.split-mode .lecture-pane {
 
 .pdf-page-canvas {
     display: block;
-    max-width: calc(100% - 32px);
-    height: auto;
     border-radius: 2px;
 }
 

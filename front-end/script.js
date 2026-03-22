@@ -4066,6 +4066,9 @@ const PdfViewer = {
         // Build text layer for selection
         const textContent = await page.getTextContent();
         textLayerDiv.innerHTML = '';
+        textLayerDiv.className = 'pdf-text-layer textLayer';
+        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+
         pdfjsLib.renderTextLayer({
             textContentSource: textContent,
             container:         textLayerDiv,
