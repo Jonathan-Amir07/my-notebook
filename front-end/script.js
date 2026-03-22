@@ -4188,20 +4188,76 @@ window.resolvePdfMode = (mode) => {
         // ── Selection toolbar ──────────────────────────────────────
         const selBar = document.getElementById('pdfSelectionBar');
 
+        // Draws amber overlay rects over all selected text spans
+        function drawSelectionOverlay() {
+            // Clear any previous overlays
+            document.querySelectorAll('.pdf-sel-overlay').forEach(el => el.remove());
+
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount || !sel.toString().trim()) return;
+
+            for (let ri = 0; ri < sel.rangeCount; ri++) {
+                const range = sel.getRangeAt(ri);
+                const rects = Array.from(range.getClientRects());
+
+                rects.forEach(cr => {
+                    // Find which page wrapper this rect sits inside
+                    const pages = document.querySelectorAll('.pdf-page-wrapper');
+                    let host = null;
+                    pages.forEach(p => {
+                        const pr = p.getBoundingClientRect();
+                        if (cr.top >= pr.top - 2 && cr.bottom <= pr.bottom + 2) host = p;
+                    });
+                    if (!host) return;
+
+                    const hostRect = host.getBoundingClientRect();
+                    const overlay = document.createElement('div');
+                    overlay.className = 'pdf-sel-overlay';
+                    overlay.style.cssText = [
+                        'position:absolute',
+                        `left:${cr.left - hostRect.left}px`,
+                        `top:${cr.top - hostRect.top}px`,
+                        `width:${cr.width}px`,
+                        `height:${cr.height}px`,
+                        'pointer-events:none',
+                        'z-index:10'
+                    ].join(';');
+                    host.appendChild(overlay);
+                });
+            }
+        }
+
+        function clearSelectionOverlay() {
+            document.querySelectorAll('.pdf-sel-overlay').forEach(el => el.remove());
+        }
+
         pagesArea && pagesArea.addEventListener('mouseup', (e) => {
             const selText = window.getSelection()?.toString().trim();
-            if (!selText) { selBar.style.display = 'none'; return; }
+            if (!selText) {
+                selBar.style.display = 'none';
+                clearSelectionOverlay();
+                return;
+            }
 
-            // Position near cursor
+            // Draw visual overlay over selected text
+            drawSelectionOverlay();
+
+            // Position toolbar near cursor
             const rect = pagesArea.getBoundingClientRect();
             selBar.style.display = 'flex';
             selBar.style.left = Math.min(e.clientX - rect.left, rect.width - 200) + 'px';
-            selBar.style.top  = (e.clientY - rect.top - 42) + 'px';
+            selBar.style.top  = (e.clientY - rect.top - 48) + 'px';
         });
 
         document.addEventListener('mousedown', (e) => {
-            if (!selBar.contains(e.target)) selBar.style.display = 'none';
+            if (!selBar.contains(e.target)) {
+                selBar.style.display = 'none';
+                clearSelectionOverlay();
+            }
         });
+
+        // Also expose clearSelectionOverlay so Highlight/Clone buttons can call it
+        PdfViewer._clearSelOverlay = clearSelectionOverlay;
 
         // Highlight button
         attachOnce('pdfHighlightBtn', 'click', () => {
@@ -4224,6 +4280,7 @@ window.resolvePdfMode = (mode) => {
 
             sel.removeAllRanges();
             selBar.style.display = 'none';
+            PdfViewer._clearSelOverlay?.();
             showToast('🖊 Highlight saved');
         });
 
