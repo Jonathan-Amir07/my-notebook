@@ -4025,6 +4025,13 @@ const PdfViewer = {
         const container = document.getElementById('pdfViewerPages');
         container.innerHTML = '';
 
+        // Ensure the container has expanded before measuring
+        // (Transition from 0 to 50% takes 300ms, but we can measure after a bit)
+        if (container.clientWidth < 100) {
+            await new Promise(r => setTimeout(r, 150));
+        }
+        this.viewerWidth = (container.clientWidth || 500) - 40;
+
         for (let p = 1; p <= this.totalPages; p++) {
             const pageEl = document.createElement('div');
             pageEl.className = 'pdf-page-wrapper';
@@ -4052,11 +4059,9 @@ const PdfViewer = {
     async _renderPage(pageNum, canvas, textLayerDiv) {
         const page = await this.pdfDoc.getPage(pageNum);
         
-        // Calculate dynamic scale to fit width
-        const container = document.getElementById('pdfViewerPages');
-        const containerWidth = (container?.clientWidth || 500) - 40; 
+        // Use stored viewer width for consistent scaling
         const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const dynamicScale = Math.min(containerWidth / unscaledViewport.width, 1.5); 
+        const dynamicScale = Math.min(this.viewerWidth / unscaledViewport.width, 1.5); 
         
         const viewport = page.getViewport({ scale: dynamicScale });
 
@@ -4076,11 +4081,33 @@ const PdfViewer = {
         textLayerDiv.className = 'pdf-text-layer textLayer';
         textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
 
-        pdfjsLib.renderTextLayer({
+        await pdfjsLib.renderTextLayer({
             textContentSource: textContent,
             container:         textLayerDiv,
             viewport,
             textDivs:          []
+        }).promise;
+
+        // Apply saved highlights to the newly rendered text layer
+        this._applyHighlightsToPage(pageNum, textLayerDiv);
+    },
+
+    // ── Re-apply highlights to a specific page's text layer ──────────
+    _applyHighlightsToPage(pageNum, textLayerDiv) {
+        const annots = this._annots().filter(a => a.page === pageNum && a.type === 'highlight');
+        if (!annots.length) return;
+
+        const spans = Array.from(textLayerDiv.querySelectorAll('span'));
+        annots.forEach(annot => {
+            const target = (annot.text || '').trim();
+            if (!target || target.length < 3) return;
+
+            // Simple match: if any span exactly contains or is part of the highlight
+            spans.forEach(span => {
+                if (span.textContent.includes(target) || target.includes(span.textContent.trim())) {
+                    span.classList.add('pdf-highlight-span');
+                }
+            });
         });
     },
 

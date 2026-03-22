@@ -2932,6 +2932,13 @@ mark.pdf-highlight {
     padding: 1px 0;
 }
 
+/* ── Spans marked during reload ── */
+.pdf-highlight-span {
+    background: rgba(255, 210, 60, 0.35) !important;
+    border-radius: 2px;
+    box-shadow: 0 0 4px rgba(255, 210, 60, 0.2);
+}
+
 /* ── Floating Selection Toolbar ── */
 #pdfSelectionBar {
     display: none;
