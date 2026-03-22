@@ -2794,19 +2794,221 @@ body.split-mode .lecture-pane {
     }
 }
 
-.lecture-frame {
-    flex-grow: 1;
-    border: none;
-    background: white;
+/* ── PDF Viewer Toolbar ── */
+#pdfViewerToolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, var(--sidebar-bg, #2c3e50) 0%, #1a252f 100%);
+    color: #fff;
+    flex-shrink: 0;
+    font-family: 'Caveat', cursive;
+    font-size: 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-wrap: nowrap;
+    min-height: 44px;
 }
 
-.lecture-header {
-    background: var(--sidebar-bg);
-    color: white;
-    padding: 10px;
+#pdfViewerTitle {
+    flex: 1;
+    font-size: 0.92rem;
+    font-family: 'Kalam', cursive;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+    opacity: 0.95;
+}
+
+#pdfViewerNav {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 3px 10px;
+}
+
+#pdfViewerNav button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.15s;
+    line-height: 1;
+}
+
+#pdfViewerNav button:hover {
+    background: rgba(255,255,255,0.18);
+}
+
+#pdfPageInfo {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    min-width: 50px;
+    text-align: center;
+    opacity: 0.85;
+    letter-spacing: 0.02em;
+}
+
+#pdfViewerClose {
+    background: rgba(255, 90, 90, 0.2);
+    border: 1px solid rgba(255,90,90,0.4);
+    color: #ffaaaa;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+#pdfViewerClose:hover {
+    background: rgba(255, 90, 90, 0.5);
+    color: #fff;
+}
+
+/* ── Scrollable PDF pages area ── */
+#pdfViewerPages {
+    flex: 1;
+    overflow-y: auto;
+    background: #1e1e2e;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+}
+
+.pdf-page-wrapper {
+    position: relative;
+    display: inline-block;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+    border-radius: 2px;
+    line-height: 0;
+}
+
+.pdf-page-canvas {
+    display: block;
+    max-width: calc(100% - 32px);
+    height: auto;
+    border-radius: 2px;
+}
+
+/* ── Text Layer (for selection) ── */
+.pdf-text-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+    line-height: 1;
+    pointer-events: auto;
+    /* text-layer spans are positioned absolutely by pdf.js */
+}
+
+.pdf-text-layer span {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+}
+
+.pdf-text-layer span::selection,
+.pdf-text-layer span::-moz-selection {
+    background: rgba(100, 170, 255, 0.4);
+    color: transparent;
+}
+
+/* ── Highlight mark ── */
+mark.pdf-highlight {
+    background: rgba(255, 210, 60, 0.55);
+    color: transparent;
+    border-radius: 2px;
+    padding: 1px 0;
+}
+
+/* ── Floating Selection Toolbar ── */
+#pdfSelectionBar {
+    display: none;
+    position: absolute;
+    z-index: 200;
+    background: rgba(30, 30, 46, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 5px 8px;
+    gap: 6px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    pointer-events: auto;
+}
+
+#pdfSelectionBar button {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #f0f0ff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: 'Kalam', cursive;
+}
+
+#pdfHighlightBtn:hover {
+    background: rgba(255, 210, 60, 0.25);
+    border-color: #ffd23c;
+    color: #ffd23c;
+}
+
+#pdfCloneBtn:hover {
+    background: rgba(80, 200, 120, 0.25);
+    border-color: #50c878;
+    color: #50c878;
+}
+
+/* ── Cloned quote in note ── */
+.pdf-cloned-quote {
+    border-left: 4px solid #e67e22;
+    background: rgba(230, 126, 34, 0.06);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-style: italic;
+    color: inherit;
+    position: relative;
+}
+
+.pdf-cloned-quote em {
+    display: block;
+    margin-top: 6px;
+    font-style: normal;
+    font-size: 0.74rem;
+    opacity: 0.65;
+}
+
+body.dark-mode .pdf-cloned-quote {
+    background: rgba(230, 126, 34, 0.1);
+}
+
+/* ── Annotation notice banner ── */
+.pdf-annot-notice {
+    background: rgba(100, 170, 255, 0.1);
+    border: 1px solid rgba(100, 170, 255, 0.25);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.82rem;
+    color: #aad0ff;
+    font-family: 'Kalam', cursive;
+    width: calc(100% - 64px);
+    text-align: center;
+    margin-bottom: 4px;
 }
 
 @media (max-width: 768px) {

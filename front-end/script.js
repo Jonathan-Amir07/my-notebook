@@ -3962,6 +3962,177 @@ window.importPdfToCanvas = async (input) => {
 
 let pendingPdfInput = null;
 
+/* =====================================================================
+   PDF SPLIT SCREEN VIEWER  (Phase 1 – Power Annotation)
+   ===================================================================== */
+
+// Module-level state for the split viewer
+const PdfViewer = {
+    pdfDoc:        null,
+    currentPage:   1,
+    totalPages:    0,
+    pageCanvases:  [],   // map: pageNum → canvas element
+    fileName:      '',
+    blobUrl:       null,
+
+    // Return the chapter's annotations array (initialised on demand)
+    _annots() {
+        const ch = chapters.find(c => c.id === currentId);
+        if (!ch) return [];
+        if (!ch.annotations) ch.annotations = [];
+        return ch.annotations;
+    },
+
+    // Persist chapter back to DB
+    async _save() {
+        const ch = chapters.find(c => c.id === currentId);
+        if (ch) await saveChapterToDB(ch);
+    },
+
+    // ── Open viewer ──────────────────────────────────────────────────
+    async open(file) {
+        this.fileName = file.name.replace(/\.[^.]+$/, '');
+        document.getElementById('pdfViewerTitle').textContent = '📄 ' + this.fileName;
+        document.getElementById('pdfViewerPages').innerHTML =
+            '<div style="text-align:center;padding:40px;color:#aaa;">⏳ Rendering PDF…</div>';
+        document.body.classList.add('split-mode');
+
+        const arrayBuffer = await file.arrayBuffer();
+        if (this.blobUrl) URL.revokeObjectURL(this.blobUrl);
+        this.blobUrl = null;
+
+        try {
+            this.pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        } catch (e) {
+            document.getElementById('pdfViewerPages').innerHTML =
+                '<div style="text-align:center;padding:40px;color:#f55;">⚠️ Could not read PDF.</div>';
+            return;
+        }
+
+        this.totalPages = this.pdfDoc.numPages;
+        this.currentPage = 1;
+        this.pageCanvases = {};
+
+        await this._renderAll();
+        this._updateNav();
+        this._reapplyHighlights();
+
+        showToast(`📖 ${this.fileName} — ${this.totalPages} pages`);
+    },
+
+    // ── Render all pages into #pdfViewerPages ────────────────────────
+    async _renderAll() {
+        const container = document.getElementById('pdfViewerPages');
+        container.innerHTML = '';
+
+        for (let p = 1; p <= this.totalPages; p++) {
+            const pageEl = document.createElement('div');
+            pageEl.className = 'pdf-page-wrapper';
+            pageEl.dataset.page = p;
+
+            // Canvas
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-page-canvas';
+
+            // Text layer
+            const textLayerDiv = document.createElement('div');
+            textLayerDiv.className = 'pdf-text-layer';
+
+            pageEl.appendChild(canvas);
+            pageEl.appendChild(textLayerDiv);
+            container.appendChild(pageEl);
+            this.pageCanvases[p] = canvas;
+
+            // Render asynchronously but in order
+            await this._renderPage(p, canvas, textLayerDiv);
+        }
+    },
+
+    // ── Render a single page ─────────────────────────────────────────
+    async _renderPage(pageNum, canvas, textLayerDiv) {
+        const page = await this.pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1.4 });
+
+        canvas.width  = viewport.width;
+        canvas.height = viewport.height;
+        textLayerDiv.style.width  = viewport.width + 'px';
+        textLayerDiv.style.height = viewport.height + 'px';
+
+        await page.render({
+            canvasContext: canvas.getContext('2d'),
+            viewport
+        }).promise;
+
+        // Build text layer for selection
+        const textContent = await page.getTextContent();
+        textLayerDiv.innerHTML = '';
+        pdfjsLib.renderTextLayer({
+            textContentSource: textContent,
+            container:         textLayerDiv,
+            viewport,
+            textDivs:          []
+        });
+    },
+
+    // ── Navigation ───────────────────────────────────────────────────
+    scrollToPage(pageNum) {
+        pageNum = Math.max(1, Math.min(pageNum, this.totalPages));
+        this.currentPage = pageNum;
+        const el = document.querySelector(`.pdf-page-wrapper[data-page="${pageNum}"]`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        this._updateNav();
+    },
+
+    _updateNav() {
+        document.getElementById('pdfPageInfo').textContent =
+            this.totalPages ? `${this.currentPage} / ${this.totalPages}` : '— / —';
+    },
+
+    // Watch scrolling to update currentPage counter
+    _onScroll() {
+        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
+        const pagesArea = document.getElementById('pdfViewerPages');
+        const mid = pagesArea.scrollTop + pagesArea.clientHeight / 2;
+        let best = 1;
+        wrappers.forEach(w => {
+            if (w.offsetTop <= mid) best = parseInt(w.dataset.page);
+        });
+        if (best !== this.currentPage) {
+            this.currentPage = best;
+            this._updateNav();
+        }
+    },
+
+    // ── Highlights persistence ───────────────────────────────────────
+    _reapplyHighlights() {
+        // Re-mark spans that match saved annotation text on page load
+        // (Full span-based highlight is applied by the Highlight button live;
+        //  on reload we denote them as a visual reminder block.)
+        const annots = this._annots();
+        if (!annots.length) return;
+        // Simple: add a sticky note marker at the top of the pane listing highlights
+        let noticeHtml = '<div class="pdf-annot-notice">📌 ' +
+            annots.length + ' saved highlight(s) in this document</div>';
+        const container = document.getElementById('pdfViewerPages');
+        if (!container.querySelector('.pdf-annot-notice')) {
+            container.insertAdjacentHTML('afterbegin', noticeHtml);
+        }
+    },
+
+    // ── Close ────────────────────────────────────────────────────────
+    close() {
+        document.body.classList.remove('split-mode');
+        document.getElementById('pdfViewerPages').innerHTML = '';
+        document.getElementById('pdfViewerTitle').textContent = '📄 PDF Reader';
+        document.getElementById('pdfPageInfo').textContent = '— / —';
+        document.getElementById('pdfSelectionBar').style.display = 'none';
+        this.pdfDoc = null;
+        this.pageCanvases = {};
+        if (this.blobUrl) { URL.revokeObjectURL(this.blobUrl); this.blobUrl = null; }
+    }
+};
+
+// — Existing modal helpers (unchanged) —
 window.loadLecturePdf = (input) => {
     if (!input.files || !input.files[0]) return;
     pendingPdfInput = input;
@@ -3982,15 +4153,121 @@ window.resolvePdfMode = (mode) => {
     if (mode === 'annotate') {
         importPdfToCanvas(pendingPdfInput);
     } else {
+        // UPGRADED: use the new interactive viewer instead of iframe
         const file = pendingPdfInput.files[0];
-        const url = URL.createObjectURL(file);
-        document.getElementById('lectureFrame').src = url;
-        document.body.classList.add('split-mode');
-        showToast("Lecture Loaded in Split View");
+        PdfViewer.open(file).catch(err => {
+            console.error('PDF viewer error:', err);
+            showToast('⚠️ Error opening PDF');
+        });
     }
     document.getElementById('pdfModeModal').style.display = 'none';
-    pendingPdfInput = null;
+    if (pendingPdfInput) { pendingPdfInput.value = ''; pendingPdfInput = null; }
 };
+
+// — Wire up viewer controls on DOM ready —
+(function initPdfViewerControls() {
+    function attachOnce(id, event, handler) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener(event, handler);
+    }
+
+    function setup() {
+        // Close
+        attachOnce('pdfViewerClose', 'click', () => PdfViewer.close());
+
+        // Prev / Next
+        attachOnce('pdfPrevPage', 'click', () => PdfViewer.scrollToPage(PdfViewer.currentPage - 1));
+        attachOnce('pdfNextPage', 'click', () => PdfViewer.scrollToPage(PdfViewer.currentPage + 1));
+
+        // Scroll tracking
+        const pagesArea = document.getElementById('pdfViewerPages');
+        if (pagesArea) {
+            pagesArea.addEventListener('scroll', () => PdfViewer._onScroll(), { passive: true });
+        }
+
+        // ── Selection toolbar ──────────────────────────────────────
+        const selBar = document.getElementById('pdfSelectionBar');
+
+        pagesArea && pagesArea.addEventListener('mouseup', (e) => {
+            const selText = window.getSelection()?.toString().trim();
+            if (!selText) { selBar.style.display = 'none'; return; }
+
+            // Position near cursor
+            const rect = pagesArea.getBoundingClientRect();
+            selBar.style.display = 'flex';
+            selBar.style.left = Math.min(e.clientX - rect.left, rect.width - 200) + 'px';
+            selBar.style.top  = (e.clientY - rect.top - 42) + 'px';
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (!selBar.contains(e.target)) selBar.style.display = 'none';
+        });
+
+        // Highlight button
+        attachOnce('pdfHighlightBtn', 'click', () => {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount || !sel.toString().trim()) return;
+            const selectedText = sel.toString().trim();
+            const range = sel.getRangeAt(0);
+
+            // Wrap selected spans in a <mark>
+            const mark = document.createElement('mark');
+            mark.className = 'pdf-highlight';
+            try { range.surroundContents(mark); } catch { /* partial selection — skip wrapping */ }
+
+            // Persist annotation
+            const pageEl = sel.anchorNode?.parentElement?.closest('.pdf-page-wrapper');
+            const page = pageEl ? parseInt(pageEl.dataset.page) : PdfViewer.currentPage;
+            const annots = PdfViewer._annots();
+            annots.push({ type: 'highlight', page, text: selectedText.slice(0, 200) });
+            PdfViewer._save();
+
+            sel.removeAllRanges();
+            selBar.style.display = 'none';
+            showToast('🖊 Highlight saved');
+        });
+
+        // Clone to Note button
+        attachOnce('pdfCloneBtn', 'click', async () => {
+            const selText = window.getSelection()?.toString().trim();
+            if (!selText) return;
+
+            const pageEl = window.getSelection()?.anchorNode?.parentElement?.closest('.pdf-page-wrapper');
+            const page = pageEl ? parseInt(pageEl.dataset.page) : PdfViewer.currentPage;
+            const citation = `<em style="font-size:0.75rem;opacity:0.65;">— From <strong>${PdfViewer.fileName}</strong>, p.${page}</em>`;
+            const blockquote = `<blockquote class="pdf-cloned-quote">${selText}${citation}</blockquote><p><br></p>`;
+
+            // Insert into the active note's content area
+            const activeArea = document.querySelector(`#page-block-${currentId} .content-area`)
+                            || document.querySelector('.content-area');
+            if (activeArea) {
+                activeArea.focus();
+                document.execCommand('insertHTML', false, blockquote);
+                // Save the chapter
+                const ch = chapters.find(c => c.id === currentId);
+                if (ch) {
+                    ch.content = activeArea.innerHTML;
+                    await saveChapterToDB(ch);
+                }
+            }
+
+            // Also save as annotation
+            const annots = PdfViewer._annots();
+            annots.push({ type: 'cloned', page, text: selText.slice(0, 200), noteId: currentId });
+            await PdfViewer._save();
+
+            window.getSelection()?.removeAllRanges();
+            selBar.style.display = 'none';
+            showToast('📋 Text cloned to note!');
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setup);
+    } else {
+        setup();
+    }
+})();
 
 // --- TOOLBAR SWITCHING ---
 function updateToolVisibility(chapter) {
@@ -5156,29 +5433,84 @@ window.startFlashcardMode = () => {
 function generateFlashcards() {
     flashcards = [];
 
-    // Scan ALL content areas in the stream
-    const editors = document.querySelectorAll('#sequentialStream .content-area');
+    // --- Strategy 1: Template-Specific Scanning ---
+    
+    // A. Cornell Notes
+    document.querySelectorAll('.cornell-container').forEach(root => {
+        const cuesNode = root.querySelector('#cornellCues');
+        const notesNode = root.querySelector('#cornellNotes');
+        if (cuesNode && notesNode) {
+            // Find all cues (excluding the title)
+            const cues = Array.from(cuesNode.querySelectorAll('div, p')).filter(el => !el.classList.contains('cornell-cues-title') && el.innerText.trim());
+            if (cues.length > 0) {
+                // If there are specific cues, they serve as Questions. 
+                // The answer is the relevant content from the notes section.
+                // Simplified: use each cue as a Q, and the whole notes summary as A if no better match.
+                cues.forEach(cue => {
+                    flashcards.push({
+                        q: cue.innerText.trim(),
+                        a: notesNode.innerText.trim() 
+                    });
+                });
+            }
+        }
+    });
+
+    // B. Outlines
+    document.querySelectorAll('#outlineContent').forEach(root => {
+        const items = Array.from(root.querySelectorAll('.outline-item'));
+        let currentQ = null;
+        let currentA = '';
+        
+        items.forEach(item => {
+            if (item.classList.contains('level-1')) {
+                if (currentQ && currentA.trim()) flashcards.push({ q: currentQ, a: currentA.trim() });
+                currentQ = item.innerText.replace(/^[IVXLC\d]+\.\s*/i, '').trim(); // Remove Roman/Arabic numerals
+                currentA = '';
+            } else if (currentQ) {
+                currentA += item.innerText.trim() + '\n';
+            }
+        });
+        if (currentQ && currentA.trim()) flashcards.push({ q: currentQ, a: currentA.trim() });
+    });
+
+    // C. Mindmaps
+    document.querySelectorAll('.mindmap-container').forEach(root => {
+        const central = root.querySelector('.mindmap-node.central input')?.value;
+        const nodes = Array.from(root.querySelectorAll('.mindmap-node:not(.central) input'));
+        if (central && nodes.length > 0) {
+            nodes.forEach(node => {
+                if (node.value.trim()) {
+                    flashcards.push({ q: `Regarding ${central}:`, a: node.value.trim() });
+                }
+            });
+        }
+    });
+
+    // --- Strategy 2: Global Content Scanning ---
+    
+    // Scan ALL content areas (Standard notes and the rest of the stream)
+    const editors = document.querySelectorAll('.content-area, .sequence-editor-block');
 
     editors.forEach(editor => {
         // Strategy A: "Question :: Answer"
-        // We scan text content for '::'
-        // Simplification: iterate over block elements
-        const blocks = editor.querySelectorAll('p, li, h1, h2, h3, h4, div');
+        const blocks = editor.querySelectorAll('p, li, h1, h2, h3, h4, div, blockquote');
         blocks.forEach(block => {
             const text = block.innerText;
             if (text.includes('::')) {
                 const parts = text.split('::');
                 if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
-                    flashcards.push({
-                        q: parts[0].trim(),
-                        a: parts[1].trim()
-                    });
+                    // Prevent duplicates from multiple selectors/strategies
+                    const q = parts[0].trim();
+                    const a = parts[1].trim();
+                    if (!flashcards.some(f => f.q === q && f.a === a)) {
+                        flashcards.push({ q, a });
+                    }
                 }
             }
         });
 
         // Strategy B: Header (Q) -> Body (A)
-        // We iterate children directly
         const children = Array.from(editor.children);
         let currentQ = null;
         let currentA = '';
@@ -5188,28 +5520,23 @@ function generateFlashcards() {
             const tag = node.tagName.toLowerCase();
 
             if (['h1', 'h2', 'h3'].includes(tag)) {
-                // If we have a pending card, push it
                 if (currentQ && currentA.trim()) {
-                    flashcards.push({ q: currentQ, a: currentA.trim() });
+                    if (!flashcards.some(f => f.q === currentQ)) {
+                        flashcards.push({ q: currentQ, a: currentA.trim() });
+                    }
                 }
-                // Start new card
-                currentQ = node.innerText;
+                currentQ = node.innerText.trim();
                 currentA = '';
             } else if (currentQ) {
-                // Append to answer if not a new header
-                // Skip empty text nodes if possible, but innerText handles it
-                if (node.innerText.trim()) {
-                    // Don't include lines that were already caught by "::" logic to avoid dupes?
-                    if (!node.innerText.includes('::')) {
-                        currentA += node.innerText + '\n';
-                    }
+                if (node.innerText.trim() && !node.innerText.includes('::')) {
+                    currentA += node.innerText.trim() + '\n';
                 }
             }
         }
-
-        // Push last card for this editor
         if (currentQ && currentA.trim()) {
-            flashcards.push({ q: currentQ, a: currentA.trim() });
+            if (!flashcards.some(f => f.q === currentQ)) {
+                flashcards.push({ q: currentQ, a: currentA.trim() });
+            }
         }
     });
 }

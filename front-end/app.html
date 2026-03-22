@@ -753,13 +753,25 @@
                 </button>
             </div>
         </main>
-        <!-- LECTURE PANE (RIGHT SPLIT) -->
+        <!-- LECTURE PANE (RIGHT SPLIT) — JS-driven PDF viewer -->
         <div class="lecture-pane" id="lecturePane">
-            <div class="lecture-header">
-                <span>📚 Lecture Reader</span>
-                <button class="bubble-btn" id="_auto_80">✖ Close</button>
+            <!-- Toolbar -->
+            <div id="pdfViewerToolbar">
+                <span id="pdfViewerTitle">📄 PDF Reader</span>
+                <div id="pdfViewerNav">
+                    <button id="pdfPrevPage" title="Previous page">◀</button>
+                    <span id="pdfPageInfo">— / —</span>
+                    <button id="pdfNextPage" title="Next page">▶</button>
+                </div>
+                <button id="pdfViewerClose" title="Close PDF">✖ Close</button>
             </div>
-            <iframe class="lecture-frame" id="lectureFrame"></iframe>
+            <!-- Scrollable pages canvas area -->
+            <div id="pdfViewerPages"></div>
+            <!-- Floating toolbar shown on text selection -->
+            <div id="pdfSelectionBar">
+                <button id="pdfHighlightBtn">🖊 Highlight</button>
+                <button id="pdfCloneBtn">📋 Clone to Note</button>
+            </div>
         </div>
     </div>
     <!-- METADATA MODAL -->
@@ -1374,6 +1386,7 @@
             line-height: 1.55;
             display: -webkit-box;
             -webkit-line-clamp: 3;
+            line-clamp: 3;
             -webkit-box-orient: vertical;
             overflow: hidden;
             margin-bottom: 10px;
