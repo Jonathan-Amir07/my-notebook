@@ -4051,7 +4051,14 @@ const PdfViewer = {
     // ── Render a single page ─────────────────────────────────────────
     async _renderPage(pageNum, canvas, textLayerDiv) {
         const page = await this.pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 1.4 });
+        
+        // Calculate dynamic scale to fit width
+        const container = document.getElementById('pdfViewerPages');
+        const containerWidth = (container?.clientWidth || 500) - 40; 
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const dynamicScale = Math.min(containerWidth / unscaledViewport.width, 1.5); 
+        
+        const viewport = page.getViewport({ scale: dynamicScale });
 
         canvas.width  = viewport.width;
         canvas.height = viewport.height;
