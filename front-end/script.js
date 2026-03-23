@@ -5351,7 +5351,7 @@ window.parseRawHtmlToSequence = function (htmlText) {
         title: title,
         content: content,
         sections: null,
-        tags: ['html-import'],
+        tags: [],
         category: 'Imported',
         author: 'Unknown',
         metadata: {
