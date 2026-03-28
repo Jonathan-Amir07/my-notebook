@@ -3966,39 +3966,44 @@ window.renderInlinePdf = async (chapter, container, preloadedPdf = null) => {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const scale = Math.min(containerWidth / unscaledViewport.width, 1.5);
-        const viewport = page.getViewport({ scale });
+        const cssScale = Math.min(containerWidth / unscaledViewport.width, 1.5);
+        const cssViewport = page.getViewport({ scale: cssScale });
+        
+        const pixelRatio = window.devicePixelRatio || 1;
+        const renderViewport = page.getViewport({ scale: cssScale * pixelRatio });
 
         const pageWrapper = document.createElement('div');
         pageWrapper.className = 'pdf-page-wrapper';
         pageWrapper.dataset.page = i;
 
-        // Render Canvas
+        // Render Canvas (High-DPI)
         const canvas = document.createElement('canvas');
         canvas.className = 'pdf-page-canvas';
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        canvas.style.width = cssViewport.width + 'px';
+        canvas.style.height = cssViewport.height + 'px';
+        canvas.width = renderViewport.width;
+        canvas.height = renderViewport.height;
         const context = canvas.getContext('2d');
         
         // Setup Text Layer
         const textLayerDiv = document.createElement('div');
         textLayerDiv.className = 'pdf-text-layer textLayer';
-        textLayerDiv.style.width = viewport.width + 'px';
-        textLayerDiv.style.height = viewport.height + 'px';
-        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+        textLayerDiv.style.width = cssViewport.width + 'px';
+        textLayerDiv.style.height = cssViewport.height + 'px';
+        textLayerDiv.style.setProperty('--scale-factor', cssViewport.scale);
 
         pageWrapper.appendChild(canvas);
         pageWrapper.appendChild(textLayerDiv);
         container.appendChild(pageWrapper);
 
         // Async render visual + text map
-        await page.render({ canvasContext: context, viewport }).promise;
+        await page.render({ canvasContext: context, viewport: renderViewport }).promise;
         
         const textContent = await page.getTextContent();
         await pdfjsLib.renderTextLayer({
             textContentSource: textContent,
             container: textLayerDiv,
-            viewport,
+            viewport: cssViewport,
             textDivs: []
         }).promise;
 
@@ -4081,10 +4086,10 @@ const PdfViewer = {
         const container = document.getElementById('pdfViewerPages');
         container.innerHTML = '';
 
-        // Ensure the container has expanded before measuring
-        // (Transition from 0 to 50% takes 300ms, but we can measure after a bit)
+        // Ensure the container has expanded completely before measuring.
+        // The split-mode CSS transition takes 0.3s, so we wait 350ms.
         if (container.clientWidth < 100) {
-            await new Promise(r => setTimeout(r, 150));
+            await new Promise(r => setTimeout(r, 350));
         }
         this.viewerWidth = (container.clientWidth || 500) - 40;
 
@@ -4115,32 +4120,38 @@ const PdfViewer = {
     async _renderPage(pageNum, canvas, textLayerDiv) {
         const page = await this.pdfDoc.getPage(pageNum);
         
-        // Use stored viewer width for consistent scaling
+        // Logical CSS scale and viewport
         const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const dynamicScale = Math.min(this.viewerWidth / unscaledViewport.width, 1.5); 
-        
-        const viewport = page.getViewport({ scale: dynamicScale });
+        const cssScale = Math.min(this.viewerWidth / unscaledViewport.width, 1.5); 
+        const cssViewport = page.getViewport({ scale: cssScale });
 
-        canvas.width  = viewport.width;
-        canvas.height = viewport.height;
-        textLayerDiv.style.width  = viewport.width + 'px';
-        textLayerDiv.style.height = viewport.height + 'px';
+        // Physical high-DPI render bounds
+        const pixelRatio = window.devicePixelRatio || 1;
+        const renderViewport = page.getViewport({ scale: cssScale * pixelRatio });
+
+        canvas.style.width  = cssViewport.width + 'px';
+        canvas.style.height = cssViewport.height + 'px';
+        canvas.width  = renderViewport.width;
+        canvas.height = renderViewport.height;
+
+        textLayerDiv.style.width  = cssViewport.width + 'px';
+        textLayerDiv.style.height = cssViewport.height + 'px';
 
         await page.render({
             canvasContext: canvas.getContext('2d'),
-            viewport
+            viewport: renderViewport
         }).promise;
 
-        // Build text layer for selection
+        // Build text layer for selection (must use CSS viewport to map 1:1 visually)
         const textContent = await page.getTextContent();
         textLayerDiv.innerHTML = '';
         textLayerDiv.className = 'pdf-text-layer textLayer';
-        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+        textLayerDiv.style.setProperty('--scale-factor', cssViewport.scale);
 
         await pdfjsLib.renderTextLayer({
             textContentSource: textContent,
             container:         textLayerDiv,
-            viewport,
+            viewport:          cssViewport,
             textDivs:          []
         }).promise;
 
