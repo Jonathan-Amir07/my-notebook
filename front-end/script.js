@@ -3899,65 +3899,121 @@ window.importPdfToCanvas = async (input) => {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
 
-        // Get the current content area (where user edits)
         const contentArea = document.querySelector('.content-area');
         if (!contentArea) {
             showToast("⚠️ Please create a page first");
             return;
         }
 
-        // Clear existing content and prepare for PDF
         contentArea.innerHTML = '';
         contentArea.style.position = 'relative';
 
-        const pdfPagesData = [];
-        const pdfContainer = document.createElement('div');
-        pdfContainer.style.cssText = 'position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 20px;';
-
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
-
-            const canvas = document.createElement('canvas');
-            canvas.className = 'pdf-page-render';
-            canvas.style.cssText = 'max-width: 100%; height: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: white;';
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-
-            await page.render({
-                canvasContext: context,
-                viewport: viewport
-            }).promise;
-
-            // Create wrapper for each page
-            const pageWrapper = document.createElement('div');
-            pageWrapper.style.cssText = 'position: relative; width: 100%; display: flex; justify-content: center;';
-            pageWrapper.appendChild(canvas);
-            pdfContainer.appendChild(pageWrapper);
-
-            pdfPagesData.push(canvas.toDataURL('image/jpeg', 0.8));
-        }
-
-        // Inject PDF into content area
-        contentArea.appendChild(pdfContainer);
-        contentArea.contentEditable = 'true'; // Allow annotations on top
+        const inlineContainer = document.createElement('div');
+        inlineContainer.className = 'inline-pdf-container';
+        inlineContainer.contentEditable = 'false'; // Keep selection logic intact
+        inlineContainer.dataset.hasPdf = 'true';
+        contentArea.appendChild(inlineContainer);
+        // Ensure user can still type in the content area outside the PDF
+        contentArea.contentEditable = 'true';
 
         const chapter = chapters.find(c => c.id === currentId);
         if (chapter) {
-            chapter.pdfPages = pdfPagesData;
-            chapter.content = contentArea.innerHTML; // Save the PDF-injected content
-            await saveChapterToDB(chapter);
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                chapter.pdfFileBase64 = reader.result; // Saves the base64 PDF string (much smaller than JPEGs)
+                chapter.content = contentArea.innerHTML;
+                await saveChapterToDB(chapter);
+                
+                await window.renderInlinePdf(chapter, inlineContainer, pdf);
+                setTimeout(resizeCanvas, 100);
+                showToast(`✓ PDF loaded: ${pdf.numPages} pages. Use mouse to highlight text!`);
+            };
         }
-
-        setTimeout(resizeCanvas, 100);
-        showToast(`✓ PDF loaded: ${pdf.numPages} pages. Click to add annotations!`);
 
     } catch (err) {
         console.error(err);
         showToast("Error reading PDF");
     }
+};
+
+// --- RENDER INLINE PDF FOR 'ANNOTATE ON PAPER' ---
+window.renderInlinePdf = async (chapter, container, preloadedPdf = null) => {
+    if (!chapter.pdfFileBase64) return;
+    
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">⏳ Loading PDF pages...</div>';
+    
+    let pdf;
+    try {
+        if (preloadedPdf) {
+            pdf = preloadedPdf;
+        } else {
+            // Load from base64 string
+            const base64Data = chapter.pdfFileBase64.split(',')[1] || chapter.pdfFileBase64;
+            const pdfData = atob(base64Data);
+            const array = new Uint8Array(pdfData.length);
+            for (let i = 0; i < pdfData.length; i++) array[i] = pdfData.charCodeAt(i);
+            pdf = await pdfjsLib.getDocument(array).promise;
+        }
+    } catch (e) {
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:#f55;">⚠️ Failed to load PDF</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    const containerWidth = (document.getElementById('sequentialStream')?.clientWidth || 800) - 40;
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const scale = Math.min(containerWidth / unscaledViewport.width, 1.5);
+        const viewport = page.getViewport({ scale });
+
+        const pageWrapper = document.createElement('div');
+        pageWrapper.className = 'pdf-page-wrapper';
+        pageWrapper.dataset.page = i;
+
+        // Render Canvas
+        const canvas = document.createElement('canvas');
+        canvas.className = 'pdf-page-canvas';
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const context = canvas.getContext('2d');
+        
+        // Setup Text Layer
+        const textLayerDiv = document.createElement('div');
+        textLayerDiv.className = 'pdf-text-layer textLayer';
+        textLayerDiv.style.width = viewport.width + 'px';
+        textLayerDiv.style.height = viewport.height + 'px';
+        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+
+        pageWrapper.appendChild(canvas);
+        pageWrapper.appendChild(textLayerDiv);
+        container.appendChild(pageWrapper);
+
+        // Async render visual + text map
+        await page.render({ canvasContext: context, viewport }).promise;
+        
+        const textContent = await page.getTextContent();
+        await pdfjsLib.renderTextLayer({
+            textContentSource: textContent,
+            container: textLayerDiv,
+            viewport,
+            textDivs: []
+        }).promise;
+
+        // Reapply highlights
+        if (PdfViewer && PdfViewer._applyHighlightsToPage) {
+            // Temporarily mock PdfViewer annots to use the global chapter for rendering inline hits
+            const originalAnnots = PdfViewer._annots;
+            PdfViewer._annots = () => chapter.annotations || [];
+            PdfViewer._applyHighlightsToPage(i, textLayerDiv);
+            PdfViewer._annots = originalAnnots;
+        }
+    }
+    
+    // Resize the overlay drawing canvas over the new long PDF
+    setTimeout(resizeCanvas, 300);
 };
 
 let pendingPdfInput = null;
@@ -4268,7 +4324,11 @@ window.resolvePdfMode = (mode) => {
             document.querySelectorAll('.pdf-sel-overlay').forEach(el => el.remove());
         }
 
-        pagesArea && pagesArea.addEventListener('mouseup', (e) => {
+        document.addEventListener('mouseup', (e) => {
+            // Only trigger if we are selecting text inside a PDF page
+            const pageWrapper = e.target.closest('.pdf-page-wrapper') || e.target.closest('.pdf-text-layer');
+            if (!pageWrapper) return;
+
             const selText = window.getSelection()?.toString().trim();
             if (!selText) {
                 selBar.style.display = 'none';
@@ -4279,11 +4339,10 @@ window.resolvePdfMode = (mode) => {
             // Draw visual overlay over selected text
             drawSelectionOverlay();
 
-            // Position toolbar near cursor
-            const rect = pagesArea.getBoundingClientRect();
+            // Position toolbar near cursor globally
             selBar.style.display = 'flex';
-            selBar.style.left = Math.min(e.clientX - rect.left, rect.width - 200) + 'px';
-            selBar.style.top  = (e.clientY - rect.top - 48) + 'px';
+            selBar.style.left = Math.min(e.clientX + 10, window.innerWidth - 180) + 'px';
+            selBar.style.top  = Math.max(10, e.clientY - 48) + 'px';
         });
 
         document.addEventListener('mousedown', (e) => {
@@ -10639,6 +10698,14 @@ class VirtualScrollManager {
         contentArea.innerHTML = chapter.content || '&lt;p&gt;Start typing...&lt;/p&gt;';
         contentArea.dataset.chapterId = chapter.id;
 
+        if (chapter.pdfFileBase64) {
+            const inlineContainer = contentArea.querySelector('.inline-pdf-container');
+            if (inlineContainer && window.renderInlinePdf) {
+                // Pre-render lazily
+                window.renderInlinePdf(chapter, inlineContainer).catch(console.error);
+            }
+        }
+
         if (index > 0) {
             contentArea.style.paddingTop = '1rem';
         }
@@ -11432,6 +11499,14 @@ function executeLoadChapterLogic(chapter, id, highlightQuery = '') {
             contentArea.contentEditable = 'true';
             contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
             contentArea.dataset.chapterId = ch.id;
+
+            if (ch.pdfFileBase64) {
+                const inlineContainer = contentArea.querySelector('.inline-pdf-container');
+                if (inlineContainer && window.renderInlinePdf) {
+                    // Start rendering asynchronously so we don't block the UI thread
+                    window.renderInlinePdf(ch, inlineContainer).catch(console.error);
+                }
+            }
 
             // Adjust padding for subsequent pages if they have a title
             if (index > 0) {
