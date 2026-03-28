@@ -6125,6 +6125,24 @@ window.handleImageUpload = (e) => {
 
 // --- UPDATED LOAD CHAPTER ---
 function loadChapter(id) {
+    const existingBlock = document.getElementById(`page-block-${id}`);
+    if (existingBlock) {
+        currentId = id;
+        document.querySelectorAll('.sequence-editor-block').forEach(b => b.classList.remove('active-focus'));
+        existingBlock.classList.add('active-focus');
+        existingBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        const chapter = chapters.find(c => c.id === id);
+        if (chapter) {
+            document.getElementById('pageTitle').value = chapter.title;
+            updateToolVisibility(chapter);
+            selectWritingTool(chapter.tool || 'pen', false);
+        }
+        renderSidebar();
+        document.getElementById('mainSidebar').classList.remove('open');
+        return;
+    }
+
     currentId = id;
     undoStack = []; redoStack = [];
     const chapter = chapters.find(c => c.id === id);
