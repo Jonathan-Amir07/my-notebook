@@ -2,7 +2,7 @@
     "name": "Academic Notebook",
     "short_name": "Notebook",
     "description": "Your entirely digital, infinitely smart study notebook.",
-    "start_url": "/app.html",
+    "start_url": "/app",
     "scope": "/",
     "display": "standalone",
     "background_color": "#2c3e50",

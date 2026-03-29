@@ -1,11 +1,12 @@
-const CACHE_NAME = 'academic-notebook-v2';
+const CACHE_NAME = 'academic-notebook-v3';
 
 // We explicitly cache ONLY the main shell files.
 // Additional files requested during runtime will be added dynamically.
 const PRECACHE_URLS = [
     '/',
-    '/app.html',
-    '/index.html',
+    '/app',
+    '/login',
+    '/library',
     '/styles.css',
     '/script.js',
     '/manifest.json',
