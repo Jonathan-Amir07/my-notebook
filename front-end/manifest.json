@@ -1,0 +1,28 @@
+{
+    "name": "Academic Notebook",
+    "short_name": "Notebook",
+    "description": "Your entirely digital, infinitely smart study notebook.",
+    "start_url": "/app.html",
+    "display": "standalone",
+    "background_color": "#2c3e50",
+    "theme_color": "#2c3e50",
+    "icons": [
+        {
+            "src": "assets/icon.svg",
+            "type": "image/svg+xml",
+            "sizes": "any"
+        },
+        {
+            "src": "assets/icon-192.png",
+            "type": "image/png",
+            "sizes": "192x192",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "assets/icon-512.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "any maskable"
+        }
+    ]
+}

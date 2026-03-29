@@ -7509,56 +7509,50 @@ window.showToast = (msg) => {
     setTimeout(() => t.classList.remove('show'), 3000);
 };
 
-// --- PWA LOGIC ---
-const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#2c3e50"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="300">📝</text></svg>`;
-const iconUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(iconSVG)}`;
-
-document.getElementById('appIcon').href = iconUrl;
-document.getElementById('appleIcon').href = iconUrl;
-
-const manifest = {
-    "name": "Academic Notebook",
-    "short_name": "Notebook",
-    "start_url": ".",
-    "display": "standalone",
-    "background_color": "#fdfbf7",
-    "theme_color": "#2c3e50",
-    "orientation": "any",
-    "icons": [
-        {
-            "src": iconUrl,
-            "sizes": "512x512",
-            "type": "image/svg+xml",
-            "purpose": "any maskable"
-        }
-    ]
-};
-
-const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-document.getElementById('appManifest').href = URL.createObjectURL(manifestBlob);
+// --- NATIVE PWA LEVERAGE & OFFLINE CACHE LOGIC ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('✅ Service Worker registered with scope:', reg.scope))
+            .catch(err => console.error('❌ Service Worker registration failed:', err));
+    });
+}
 
 let deferredPrompt;
 const installBtn = document.getElementById('installAppBtn');
 
+// Hide initially until the heuristic triggers
+if (installBtn) installBtn.style.display = 'none';
+
 window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
     e.preventDefault();
+    // Stash the event so it can be triggered later.
     deferredPrompt = e;
-    installBtn.style.display = 'flex';
+    // Show the custom install button in the sidebar tools
+    if (installBtn) {
+        installBtn.style.display = 'flex';
+        installBtn.onclick = async () => {
+            // Show the native install prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond to the prompt
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User interaction with install prompt: ${outcome}`);
+            
+            if (outcome === 'accepted') {
+                installBtn.style.display = 'none';
+                showToast("App Installed Successfully!");
+            }
+            // Clear the deferredPrompt
+            deferredPrompt = null;
+        };
+    }
 });
 
-window.installPWA = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-        installBtn.style.display = 'none';
-    }
-    deferredPrompt = null;
-};
-
 window.addEventListener('appinstalled', () => {
-    installBtn.style.display = 'none';
-    showToast("App Installed Successfully!");
+    // Hide the install button once it acts like a native app
+    if (installBtn) installBtn.style.display = 'none';
+    console.log('✅ Academic Notebook flawlessly installed as a native app.');
 });
 
 // ==================== POMODORO TIMER ====================
