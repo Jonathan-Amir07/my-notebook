@@ -7401,3 +7401,8 @@ mark.search-highlight {
     border-radius: 2px;
     padding: 0 2px;
 }
+
+@keyframes popIn {
+    from { opacity: 0; transform: translate(-50%, -20px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}

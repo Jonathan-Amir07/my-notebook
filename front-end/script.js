@@ -107,9 +107,148 @@ class AuthManager {
 window.OAUTH_CONFIG = {};
 
 // ─────────────────────────────────────────────
-//  GLOBAL SINGLETON
-// ─────────────────────────────────────────────
 window.AUTH = new AuthManager();
+
+// ─────────────────────────────────────────────
+// REAL-TIME CLOUD SYNC ENGINE
+// ─────────────────────────────────────────────
+class SyncEngine {
+    constructor() {
+        this.lastSync = new Date().toISOString();
+        this.intervalId = null;
+        this.isEnabled = true;
+        
+        window.addEventListener('online', () => {
+            this.updateStatus('☁️ Back online, syncing...');
+            this.forceSync();
+        });
+        
+        window.addEventListener('offline', () => {
+            this.updateStatus('🔴 Offline (Saving locally)');
+        });
+        
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                this.forceSync();
+            }
+        });
+    }
+
+    start(intervalMs = 5000) {
+        if (!window.api || !window.api.auth.isLoggedIn()) return;
+        this.updateStatus('🟢 Synced');
+        this.intervalId = setInterval(() => this.performSync(), intervalMs);
+    }
+
+    stop() {
+        if (this.intervalId) clearInterval(this.intervalId);
+    }
+
+    updateStatus(msg) {
+        const statusEl = document.getElementById('saveStatus');
+        if (statusEl) statusEl.textContent = msg;
+    }
+    
+    forceSync() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = setInterval(() => this.performSync(), 5000);
+        }
+        this.performSync();
+    }
+
+    async performSync() {
+        if (!navigator.onLine || !this.isEnabled || !window.api || !window.api.auth.isLoggedIn()) return;
+        
+        try {
+            const data = await window.api.sync(this.lastSync);
+            this.lastSync = data.syncTime || new Date().toISOString();
+            
+            if (data.notes && data.notes.length > 0) {
+                this.processIncomingUpdates(data.notes);
+            }
+        } catch (err) {
+            console.warn('Background sync failed:', err);
+        }
+    }
+
+    processIncomingUpdates(incomingNotes) {
+        let needsSidebarRender = false;
+
+        incomingNotes.forEach(serverNote => {
+            const incomingData = serverNote.frontEndData || serverNote;
+            const existingIndex = chapters.findIndex(c => c.id === incomingData.id);
+            
+            if (existingIndex === -1) {
+                // New note from another device
+                chapters.push(incomingData);
+                needsSidebarRender = true;
+            } else {
+                // Update existing note
+                // ONLY update if server timestamp is strictly newer
+                const localDate = new Date(chapters[existingIndex].updatedAt || 0);
+                const serverDate = new Date(incomingData.updatedAt || 0);
+                
+                if (serverDate > localDate) {
+                    chapters[existingIndex] = incomingData;
+                    needsSidebarRender = true;
+                    
+                    // If the updated note is CURRENTLY open on screen
+                    if (incomingData.id === currentId) {
+                        this.handleActiveDocumentUpdate(incomingData);
+                    }
+                }
+            }
+        });
+
+        if (needsSidebarRender) {
+            renderSidebar();
+            renderTagCloud();
+        }
+    }
+    
+    handleActiveDocumentUpdate(newData) {
+        const contentArea = document.querySelector(`.content-area[data-chapter-id="${newData.id}"]`) || document.querySelector('.content-area');
+        if (!contentArea) return;
+        
+        // Check if user is actively typing in it
+        const isTyping = document.activeElement && contentArea.contains(document.activeElement);
+        
+        if (isTyping) {
+            // Unobtrusive banner (avoid Edit Wars)
+            this.showConflictBanner();
+        } else {
+            // Safe to hot-swap content
+            contentArea.innerHTML = newData.content || '<p>Start typing...</p>';
+            
+            // Brief visual flash
+            contentArea.style.transition = 'background 0.3s';
+            contentArea.style.background = 'rgba(46, 204, 113, 0.15)';
+            setTimeout(() => contentArea.style.background = 'transparent', 300);
+            
+            this.updateStatus('✨ Remote changes applied');
+            setTimeout(() => this.updateStatus('🟢 Synced'), 3000);
+        }
+    }
+    
+    showConflictBanner() {
+        let banner = document.getElementById('syncConflictBanner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'syncConflictBanner';
+            banner.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:10px 20px; border-radius:20px; box-shadow:0 4px 15px rgba(0,0,0,0.2); z-index:9999; display:flex; gap:15px; align-items:center; animation: popIn 0.3s ease-out;';
+            banner.innerHTML = `
+                <span>✨ Note updated remotely.</span>
+                <button onclick="location.reload()" style="background:white; color:var(--primary); border:none; padding:4px 10px; border-radius:12px; cursor:pointer; font-weight:bold;">Refresh</button>
+                <button onclick="this.parentElement.remove()" style="background:transparent; color:white; border:1px solid white; padding:4px 10px; border-radius:12px; cursor:pointer;">Ignore</button>
+            `;
+            document.body.appendChild(banner);
+        }
+    }
+}
+
+window.SYNC_ENGINE = new SyncEngine();
+window.SYNC_ENGINE.start(5000);
 /**
  * SharedLibrary — Local shared notes library
  *
@@ -3096,17 +3235,18 @@ const DB_NAME = 'NotebookDB_vSeq_api_migrated';
 const STORE_NAME = 'chapters';
 let db = null; // Removed IndexedDB local reference
 
-async function initDB() {
-    return Promise.resolve(null);
-}
-
 async function saveChapterToDB(chapter) {
     if (!chapter.metadata) {
         chapter.metadata = { discipline: 'general', type: PAGE_TYPES.NOTE, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     }
     chapter.updatedAt = new Date().toISOString();
 
-    if (!window.api || !window.api.auth.isLoggedIn()) return;
+    if (!window.api || !window.api.auth.isLoggedIn()) {
+        if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('🔴 Saved locally (Not logged in)');
+        return;
+    }
+
+    if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('⏳ Saving to cloud...');
 
     try {
         if (chapter._id) {
@@ -3126,8 +3266,15 @@ async function saveChapterToDB(chapter) {
             chapter._id = data.note._id;
             chapter.id = data.note._id; // Make the frontend ID match the backend _id
         }
+        
+        // Keep sync horizon updated so we don't fetch our own save
+        if (window.SYNC_ENGINE) {
+            window.SYNC_ENGINE.updateStatus('🟢 Synced');
+            window.SYNC_ENGINE.lastSync = new Date().toISOString();
+        }
     } catch (err) {
         console.error('Failed to save chapter to API:', err);
+        if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('🔴 Sync failed - Will retry');
     }
 }
 
