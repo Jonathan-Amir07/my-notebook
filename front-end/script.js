@@ -3966,7 +3966,7 @@ window.renderInlinePdf = async (chapter, container, preloadedPdf = null) => {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const cssScale = Math.min(containerWidth / unscaledViewport.width, 1.5);
+        const cssScale = Math.min(containerWidth / unscaledViewport.width, 3.5);
         const cssViewport = page.getViewport({ scale: cssScale });
         
         const pixelRatio = window.devicePixelRatio || 1;
@@ -4122,7 +4122,7 @@ const PdfViewer = {
         
         // Logical CSS scale and viewport
         const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const cssScale = Math.min(this.viewerWidth / unscaledViewport.width, 1.5); 
+        const cssScale = Math.min(this.viewerWidth / unscaledViewport.width, 3.5); 
         const cssViewport = page.getViewport({ scale: cssScale });
 
         // Physical high-DPI render bounds
