@@ -3,6 +3,7 @@
     "short_name": "Notebook",
     "description": "Your entirely digital, infinitely smart study notebook.",
     "start_url": "/app.html",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#2c3e50",
     "theme_color": "#2c3e50",

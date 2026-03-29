@@ -12,6 +12,7 @@ const statsRoutes = require('./routes/stats');
 const syncRoutes = require('./routes/sync');
 const healthRoutes = require('./routes/health');
 const googleAuthRoutes = require('./routes/google-auth');
+const pipelineRoutes = require('./routes/pipeline');
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use('/api/library', libraryRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/pipeline', pipelineRoutes);
 
 // Root API info
 app.get('/api', (req, res) => {

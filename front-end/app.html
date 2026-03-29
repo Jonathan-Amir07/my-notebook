@@ -556,6 +556,7 @@
                 </div>
                 <div class="section-content" id="toolsContent">
                     <div class="sidebar-actions">
+                        <button class="btn btn-add" id="openPipelineBtn" style="background:#8e44ad; margin-bottom: 12px; font-weight: bold;">🔬 Study Pipeline</button>
                         <button class="btn" id="installAppBtn">📲 Install App</button>
                         <button class="btn" id="openLibraryPanelBtn" onclick="openLibraryPanel()"
                             style="background:rgba(255,255,255,0.15); color:#ecf0f1;">📚 Note Library</button>
@@ -1918,6 +1919,17 @@
         }
     </style>
     <!-- Circuit components functionality is in script.js -->
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('[SW] Registered, scope:', reg.scope))
+                    .catch(err => console.warn('[SW] Registration failed:', err));
+            });
+        }
+    </script>
 </body>
 
 </html>
