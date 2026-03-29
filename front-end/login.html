@@ -912,7 +912,7 @@
 
             // Already logged in → skip straight to the app
             if (window.api.auth.isLoggedIn()) {
-                window.location.replace('app.html');
+                window.location.replace('/app');
             }
         });
 
@@ -987,7 +987,7 @@
             const overlay = document.getElementById('successOverlay');
             document.getElementById('successText').textContent = message;
             overlay.classList.add('visible');
-            setTimeout(function () { window.location.replace('app.html'); }, 900);
+            setTimeout(function () { window.location.replace('/app'); }, 900);
         }
 
         // ─────────────────────────────────────────────

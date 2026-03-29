@@ -22,7 +22,7 @@
 
 class AuthManager {
     constructor() {
-        this.LOGIN_PAGE = 'login.html';
+        this.LOGIN_PAGE = '/login';
     }
 
     getCurrentUser() {
@@ -3156,7 +3156,7 @@ class WidgetRailManager {
     const isLoginPage = p.endsWith('login.html') || p.endsWith('/login') || p.endsWith('/login/');
 
     if (window.AUTH && !window.AUTH.isAuthenticated() && !isLoginPage) {
-        window.location.replace('login.html');
+        window.location.replace('/login');
     }
 })();
 // ─────────────────────────────────────────────────────────────────────────────

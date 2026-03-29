@@ -27,7 +27,7 @@ function getFrontEndUrl(req) {
 router.get('/google', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.redirect(
-            getFrontEndUrl(req) + '/login.html?error=oauth_unconfigured'
+            getFrontEndUrl(req) + '/login?error=oauth_unconfigured'
         );
     }
     passport.authenticate('google', {
@@ -42,7 +42,7 @@ router.get('/google/callback',
     (req, res, next) => {
         passport.authenticate('google', {
             session: false,
-            failureRedirect: getFrontEndUrl(req) + '/login.html?error=oauth_failed'
+            failureRedirect: getFrontEndUrl(req) + '/login?error=oauth_failed'
         })(req, res, next);
     },
     async (req, res) => {
@@ -50,11 +50,11 @@ router.get('/google/callback',
             const token = generateToken(req.user._id);
             const userObj = encodeURIComponent(JSON.stringify(req.user.toPublic()));
             res.redirect(
-                getFrontEndUrl(req) + `/login.html?token=${token}&user=${userObj}`
+                getFrontEndUrl(req) + `/login?token=${token}&user=${userObj}`
             );
         } catch (error) {
             console.error('OAuth callback error:', error);
-            res.redirect(getFrontEndUrl(req) + '/login.html?error=oauth_failed');
+            res.redirect(getFrontEndUrl(req) + '/login?error=oauth_failed');
         }
     }
 );

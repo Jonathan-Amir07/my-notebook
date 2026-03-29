@@ -56,7 +56,7 @@ async function apiRequest(endpoint, options = {}) {
                 endpoint !== '/auth/register') {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                window.location.href = '/login.html';
+                window.location.href = '/login';
             }
             throw new Error(data.error || `Request failed with status ${response.status}`);
         }
@@ -96,7 +96,7 @@ const auth = {
     logout() {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login.html';
+        window.location.href = '/login';
     },
 
     async getProfile() {
