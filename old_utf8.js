@@ -1,23 +1,23 @@
-/**
- * AuthManager — Local-only authentication system
+﻿/**
+ * AuthManager ΓÇö Local-only authentication system
  *
  * Stores users + sessions in localStorage.
  * Passwords are hashed with SHA-256 (Web Crypto API) before storage.
  * Each user gets their own IndexedDB and localStorage namespace.
  *
  * API (exposed as window.AUTH):
- *   AUTH.register(email, password, displayName) → Promise<{ok, error}>
- *   AUTH.login(email, password)                 → Promise<{ok, error}>
- *   AUTH.loginAsGuest()                         → {ok}
- *   AUTH.logout()                               → void (redirects to login.html)
- *   AUTH.getCurrentUser()                       → session object | null
- *   AUTH.isAuthenticated()                      → boolean
- *   AUTH.requireAuth()                          → boolean (redirects if false)
- *   AUTH.getDbName()                            → string  (per-user IndexedDB name)
- *   AUTH.getStorageKey(key)                     → string  (per-user localStorage key)
- *   AUTH.updateDisplayName(name)               → void
- *   AUTH.updatePassword(oldPw, newPw)          → Promise<{ok, error}>
- *   AUTH.deleteAccount()                        → Promise<void>
+ *   AUTH.register(email, password, displayName) ΓåÆ Promise<{ok, error}>
+ *   AUTH.login(email, password)                 ΓåÆ Promise<{ok, error}>
+ *   AUTH.loginAsGuest()                         ΓåÆ {ok}
+ *   AUTH.logout()                               ΓåÆ void (redirects to login.html)
+ *   AUTH.getCurrentUser()                       ΓåÆ session object | null
+ *   AUTH.isAuthenticated()                      ΓåÆ boolean
+ *   AUTH.requireAuth()                          ΓåÆ boolean (redirects if false)
+ *   AUTH.getDbName()                            ΓåÆ string  (per-user IndexedDB name)
+ *   AUTH.getStorageKey(key)                     ΓåÆ string  (per-user localStorage key)
+ *   AUTH.updateDisplayName(name)               ΓåÆ void
+ *   AUTH.updatePassword(oldPw, newPw)          ΓåÆ Promise<{ok, error}>
+ *   AUTH.deleteAccount()                        ΓåÆ Promise<void>
  */
 
 class AuthManager {
@@ -101,156 +101,17 @@ class AuthManager {
     }
 }
 
-// ─────────────────────────────────────────────
-//  OAUTH CONFIGURATION — Google only
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+//  OAUTH CONFIGURATION ΓÇö Google only
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 window.OAUTH_CONFIG = {};
 
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+//  GLOBAL SINGLETON
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 window.AUTH = new AuthManager();
-
-// ─────────────────────────────────────────────
-// REAL-TIME CLOUD SYNC ENGINE
-// ─────────────────────────────────────────────
-class SyncEngine {
-    constructor() {
-        this.lastSync = new Date().toISOString();
-        this.intervalId = null;
-        this.isEnabled = true;
-        
-        window.addEventListener('online', () => {
-            this.updateStatus('☁️ Back online, syncing...');
-            this.forceSync();
-        });
-        
-        window.addEventListener('offline', () => {
-            this.updateStatus('🔴 Offline (Saving locally)');
-        });
-        
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                this.forceSync();
-            }
-        });
-    }
-
-    start(intervalMs = 5000) {
-        if (!window.api || !window.api.auth.isLoggedIn()) return;
-        this.updateStatus('🟢 Synced');
-        this.intervalId = setInterval(() => this.performSync(), intervalMs);
-    }
-
-    stop() {
-        if (this.intervalId) clearInterval(this.intervalId);
-    }
-
-    updateStatus(msg) {
-        const statusEl = document.getElementById('saveStatus');
-        if (statusEl) statusEl.textContent = msg;
-    }
-    
-    forceSync() {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = setInterval(() => this.performSync(), 5000);
-        }
-        this.performSync();
-    }
-
-    async performSync() {
-        if (!navigator.onLine || !this.isEnabled || !window.api || !window.api.auth.isLoggedIn()) return;
-        
-        try {
-            const data = await window.api.sync(this.lastSync);
-            this.lastSync = data.syncTime || new Date().toISOString();
-            
-            if (data.notes && data.notes.length > 0) {
-                this.processIncomingUpdates(data.notes);
-            }
-        } catch (err) {
-            console.warn('Background sync failed:', err);
-        }
-    }
-
-    processIncomingUpdates(incomingNotes) {
-        let needsSidebarRender = false;
-
-        incomingNotes.forEach(serverNote => {
-            const incomingData = serverNote.frontEndData || serverNote;
-            const existingIndex = chapters.findIndex(c => c.id === incomingData.id);
-            
-            if (existingIndex === -1) {
-                // New note from another device
-                chapters.push(incomingData);
-                needsSidebarRender = true;
-            } else {
-                // Update existing note
-                // ONLY update if server timestamp is strictly newer
-                const localDate = new Date(chapters[existingIndex].updatedAt || 0);
-                const serverDate = new Date(incomingData.updatedAt || 0);
-                
-                if (serverDate > localDate) {
-                    chapters[existingIndex] = incomingData;
-                    needsSidebarRender = true;
-                    
-                    // If the updated note is CURRENTLY open on screen
-                    if (incomingData.id === currentId) {
-                        this.handleActiveDocumentUpdate(incomingData);
-                    }
-                }
-            }
-        });
-
-        if (needsSidebarRender) {
-            renderSidebar();
-            renderTagCloud();
-        }
-    }
-    
-    handleActiveDocumentUpdate(newData) {
-        const contentArea = document.querySelector(`.content-area[data-chapter-id="${newData.id}"]`) || document.querySelector('.content-area');
-        if (!contentArea) return;
-        
-        // Check if user is actively typing in it
-        const isTyping = document.activeElement && contentArea.contains(document.activeElement);
-        
-        if (isTyping) {
-            // Unobtrusive banner (avoid Edit Wars)
-            this.showConflictBanner();
-        } else {
-            // Safe to hot-swap content
-            contentArea.innerHTML = newData.content || '<p>Start typing...</p>';
-            
-            // Brief visual flash
-            contentArea.style.transition = 'background 0.3s';
-            contentArea.style.background = 'rgba(46, 204, 113, 0.15)';
-            setTimeout(() => contentArea.style.background = 'transparent', 300);
-            
-            this.updateStatus('✨ Remote changes applied');
-            setTimeout(() => this.updateStatus('🟢 Synced'), 3000);
-        }
-    }
-    
-    showConflictBanner() {
-        let banner = document.getElementById('syncConflictBanner');
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'syncConflictBanner';
-            banner.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:10px 20px; border-radius:20px; box-shadow:0 4px 15px rgba(0,0,0,0.2); z-index:9999; display:flex; gap:15px; align-items:center; animation: popIn 0.3s ease-out;';
-            banner.innerHTML = `
-                <span>✨ Note updated remotely.</span>
-                <button onclick="location.reload()" style="background:white; color:var(--primary); border:none; padding:4px 10px; border-radius:12px; cursor:pointer; font-weight:bold;">Refresh</button>
-                <button onclick="this.parentElement.remove()" style="background:transparent; color:white; border:1px solid white; padding:4px 10px; border-radius:12px; cursor:pointer;">Ignore</button>
-            `;
-            document.body.appendChild(banner);
-        }
-    }
-}
-
-window.SYNC_ENGINE = new SyncEngine();
-window.SYNC_ENGINE.start(5000);
 /**
- * SharedLibrary — Local shared notes library
+ * SharedLibrary ΓÇö Local shared notes library
  *
  * Stores published notes in a shared localStorage key accessible
  * by all users on the same device/browser.
@@ -258,15 +119,15 @@ window.SYNC_ENGINE.start(5000);
  * Share format: exported as .json files that other users can import.
  *
  * API (exposed as window.LIBRARY):
- *   LIBRARY.publish(chapter, user)     → {ok, error, entry}
- *   LIBRARY.getAll()                   → entry[]
- *   LIBRARY.search(query)              → entry[]
- *   LIBRARY.getById(id)                → entry | null
- *   LIBRARY.deleteEntry(id, userId)    → {ok, error}
- *   LIBRARY.exportNote(id)             → void  (triggers download)
- *   LIBRARY.importFromFile(file)       → Promise<{ok, error, entry}>
- *   LIBRARY.isPublished(chapterId)     → boolean
- *   LIBRARY.getByChapterId(chapterId)  → entry | null
+ *   LIBRARY.publish(chapter, user)     ΓåÆ {ok, error, entry}
+ *   LIBRARY.getAll()                   ΓåÆ entry[]
+ *   LIBRARY.search(query)              ΓåÆ entry[]
+ *   LIBRARY.getById(id)                ΓåÆ entry | null
+ *   LIBRARY.deleteEntry(id, userId)    ΓåÆ {ok, error}
+ *   LIBRARY.exportNote(id)             ΓåÆ void  (triggers download)
+ *   LIBRARY.importFromFile(file)       ΓåÆ Promise<{ok, error, entry}>
+ *   LIBRARY.isPublished(chapterId)     ΓåÆ boolean
+ *   LIBRARY.getByChapterId(chapterId)  ΓåÆ entry | null
  */
 
 class SharedLibrary {
@@ -531,16 +392,16 @@ ${jsonStr}
     }
 }
 
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 //  GLOBAL SINGLETON
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 window.LIBRARY = new SharedLibrary();
 
 // (Removed duplicate parseRawHtmlToSequence)
 
 //  SHARED STYLED HTML BUILDER (async)
 //  Fetches styles.css + embeds all fonts/nav for full-fidelity read-only view
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 window.buildStyledHtml = async function (entry) {
     if (!entry) return null;
 
@@ -557,7 +418,7 @@ window.buildStyledHtml = async function (entry) {
     try {
         const resp = await fetch('styles.css');
         if (resp.ok) appCss = await resp.text();
-    } catch (e) { /* offline — degrades gracefully */ }
+    } catch (e) { /* offline ΓÇö degrades gracefully */ }
 
     const customStyles = entry.metadata?.customStyles || '';
     const customSidebar = entry.metadata?.customSidebar || '';
@@ -587,14 +448,14 @@ window.buildStyledHtml = async function (entry) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${esc(entry.title)} — Library Note</title>
+    <title>${esc(entry.title)} ΓÇö Library Note</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Kalam:wght@300;400;700&family=Patrick+Hand&family=Permanent+Marker&family=Shadows+Into+Light&family=Architects+Daughter&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <style>
 ${appCss}
 ${customStyles}
-        /* ── Read-only overrides ── */
+        /* ΓöÇΓöÇ Read-only overrides ΓöÇΓöÇ */
         body   { overflow: auto !important; height: auto !important; display: block !important; }
         .sidebar, .tool-tray-container, .status-bar, .writing-tools,
         .show-tools-btn, canvas#sketchCanvas, #pdfBackground,
@@ -605,7 +466,7 @@ ${customStyles}
         .content-area { min-height: unset !important; border: none !important; outline: none !important; }
         html, body { background-color: var(--workspace-bg, #e0e0e0) !important; }
 
-        /* ── Shell layout ── */
+        /* ΓöÇΓöÇ Shell layout ΓöÇΓöÇ */
         .ro-shell { display: flex; flex-direction: column; min-height: 100vh; }
         .ro-topbar {
             background: var(--sidebar-bg, #2c3e50); color: #fff;
@@ -634,11 +495,11 @@ ${customStyles}
 <body>
 <div class="ro-shell">
     <div class="ro-topbar">
-        <div class="ro-topbar-title">📖 ${esc(entry.title)}</div>
-        <span class="ro-topbar-meta">✏️ ${esc(entry.author || 'Unknown')} · ${esc(entry.category || 'General')}</span>
+        <div class="ro-topbar-title">≡ƒôû ${esc(entry.title)}</div>
+        <span class="ro-topbar-meta">Γ£Å∩╕Å ${esc(entry.author || 'Unknown')} ┬╖ ${esc(entry.category || 'General')}</span>
         ${(entry.tags || []).map(t => `<span class="ro-tag">#${esc(t)}</span>`).join(' ')}
     </div>
-    <div class="ro-banner">🔒 <strong>Read-only view</strong> — Original styled version. Edit your copy inside the notebook.</div>
+    <div class="ro-banner">≡ƒöÆ <strong>Read-only view</strong> ΓÇö Original styled version. Edit your copy inside the notebook.</div>
     <div class="ro-body">
         ${customSidebar ? `<div class="ro-nav">${customSidebar}</div>` : ''}
         <div class="ro-workspace">
@@ -656,16 +517,16 @@ ${JSON.stringify(shareData)}
 </html>`;
 };
 
-// ═══════════════════════════════════════════════════════════════════════
-//  EMBEDDED LIBRARY PANEL — runs inside index.html
+// ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+//  EMBEDDED LIBRARY PANEL ΓÇö runs inside index.html
 //  All functions are prefixed with `lib` to avoid collisions with the
 //  main app.  The panel is a fixed overlay that slides in from the right.
-// ═══════════════════════════════════════════════════════════════════════
+// ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
 
 let _libCurrentEntryId = null;
 let _libToastTimer = null;
 
-// ── Open / close ─────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Open / close ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function openLibraryPanel() {
     const panel = document.getElementById('libraryPanel');
     if (!panel) return;
@@ -685,7 +546,7 @@ function closeLibraryPanel() {
 }
 window.closeLibraryPanel = closeLibraryPanel;
 
-// ── Render cards ──────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Render cards ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function libRenderCards() {
     if (!window.LIBRARY) return;
     const query = (document.getElementById('libSearchInput') || {}).value || '';
@@ -711,7 +572,7 @@ async function libRenderCards() {
             hasAny ? 'No results found' : 'The library is empty';
         document.getElementById('libEmptySub').innerHTML = hasAny
             ? 'Try a different search term or category.'
-            : 'Click the 📤 share icon next to any note to publish it here.<br>Or import a shared .json file using the button above.';
+            : 'Click the ≡ƒôñ share icon next to any note to publish it here.<br>Or import a shared .json file using the button above.';
         count.textContent = '';
         return;
     }
@@ -730,7 +591,7 @@ async function libRenderCards() {
 }
 window.libRenderCards = libRenderCards;
 
-// ── Build card ────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Build card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function libBuildCard(entry, libUser) {
     const isOwner = libUser && (entry.authorId === libUser.id || entry.authorId === libUser._id);
     const date = entry.publishedAt
@@ -749,7 +610,7 @@ function libBuildCard(entry, libUser) {
     if (isOwner) {
         const badge = document.createElement('div');
         badge.className = 'lib-mine-badge';
-        badge.textContent = '✏️ mine';
+        badge.textContent = 'Γ£Å∩╕Å mine';
         card.appendChild(badge);
     }
 
@@ -765,24 +626,24 @@ function libBuildCard(entry, libUser) {
         <div class="lib-card-snippet">${libEscHtml(entry.snippet || '(no preview)')}</div>
         ${tagsHtml}
         <div class="lib-card-meta">
-            <span class="lib-card-meta-author">✏️ ${libEscHtml(entry.author || 'Unknown')}</span>
-            ${date ? `<span>📅 ${date}</span>` : ''}
+            <span class="lib-card-meta-author">Γ£Å∩╕Å ${libEscHtml(entry.author || 'Unknown')}</span>
+            ${date ? `<span>≡ƒôà ${date}</span>` : ''}
         </div>`;
     card.appendChild(body);
 
     const actions = document.createElement('div');
     actions.className = 'lib-card-actions';
     actions.innerHTML = `
-        <button class="lib-card-btn"              onclick="libOpenModal('${entry.id}')">👁 View</button>
-        <button class="lib-card-btn lib-btn-clone"    onclick="libCloneEntry('${entry.id}')">📋 Clone</button>
-        <button class="lib-card-btn lib-btn-download" onclick="libDownloadEntry('${entry.id}')">⬇ Download</button>
+        <button class="lib-card-btn"              onclick="libOpenModal('${entry.id}')">≡ƒæü View</button>
+        <button class="lib-card-btn lib-btn-clone"    onclick="libCloneEntry('${entry.id}')">≡ƒôï Clone</button>
+        <button class="lib-card-btn lib-btn-download" onclick="libDownloadEntry('${entry.id}')">Γ¼ç Download</button>
         ${isOwner ? `<button class="lib-card-btn lib-btn-delete"
-                        onclick="libDeleteEntry('${entry.id}')" title="Remove from library">🗑</button>` : ''}`;
+                        onclick="libDeleteEntry('${entry.id}')" title="Remove from library">≡ƒùæ</button>` : ''}`;
     card.appendChild(actions);
     return card;
 }
 
-// ── Open details modal ────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Open details modal ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function libOpenModal(id) {
     const entry = await window.LIBRARY.getById(id);
     if (!entry) return;
@@ -801,11 +662,11 @@ async function libOpenModal(id) {
         `<span class="lib-card-tag">#${libEscHtml(t)}</span>`).join('');
     document.getElementById('libModalMeta').innerHTML = `
         <span class="lib-card-meta-author" style="font-family:'Kalam',cursive;font-size:0.8rem;">
-            ✏️ ${libEscHtml(entry.author)}</span>
-        ${date ? `<span style="font-family:'Kalam',cursive;font-size:0.8rem;color:#718096;">📅 ${date}</span>` : ''}
+            Γ£Å∩╕Å ${libEscHtml(entry.author)}</span>
+        ${date ? `<span style="font-family:'Kalam',cursive;font-size:0.8rem;color:#718096;">≡ƒôà ${date}</span>` : ''}
         ${tagsHtml}
         ${isOwner ? `<span style="font-family:'Kalam',cursive;font-size:0.75rem;
-                          background:#2c3e50;color:#fff;padding:2px 8px;border-radius:8px;">✏️ mine</span>` : ''}`;
+                          background:#2c3e50;color:#fff;padding:2px 8px;border-radius:8px;">Γ£Å∩╕Å mine</span>` : ''}`;
 
     const overlay = document.getElementById('libViewModal');
     const contentArea = document.getElementById('libModalContent');
@@ -843,7 +704,7 @@ function libDownloadCurrentEntry() { if (_libCurrentEntryId) libDownloadEntry(_l
 window.libCloneCurrentEntry = libCloneCurrentEntry;
 window.libDownloadCurrentEntry = libDownloadCurrentEntry;
 
-// ── Cheat-sheet renderer ──────────────────────────────────────────────────────
+// ΓöÇΓöÇ Cheat-sheet renderer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function libRenderCheatSheet(entry) {
     const sanitize = (html) => (html || '')
         .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -852,8 +713,8 @@ function libRenderCheatSheet(entry) {
     let html = `
         <div class="cs-note-header">
             <h1 class="cs-note-title">${libEscHtml(entry.title)}</h1>
-            <p class="cs-note-sub">✏️&nbsp;${libEscHtml(entry.author || 'Unknown')}
-                &nbsp;·&nbsp;${entry.sections.length} page${entry.sections.length !== 1 ? 's' : ''}</p>
+            <p class="cs-note-sub">Γ£Å∩╕Å&nbsp;${libEscHtml(entry.author || 'Unknown')}
+                &nbsp;┬╖&nbsp;${entry.sections.length} page${entry.sections.length !== 1 ? 's' : ''}</p>
         </div>`;
 
     entry.sections.forEach((section, idx) => {
@@ -877,20 +738,20 @@ function libRenderCheatSheet(entry) {
     return html;
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Actions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function libCloneEntry(id) {
     showToast('Cloning...');
     const clone = await window.LIBRARY.buildClone(id);
     if (!clone) { showToast('Note not found or you are not logged in'); return; }
 
-    // Store pending clone — main app picks it up on next init (or immediately
+    // Store pending clone ΓÇö main app picks it up on next init (or immediately
     // since we're already on index.html)
     const pendingKey = window.api && window.api.auth.isLoggedIn()
         ? 'nb_pending_clone_' + window.api.auth.getCurrentUser()._id
         : 'nb_pending_clone';
     localStorage.setItem(pendingKey, JSON.stringify(clone));
 
-    showToast('📋 Cloned into your notebook!');
+    showToast('≡ƒôï Cloned into your notebook!');
     libCloseModal();
     closeLibraryPanel();
 
@@ -911,7 +772,7 @@ window.libCloneEntry = libCloneEntry;
 
 function libDownloadEntry(id) {
     window.LIBRARY.exportNote(id);
-    showToast('⬇ Downloading share file…');
+    showToast('Γ¼ç Downloading share fileΓÇª');
 }
 window.libDownloadEntry = libDownloadEntry;
 
@@ -919,22 +780,22 @@ async function libDeleteEntry(id) {
     if (!confirm('Are you sure you want to remove this note from the shared library?')) return;
     const libUser = window.api.auth.getCurrentUser();
     if (!libUser) {
-        showToast('❌ You must be logged in to delete notes.');
+        showToast('Γ¥î You must be logged in to delete notes.');
         return;
     }
     const result = await window.LIBRARY.deleteEntry(id, libUser.id || libUser._id);
     if (result.ok) {
-        showToast('🗑 Removed from library');
+        showToast('≡ƒùæ Removed from library');
         libCloseModal();
         libRenderCards();
         if (typeof renderSidebar === 'function') renderSidebar();
     } else {
-        showToast('❌ ' + result.error);
+        showToast('Γ¥î ' + result.error);
     }
 }
 window.libDeleteEntry = libDeleteEntry;
 
-// ── Import ────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Import ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function libHandleImport(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -949,11 +810,11 @@ async function libHandleImport(e) {
                     tags: result.entry.tags,
                     frontEndData: result.entry
                 });
-                showToast('✅ HTML imported to Library!');
+                showToast('Γ£à HTML imported to Library!');
                 libRenderCards();
                 if (typeof renderSidebar === 'function') renderSidebar();
             } catch (err) {
-                showToast('❌ Failed to import HTML to Library');
+                showToast('Γ¥î Failed to import HTML to Library');
                 console.error(err);
             }
         } else {
@@ -963,7 +824,7 @@ async function libHandleImport(e) {
                 : 'nb_pending_clone';
             localStorage.setItem(pendingKey, JSON.stringify(result.entry));
 
-            showToast('✅ Note imported into your Notebook!');
+            showToast('Γ£à Note imported into your Notebook!');
             libCloseModal();
             closeLibraryPanel();
 
@@ -975,11 +836,11 @@ async function libHandleImport(e) {
             }
         }
     } else {
-        showToast('❌ ' + result.error);
+        showToast('Γ¥î ' + result.error);
     }
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Toast ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function showToast(msg) {
     const el = document.getElementById('libToast');
     if (!el) return;
@@ -989,13 +850,13 @@ function showToast(msg) {
     _libToastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-// ── Escape HTML util ──────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Escape HTML util ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function libEscHtml(str) {
     return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ── Wire up panel controls once DOM is ready ─────────────────────────────────
+// ΓöÇΓöÇ Wire up panel controls once DOM is ready ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 document.addEventListener('DOMContentLoaded', () => {
     const searchEl = document.getElementById('libSearchInput');
     const filterEl = document.getElementById('libCategoryFilter');
@@ -1020,11 +881,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 /**
- * LassoSelector — Professional Multi-Select System
+ * LassoSelector ΓÇö Professional Multi-Select System
  * 
  * Two selection modes:
- *   BOX mode  — rectangular marquee selection
- *   FREE mode — freeform lasso drawing (any shape)
+ *   BOX mode  ΓÇö rectangular marquee selection
+ *   FREE mode ΓÇö freeform lasso drawing (any shape)
  * 
  * Supports: plain text blocks, outline items, images, headers, divs, and all
  * block-level content within content areas.
@@ -1131,7 +992,7 @@ class LassoSelector {
         if (freeBtn) freeBtn.classList.toggle('active', mode === 'free');
 
         if (typeof showToast === 'function') {
-            showToast(mode === 'box' ? '▭ Box Selection Mode' : '✏️ Freeform Selection Mode');
+            showToast(mode === 'box' ? 'Γû¡ Box Selection Mode' : 'Γ£Å∩╕Å Freeform Selection Mode');
         }
     }
 
@@ -1148,9 +1009,8 @@ class LassoSelector {
             }
         }
 
-        // Disable contenteditable and ensure items are block-wrapped
+        // Disable contenteditable
         document.querySelectorAll('.content-area').forEach(el => {
-            this._ensureBlockWrapping(el);
             el.setAttribute('data-lasso-prev-editable', el.contentEditable);
             el.contentEditable = 'false';
         });
@@ -1206,54 +1066,8 @@ class LassoSelector {
         if (btn) btn.classList.remove('active');
     }
 
-    /**
-     * Ensures all text nodes and inline elements at the top level of the content area
-     * are wrapped in <p> tags so they are detectable as block-level selectable elements.
-     */
-    _ensureBlockWrapping(area) {
-        if (!area) return;
-        let nodesToWrap = [];
-        const finalizeWrap = () => {
-            if (nodesToWrap.length > 0) {
-                const p = document.createElement('p');
-                // Use the first node in the sequence to find the insertion point
-                const firstNode = nodesToWrap[0];
-                if (firstNode.parentNode) {
-                    firstNode.parentNode.insertBefore(p, firstNode);
-                    nodesToWrap.forEach(node => {
-                        p.appendChild(node);
-                    });
-                }
-                nodesToWrap = [];
-            }
-        };
-
-        // We use childNodes to see text nodes as well as element nodes
-        const nodes = Array.from(area.childNodes);
-        const blockTags = ['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'UL', 'OL', 'TABLE', 'PRE', 'HR', 'SECTION', 'ARTICLE'];
-
-        nodes.forEach(node => {
-            const isBlockElement = node.nodeType === 1 && blockTags.includes(node.tagName.toUpperCase());
-            const isLassoUI = node.nodeType === 1 && (node.classList.contains('rd-image-wrapper') || node.classList.contains('uploaded-container'));
-
-            if (isBlockElement || isLassoUI) {
-                // If we encounter a block, wrap whatever inline stuff we collected before it
-                finalizeWrap();
-            } else {
-                // Ignore empty whitespace-only text nodes at the very start or between blocks
-                if (node.nodeType === 3 && !node.textContent.trim() && nodesToWrap.length === 0) {
-                    return;
-                }
-                nodesToWrap.push(node);
-            }
-        });
-
-        // Wrap any remaining nodes at the end
-        finalizeWrap();
-    }
-
     // ================================================================
-    //  SELECTABLE ELEMENT DETECTION — works on ALL block content
+    //  SELECTABLE ELEMENT DETECTION ΓÇö works on ALL block content
     // ================================================================
 
     _detectTemplateContext() {
@@ -1336,7 +1150,7 @@ class LassoSelector {
     }
 
     // ================================================================
-    //  MOUSE / TOUCH HANDLERS — dispatches to box or freeform
+    //  MOUSE / TOUCH HANDLERS ΓÇö dispatches to box or freeform
     // ================================================================
 
     _handleMouseDown(e) {
@@ -1430,7 +1244,7 @@ class LassoSelector {
             return;
         }
 
-        // M key — toggle between Box and Free modes
+        // M key ΓÇö toggle between Box and Free modes
         if (e.key === 'm' || e.key === 'M') {
             e.preventDefault();
             this.setSelectionMode(this.selectionMode === 'box' ? 'free' : 'box');
@@ -1441,7 +1255,7 @@ class LassoSelector {
     }
 
     // ================================================================
-    //  BOX MODE — rectangular marquee
+    //  BOX MODE ΓÇö rectangular marquee
     // ================================================================
 
     _startBox() {
@@ -1488,7 +1302,7 @@ class LassoSelector {
     }
 
     // ================================================================
-    //  FREEFORM MODE — draw any shape
+    //  FREEFORM MODE ΓÇö draw any shape
     // ================================================================
 
     _showFreeformCanvas() {
@@ -1552,7 +1366,7 @@ class LassoSelector {
         this._hideFreeformCanvas();
 
         if (this._freeformPath.length < 5) {
-            // Too few points — treat as a click
+            // Too few points ΓÇö treat as a click
             this.clearSelection();
             return;
         }
@@ -1652,7 +1466,7 @@ class LassoSelector {
     }
 
     /**
-     * Check if selection rect overlaps element rect by ≥20% of element area.
+     * Check if selection rect overlaps element rect by ΓëÑ20% of element area.
      */
     _rectsOverlap(selRect, elRect) {
         if (selRect.right < elRect.left || selRect.left > elRect.right) return false;
@@ -1732,14 +1546,14 @@ class LassoSelector {
 
         this.actionBar.innerHTML = `
             <div class="lasso-mode-toggle" title="Press M to toggle">
-                <button class="lasso-mode-btn active" data-lasso-mode="box" title="Box select">▭</button>
-                <button class="lasso-mode-btn" data-lasso-mode="free" title="Freeform select">✏️</button>
+                <button class="lasso-mode-btn active" data-lasso-mode="box" title="Box select">Γû¡</button>
+                <button class="lasso-mode-btn" data-lasso-mode="free" title="Freeform select">Γ£Å∩╕Å</button>
             </div>
             <span class="lasso-action-divider">|</span>
             <span class="lasso-action-count">0 selected</span>
-            <button class="lasso-action-btn" data-action="duplicate" title="Duplicate (Ctrl+D)">📋 Duplicate</button>
-            <button class="lasso-action-btn lasso-action-delete" data-action="delete" title="Delete (Del)">🗑️ Delete</button>
-            <button class="lasso-action-btn" data-action="clear" title="Clear Selection">✖ Clear</button>
+            <button class="lasso-action-btn" data-action="duplicate" title="Duplicate (Ctrl+D)">≡ƒôï Duplicate</button>
+            <button class="lasso-action-btn lasso-action-delete" data-action="delete" title="Delete (Del)">≡ƒùæ∩╕Å Delete</button>
+            <button class="lasso-action-btn" data-action="clear" title="Clear Selection">Γ£û Clear</button>
         `;
 
         // Prevent bar clicks from triggering lasso drawing
@@ -1893,7 +1707,7 @@ class LassoSelector {
     }
 
     // ================================================================
-    //  GROUP DRAG — converts flow elements to absolute on first drag
+    //  GROUP DRAG ΓÇö converts flow elements to absolute on first drag
     // ================================================================
 
     _startGroupDrag(ev, clickedElement) {
@@ -1909,7 +1723,7 @@ class LassoSelector {
 
             if (!wasAbsolute) {
                 // Capture current position relative to offsetParent before
-                // switching to absolute — this keeps the element in the same
+                // switching to absolute ΓÇö this keeps the element in the same
                 // visual spot.
                 const rect = el.getBoundingClientRect();
                 const parent = el.offsetParent || el.parentElement;
@@ -1986,7 +1800,7 @@ class LassoSelector {
     }
 }
 /**
- * AudioRecorderWidget — Record & Transcribe System
+ * AudioRecorderWidget ΓÇö Record & Transcribe System
  * 
  * Uses MediaRecorder API for audio capture and Web Speech API for live
  * transcription. Saves recordings as small playback widgets pinned to
@@ -2092,11 +1906,11 @@ class AudioRecorderWidget {
                 this.onStateChange(true);
             }
 
-            if (typeof showToast === 'function') showToast('🎤 Recording started...');
+            if (typeof showToast === 'function') showToast('≡ƒÄñ Recording started...');
 
         } catch (err) {
             console.error('Microphone access denied:', err);
-            if (typeof showToast === 'function') showToast('Microphone access denied — check permissions');
+            if (typeof showToast === 'function') showToast('Microphone access denied ΓÇö check permissions');
         }
     }
 
@@ -2140,16 +1954,16 @@ class AudioRecorderWidget {
     _startSpeechRecognition() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            console.warn('Speech Recognition not supported — recording audio only');
-            this._updateTranscriptDisplay('⚠️ Transcription unavailable: your browser doesn\'t support the Web Speech API. Try Chrome or Edge. Audio is still being recorded.');
+            console.warn('Speech Recognition not supported ΓÇö recording audio only');
+            this._updateTranscriptDisplay('ΓÜá∩╕Å Transcription unavailable: your browser doesn\'t support the Web Speech API. Try Chrome or Edge. Audio is still being recorded.');
             return;
         }
 
         // Web Speech API works best on HTTPS/localhost, but we still attempt to start
         const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         if (!isSecure) {
-            console.warn('Speech Recognition may require HTTPS — attempting anyway');
-            this._updateTranscriptDisplay('⚠️ Transcription usually requires HTTPS/localhost. Attempting anyway…');
+            console.warn('Speech Recognition may require HTTPS ΓÇö attempting anyway');
+            this._updateTranscriptDisplay('ΓÜá∩╕Å Transcription usually requires HTTPS/localhost. Attempting anywayΓÇª');
         }
 
         this.recognition = new SpeechRecognition();
@@ -2187,11 +2001,11 @@ class AudioRecorderWidget {
                     try { this.recognition.start(); } catch (e) { /* already running */ }
                 }
             } else if (event.error === 'network') {
-                this._updateTranscriptDisplay('⚠️ Transcription failed: network error. This usually means the page is not served over HTTPS. Audio is still being recorded.');
+                this._updateTranscriptDisplay('ΓÜá∩╕Å Transcription failed: network error. This usually means the page is not served over HTTPS. Audio is still being recorded.');
             } else if (event.error === 'not-allowed') {
-                this._updateTranscriptDisplay('⚠️ Microphone permission denied. Please allow microphone access and try again.');
+                this._updateTranscriptDisplay('ΓÜá∩╕Å Microphone permission denied. Please allow microphone access and try again.');
             } else if (event.error === 'audio-capture') {
-                this._updateTranscriptDisplay('⚠️ No microphone found. Please connect a microphone and try again.');
+                this._updateTranscriptDisplay('ΓÜá∩╕Å No microphone found. Please connect a microphone and try again.');
             }
         };
 
@@ -2204,10 +2018,10 @@ class AudioRecorderWidget {
 
         try {
             this.recognition.start();
-            if (isSecure) this._updateTranscriptDisplay('🎤 Listening…');
+            if (isSecure) this._updateTranscriptDisplay('≡ƒÄñ ListeningΓÇª');
         } catch (e) {
             console.warn('Could not start speech recognition:', e);
-            this._updateTranscriptDisplay('⚠️ Could not start transcription: ' + e.message);
+            this._updateTranscriptDisplay('ΓÜá∩╕Å Could not start transcription: ' + e.message);
         }
     }
 
@@ -2226,7 +2040,7 @@ class AudioRecorderWidget {
                     <span class="recording-label">Recording</span>
                 </div>
                 <span class="recording-timer">00:00</span>
-                <button class="recording-stop-btn" title="Stop recording">⏹ Stop</button>
+                <button class="recording-stop-btn" title="Stop recording">ΓÅ╣ Stop</button>
             </div>
             <div class="recording-transcript-live">
                 <div class="recording-transcript-text">Listening...</div>
@@ -2285,7 +2099,7 @@ class AudioRecorderWidget {
     }
 
     // ================================================================
-    //  FINALIZE RECORDING → create widget
+    //  FINALIZE RECORDING ΓåÆ create widget
     // ================================================================
 
     _finalizeRecording() {
@@ -2318,7 +2132,7 @@ class AudioRecorderWidget {
         // Show the container if hidden
         if (this.widgetsContainer) this.widgetsContainer.style.display = 'flex';
 
-        if (typeof showToast === 'function') showToast(`✓ Recording saved (${duration})`);
+        if (typeof showToast === 'function') showToast(`Γ£ô Recording saved (${duration})`);
     }
 
     _finalizeTranscript() {
@@ -2346,15 +2160,15 @@ class AudioRecorderWidget {
         const header = document.createElement('div');
         header.className = 'recordings-header';
         header.innerHTML = `
-            <span>🎤 Recordings</span>
-            <button class="recordings-minimize-btn" title="Minimize">—</button>
+            <span>≡ƒÄñ Recordings</span>
+            <button class="recordings-minimize-btn" title="Minimize">ΓÇö</button>
         `;
         header.querySelector('.recordings-minimize-btn').addEventListener('click', () => {
             const list = this.widgetsContainer.querySelector('.recordings-list');
             if (list) {
                 const isHidden = list.style.display === 'none';
                 list.style.display = isHidden ? 'flex' : 'none';
-                header.querySelector('.recordings-minimize-btn').textContent = isHidden ? '—' : '+';
+                header.querySelector('.recordings-minimize-btn').textContent = isHidden ? 'ΓÇö' : '+';
             }
         });
 
@@ -2392,14 +2206,14 @@ class AudioRecorderWidget {
                     <span class="recording-widget-duration">${recording.duration}</span>
                 </div>
                 <div class="recording-widget-controls">
-                    <button class="recording-play-btn" title="Play">▶</button>
-                    <button class="recording-delete-btn" title="Delete">✕</button>
+                    <button class="recording-play-btn" title="Play">Γû╢</button>
+                    <button class="recording-delete-btn" title="Delete">Γ£ò</button>
                 </div>
             </div>
             <audio class="recording-audio" src="${recording.blobUrl}" preload="metadata"></audio>
             ${hasTranscript ? `
                 <div class="recording-widget-transcript collapsed">
-                    <div class="transcript-toggle">📝 Transcript <span class="transcript-arrow">▸</span></div>
+                    <div class="transcript-toggle">≡ƒô¥ Transcript <span class="transcript-arrow">Γû╕</span></div>
                     <div class="transcript-content">${recording.transcript}</div>
                 </div>
             ` : `
@@ -2418,19 +2232,19 @@ class AudioRecorderWidget {
                     if (a !== audio && !a.paused) {
                         a.pause();
                         a.currentTime = 0;
-                        a.closest('.recording-widget').querySelector('.recording-play-btn').textContent = '▶';
+                        a.closest('.recording-widget').querySelector('.recording-play-btn').textContent = 'Γû╢';
                     }
                 });
                 audio.play();
-                playBtn.textContent = '⏸';
+                playBtn.textContent = 'ΓÅ╕';
             } else {
                 audio.pause();
-                playBtn.textContent = '▶';
+                playBtn.textContent = 'Γû╢';
             }
         });
 
         audio.addEventListener('ended', () => {
-            playBtn.textContent = '▶';
+            playBtn.textContent = 'Γû╢';
         });
 
         // Delete
@@ -2451,7 +2265,7 @@ class AudioRecorderWidget {
                 const wrapper = widget.querySelector('.recording-widget-transcript');
                 const arrow = widget.querySelector('.transcript-arrow');
                 wrapper.classList.toggle('collapsed');
-                arrow.textContent = wrapper.classList.contains('collapsed') ? '▸' : '▾';
+                arrow.textContent = wrapper.classList.contains('collapsed') ? 'Γû╕' : 'Γû╛';
             });
         }
 
@@ -2518,14 +2332,14 @@ class WidgetRailManager {
         this._wireScrollAutoExpand();
     }
 
-    // ── WIDGET REGISTRY ──────────────────────────────────────────────────────
+    // ΓöÇΓöÇ WIDGET REGISTRY ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     _registerWidgets() {
         this.registry = {
 
-            // ── RECORDING ────────────────────────────────────────────────────
+            // ΓöÇΓöÇ RECORDING ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             recording: {
-                id: 'recording', title: 'Recording', icon: '🎤', desc: 'Record & transcribe audio',
+                id: 'recording', title: 'Recording', icon: '≡ƒÄñ', desc: 'Record & transcribe audio',
                 render: (container) => {
                     const wrap = document.createElement('div');
                     const status = document.createElement('div');
@@ -2539,19 +2353,19 @@ class WidgetRailManager {
                     recordingsHost.className = 'widget-recordings-host';
                     if (this.audioRecorder) {
                         this.audioRecorder.onStateChange = (rec) => {
-                            status.textContent = rec ? '🔴 Recording…' : 'Ready to record';
+                            status.textContent = rec ? '≡ƒö┤ RecordingΓÇª' : 'Ready to record';
                             recordBtn.textContent = rec ? 'Stop Recording' : 'Start Recording';
                         };
                         this.audioRecorder.mountRecordingsContainer(recordingsHost);
-                    } else { status.textContent = 'Recorder initializing…'; }
+                    } else { status.textContent = 'Recorder initializingΓÇª'; }
                     wrap.appendChild(status); wrap.appendChild(recordBtn); wrap.appendChild(recordingsHost);
                     container.appendChild(wrap);
                 }
             },
 
-            // ── CALCULATOR ───────────────────────────────────────────────────
+            // ΓöÇΓöÇ CALCULATOR ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             calculator: {
-                id: 'calculator', title: 'Calculator', icon: '🧮', desc: 'Basic & scientific calculator',
+                id: 'calculator', title: 'Calculator', icon: '≡ƒº«', desc: 'Basic & scientific calculator',
                 render: (container) => {
                     const saved = this.state.widgetState.calculator || {};
                     let expr = saved.expr || '';
@@ -2581,7 +2395,7 @@ class WidgetRailManager {
                                 .replace(/sin\(/g, 'Math.sin(').replace(/cos\(/g, 'Math.cos(')
                                 .replace(/tan\(/g, 'Math.tan(').replace(/log\(/g, 'Math.log10(')
                                 .replace(/ln\(/g, 'Math.log(').replace(/sqrt\(/g, 'Math.sqrt(')
-                                .replace(/abs\(/g, 'Math.abs(').replace(/π/g, 'Math.PI')
+                                .replace(/abs\(/g, 'Math.abs(').replace(/╧Ç/g, 'Math.PI')
                                 .replace(/e(?![0-9])/g, 'Math.E').replace(/\^/g, '**');
                             const val = Function('"use strict"; return (' + safe + ')')();
                             const dv = Number.isFinite(val) ? +val.toPrecision(10) : 'Error';
@@ -2592,9 +2406,9 @@ class WidgetRailManager {
 
                     const press = (val) => {
                         if (val === 'C') { expr = ''; exprLine.textContent = ' '; resultLine.textContent = '0'; this._updateWidgetState('calculator', { expr: '', result: '', scientific }); return; }
-                        if (val === '⌫') { expr = expr.slice(0, -1); exprLine.textContent = expr || ' '; evaluate(); return; }
+                        if (val === 'Γî½') { expr = expr.slice(0, -1); exprLine.textContent = expr || ' '; evaluate(); return; }
                         if (val === '=') { evaluate(); return; }
-                        if (val === 'x²') { expr += '**2'; }
+                        if (val === 'x┬▓') { expr += '**2'; }
                         else if (val === '1/x') { expr = '1/(' + expr + ')'; }
                         else { expr += val; }
                         exprLine.textContent = expr; evaluate();
@@ -2604,11 +2418,11 @@ class WidgetRailManager {
                         grid.innerHTML = '';
                         const sci = scientific ? [
                             { l: 'sin(', c: 'fn' }, { l: 'cos(', c: 'fn' }, { l: 'tan(', c: 'fn' }, { l: 'log(', c: 'fn' },
-                            { l: 'ln(', c: 'fn' }, { l: 'sqrt(', c: 'fn' }, { l: 'x²', c: 'fn' }, { l: '1/x', c: 'fn' },
-                            { l: 'π', c: 'fn' }, { l: 'e', c: 'fn' }, { l: '(', c: 'op' }, { l: ')', c: 'op' },
+                            { l: 'ln(', c: 'fn' }, { l: 'sqrt(', c: 'fn' }, { l: 'x┬▓', c: 'fn' }, { l: '1/x', c: 'fn' },
+                            { l: '╧Ç', c: 'fn' }, { l: 'e', c: 'fn' }, { l: '(', c: 'op' }, { l: ')', c: 'op' },
                         ] : [];
                         const basic = [
-                            { l: 'C', c: 'clr' }, { l: '⌫', c: 'clr' }, { l: '%', c: 'op' }, { l: '/', c: 'op' },
+                            { l: 'C', c: 'clr' }, { l: 'Γî½', c: 'clr' }, { l: '%', c: 'op' }, { l: '/', c: 'op' },
                             { l: '7', c: '' }, { l: '8', c: '' }, { l: '9', c: '' }, { l: '*', c: 'op' },
                             { l: '4', c: '' }, { l: '5', c: '' }, { l: '6', c: '' }, { l: '-', c: 'op' },
                             { l: '1', c: '' }, { l: '2', c: '' }, { l: '3', c: '' }, { l: '+', c: 'op' },
@@ -2629,9 +2443,9 @@ class WidgetRailManager {
                 }
             },
 
-            // ── POMODORO ─────────────────────────────────────────────────────
+            // ΓöÇΓöÇ POMODORO ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             pomodoro: {
-                id: 'pomodoro', title: 'Pomodoro', icon: '🍅', desc: 'Focus timer with breaks',
+                id: 'pomodoro', title: 'Pomodoro', icon: '≡ƒìà', desc: 'Focus timer with breaks',
                 render: (container) => {
                     if (this._pomodoroTimer) { clearInterval(this._pomodoroTimer); this._pomodoroTimer = null; }
                     const saved = this.state.widgetState.pomodoro || {};
@@ -2732,9 +2546,9 @@ class WidgetRailManager {
                 }
             },
 
-            // ── STICKY NOTE ──────────────────────────────────────────────────
+            // ΓöÇΓöÇ STICKY NOTE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             sticky: {
-                id: 'sticky', title: 'Sticky Note', icon: '📌', desc: 'Quick scratchpad notes',
+                id: 'sticky', title: 'Sticky Note', icon: '≡ƒôî', desc: 'Quick scratchpad notes',
                 render: (container) => {
                     const saved = this.state.widgetState.sticky || {};
                     const colors = ['#fef9c3', '#fce7f3', '#dcfce7', '#dbeafe', '#ffffff'];
@@ -2752,7 +2566,7 @@ class WidgetRailManager {
                         colorRow.appendChild(dot);
                     });
                     const ta = document.createElement('textarea'); ta.className = 'sticky-textarea';
-                    ta.placeholder = 'Jot something down…'; ta.value = saved.content || ''; ta.style.background = activeColor;
+                    ta.placeholder = 'Jot something downΓÇª'; ta.value = saved.content || ''; ta.style.background = activeColor;
                     const chars = document.createElement('div'); chars.className = 'sticky-chars';
                     chars.textContent = (saved.content || '').length + ' chars';
                     ta.addEventListener('input', () => { chars.textContent = ta.value.length + ' chars'; this._updateWidgetState('sticky', { content: ta.value, color: activeColor }); });
@@ -2760,9 +2574,9 @@ class WidgetRailManager {
                 }
             },
 
-            // ── TO-DO ────────────────────────────────────────────────────────
+            // ΓöÇΓöÇ TO-DO ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             todo: {
-                id: 'todo', title: 'To-Do', icon: '✅', desc: 'Quick task checklist',
+                id: 'todo', title: 'To-Do', icon: 'Γ£à', desc: 'Quick task checklist',
                 render: (container) => {
                     const saved = this.state.widgetState.todo || {};
                     let items = saved.items ? JSON.parse(JSON.stringify(saved.items)) : [];
@@ -2777,14 +2591,14 @@ class WidgetRailManager {
                             const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'todo-checkbox'; cb.checked = item.done;
                             cb.addEventListener('change', () => { items[i].done = cb.checked; row.classList.toggle('done', cb.checked); updateFooter(); save(); });
                             const txt = document.createElement('div'); txt.className = 'todo-text'; txt.textContent = item.text;
-                            const del = document.createElement('button'); del.className = 'todo-del'; del.textContent = '×';
+                            const del = document.createElement('button'); del.className = 'todo-del'; del.textContent = '├ù';
                             del.addEventListener('click', () => { items.splice(i, 1); renderList(); save(); });
                             row.appendChild(cb); row.appendChild(txt); row.appendChild(del); listEl.appendChild(row);
                         });
                         updateFooter();
                     };
                     const inputRow = document.createElement('div'); inputRow.className = 'todo-input-row';
-                    const inp = document.createElement('input'); inp.className = 'todo-input'; inp.placeholder = 'Add a task…'; inp.type = 'text';
+                    const inp = document.createElement('input'); inp.className = 'todo-input'; inp.placeholder = 'Add a taskΓÇª'; inp.type = 'text';
                     const addBtn = document.createElement('button'); addBtn.className = 'todo-add-btn'; addBtn.textContent = '+';
                     const addTask = () => { const t = inp.value.trim(); if (!t) return; items.push({ id: Date.now(), text: t, done: false }); inp.value = ''; renderList(); save(); };
                     addBtn.addEventListener('click', addTask); inp.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
@@ -2798,19 +2612,19 @@ class WidgetRailManager {
                 }
             },
 
-            // ── UNIT CONVERTER ───────────────────────────────────────────────
+            // ΓöÇΓöÇ UNIT CONVERTER ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             unitconverter: {
-                id: 'unitconverter', title: 'Unit Converter', icon: '📐', desc: 'Length, weight, temp & more',
+                id: 'unitconverter', title: 'Unit Converter', icon: '≡ƒôÉ', desc: 'Length, weight, temp & more',
                 render: (container) => {
                     const saved = this.state.widgetState.unitconverter || {};
                     const CATS = {
                         Length: { units: ['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi'], factors: { mm: .001, cm: .01, m: 1, km: 1000, in: .0254, ft: .3048, yd: .9144, mi: 1609.344 } },
                         Weight: { units: ['mg', 'g', 'kg', 'lb', 'oz', 't'], factors: { mg: .000001, g: .001, kg: 1, lb: .453592, oz: .02835, t: 1000 } },
-                        Temperature: { units: ['°C', '°F', 'K'], factors: null },
+                        Temperature: { units: ['┬░C', '┬░F', 'K'], factors: null },
                         Volume: { units: ['ml', 'l', 'fl oz', 'cup', 'pt', 'qt', 'gal'], factors: { ml: .001, l: 1, 'fl oz': .029574, cup: .236588, pt: .473176, qt: .946353, gal: 3.785412 } },
                         Speed: { units: ['m/s', 'km/h', 'mph', 'knot'], factors: { 'm/s': 1, 'km/h': .277778, mph: .44704, knot: .514444 } },
                     };
-                    const convertTemp = (val, from, to) => { let c = from === '°C' ? val : from === '°F' ? (val - 32) * 5 / 9 : val - 273.15; return to === '°C' ? c : to === '°F' ? c * 9 / 5 + 32 : c + 273.15; };
+                    const convertTemp = (val, from, to) => { let c = from === '┬░C' ? val : from === '┬░F' ? (val - 32) * 5 / 9 : val - 273.15; return to === '┬░C' ? c : to === '┬░F' ? c * 9 / 5 + 32 : c + 273.15; };
                     const fillUnits = (sel, units, selected) => { sel.innerHTML = ''; units.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; if (u === selected) o.selected = true; sel.appendChild(o); }); };
 
                     const catSel = document.createElement('select'); catSel.className = 'uc-category-select';
@@ -2822,7 +2636,7 @@ class WidgetRailManager {
                     const fromUnit = document.createElement('select'); fromUnit.className = 'uc-unit-select';
                     fromRow.appendChild(fromInput); fromRow.appendChild(fromUnit);
 
-                    const arrow = document.createElement('div'); arrow.className = 'uc-arrow'; arrow.textContent = '↓';
+                    const arrow = document.createElement('div'); arrow.className = 'uc-arrow'; arrow.textContent = 'Γåô';
 
                     const toRow = document.createElement('div'); toRow.className = 'uc-row';
                     const spacer = document.createElement('div'); spacer.className = 'uc-input'; spacer.style.visibility = 'hidden';
@@ -2831,7 +2645,7 @@ class WidgetRailManager {
 
                     const resultEl = document.createElement('div'); resultEl.className = 'uc-result';
                     const convert = () => {
-                        const cat = CATS[catSel.value]; const val = parseFloat(fromInput.value); if (isNaN(val)) { resultEl.textContent = '—'; return; }
+                        const cat = CATS[catSel.value]; const val = parseFloat(fromInput.value); if (isNaN(val)) { resultEl.textContent = 'ΓÇö'; return; }
                         let res = catSel.value === 'Temperature' ? convertTemp(val, fromUnit.value, toUnit.value) : (val * cat.factors[fromUnit.value]) / cat.factors[toUnit.value];
                         resultEl.textContent = (Math.abs(res) < .001 || Math.abs(res) > 999999 ? res.toExponential(4) : +res.toPrecision(7)) + ' ' + toUnit.value;
                         this._updateWidgetState('unitconverter', { cat: catSel.value, val: fromInput.value, from: fromUnit.value, to: toUnit.value });
@@ -2845,20 +2659,20 @@ class WidgetRailManager {
                 }
             },
 
-            // ── DICTIONARY ───────────────────────────────────────────────────
+            // ΓöÇΓöÇ DICTIONARY ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             dictionary: {
-                id: 'dictionary', title: 'Dictionary', icon: '📖', desc: 'Look up word definitions',
+                id: 'dictionary', title: 'Dictionary', icon: '≡ƒôû', desc: 'Look up word definitions',
                 render: (container) => {
                     const saved = this.state.widgetState.dictionary || {};
                     const inputRow = document.createElement('div'); inputRow.className = 'dict-input-row';
-                    const inp = document.createElement('input'); inp.className = 'dict-input'; inp.placeholder = 'Enter a word…'; inp.type = 'text'; inp.value = saved.word || '';
+                    const inp = document.createElement('input'); inp.className = 'dict-input'; inp.placeholder = 'Enter a wordΓÇª'; inp.type = 'text'; inp.value = saved.word || '';
                     const lookupBtn = document.createElement('button'); lookupBtn.className = 'dict-lookup-btn'; lookupBtn.textContent = 'Look up';
                     inputRow.appendChild(inp); inputRow.appendChild(lookupBtn);
                     const resultEl = document.createElement('div'); resultEl.className = 'dict-result';
                     const showMsg = (cls, msg) => { resultEl.innerHTML = '<div class="' + cls + '">' + msg + '</div>'; };
                     const lookup = async () => {
                         const word = inp.value.trim(); if (!word) { showMsg('dict-empty', 'Type a word and press Look up'); return; }
-                        lookupBtn.textContent = '…'; lookupBtn.disabled = true; this._updateWidgetState('dictionary', { word });
+                        lookupBtn.textContent = 'ΓÇª'; lookupBtn.disabled = true; this._updateWidgetState('dictionary', { word });
                         try {
                             const res = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
                             if (!res.ok) { showMsg('dict-error', res.status === 404 ? 'Word not found.' : 'Network error.'); return; }
@@ -2883,19 +2697,19 @@ class WidgetRailManager {
                 }
             },
 
-            // ── MINI BROWSER ─────────────────────────────────────────────────
+            // ΓöÇΓöÇ MINI BROWSER ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             minibrowser: {
-                id: 'minibrowser', title: 'Web Clip', icon: '🌐', desc: 'Browse & clip to notes',
+                id: 'minibrowser', title: 'Web Clip', icon: '≡ƒîÉ', desc: 'Browse & clip to notes',
                 render: (container) => {
                     const saved = this.state.widgetState.minibrowser || {};
                     let currentUrl = saved.url || '';
                     const urlRow = document.createElement('div'); urlRow.className = 'mb-url-row';
-                    const urlInp = document.createElement('input'); urlInp.className = 'mb-url-input'; urlInp.placeholder = 'https://…'; urlInp.value = currentUrl; urlInp.type = 'text';
+                    const urlInp = document.createElement('input'); urlInp.className = 'mb-url-input'; urlInp.placeholder = 'https://ΓÇª'; urlInp.value = currentUrl; urlInp.type = 'text';
                     const goBtn = document.createElement('button'); goBtn.className = 'mb-go-btn'; goBtn.textContent = 'Go';
                     urlRow.appendChild(urlInp); urlRow.appendChild(goBtn);
                     const frameWrap = document.createElement('div'); frameWrap.className = 'mb-frame-wrap';
                     const placeholder = document.createElement('div'); placeholder.className = 'mb-placeholder';
-                    placeholder.innerHTML = '🌐<br>Enter a URL above<br><small style="color:#bbb">Some sites block embedding</small>';
+                    placeholder.innerHTML = '≡ƒîÉ<br>Enter a URL above<br><small style="color:#bbb">Some sites block embedding</small>';
                     frameWrap.appendChild(placeholder);
                     let iframe = null;
                     const loadUrl = (url) => {
@@ -2909,13 +2723,13 @@ class WidgetRailManager {
                     goBtn.addEventListener('click', () => loadUrl(urlInp.value.trim()));
                     urlInp.addEventListener('keydown', e => { if (e.key === 'Enter') loadUrl(urlInp.value.trim()); });
                     const actionsRow = document.createElement('div'); actionsRow.className = 'mb-actions-row';
-                    const clipBtn = document.createElement('button'); clipBtn.className = 'mb-action-btn'; clipBtn.textContent = '📋 Clip link to notes';
+                    const clipBtn = document.createElement('button'); clipBtn.className = 'mb-action-btn'; clipBtn.textContent = '≡ƒôï Clip link to notes';
                     clipBtn.addEventListener('click', () => {
                         if (!currentUrl) return;
                         try { const s = window.getSelection(); if (s && s.rangeCount) { const r = s.getRangeAt(0); r.deleteContents(); r.insertNode(document.createTextNode('\n[' + currentUrl + ']\n')); } } catch { }
-                        clipBtn.textContent = '✓ Clipped!'; setTimeout(() => { clipBtn.textContent = '📋 Clip link to notes'; }, 1500);
+                        clipBtn.textContent = 'Γ£ô Clipped!'; setTimeout(() => { clipBtn.textContent = '≡ƒôï Clip link to notes'; }, 1500);
                     });
-                    const openBtn = document.createElement('button'); openBtn.className = 'mb-action-btn'; openBtn.textContent = '↗ Open in tab';
+                    const openBtn = document.createElement('button'); openBtn.className = 'mb-action-btn'; openBtn.textContent = 'Γåù Open in tab';
                     openBtn.addEventListener('click', () => { if (currentUrl) window.open(currentUrl, '_blank'); });
                     actionsRow.appendChild(clipBtn); actionsRow.appendChild(openBtn);
                     if (currentUrl) loadUrl(currentUrl);
@@ -2934,7 +2748,7 @@ class WidgetRailManager {
         }
     }
 
-    // ── RENDER ───────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ RENDER ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     _render() {
         this.list.innerHTML = '';
@@ -2953,9 +2767,9 @@ class WidgetRailManager {
         const header = document.createElement('div'); header.className = 'widget-card-header'; header.draggable = true;
         const title = document.createElement('div'); title.className = 'widget-card-title'; title.innerHTML = '<span>' + def.icon + '</span><span>' + def.title + '</span>';
         const actions = document.createElement('div'); actions.className = 'widget-card-actions';
-        const detachBtn = document.createElement('button'); detachBtn.title = 'Detach'; detachBtn.textContent = '↗';
+        const detachBtn = document.createElement('button'); detachBtn.title = 'Detach'; detachBtn.textContent = 'Γåù';
         detachBtn.addEventListener('click', (e) => { e.stopPropagation(); this._detachCard(card, def.id); });
-        const minimizeBtn = document.createElement('button'); minimizeBtn.title = 'Minimize'; minimizeBtn.textContent = '—';
+        const minimizeBtn = document.createElement('button'); minimizeBtn.title = 'Minimize'; minimizeBtn.textContent = 'ΓÇö';
         minimizeBtn.addEventListener('click', (e) => { e.stopPropagation(); card.classList.toggle('minimized'); this.state.minimized[def.id] = card.classList.contains('minimized'); this._saveState(); });
         actions.appendChild(detachBtn); actions.appendChild(minimizeBtn);
         header.appendChild(title); header.appendChild(actions);
@@ -2975,7 +2789,7 @@ class WidgetRailManager {
         this.tab.appendChild(wrap);
     }
 
-    // ── EVENTS ───────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ EVENTS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     _wireEvents() {
         this.tab.addEventListener('click', () => this._setCollapsed(false));
@@ -2994,7 +2808,7 @@ class WidgetRailManager {
         }
     }
 
-    // ── GALLERY ──────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ GALLERY ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     _openGallery() {
         if (!this.galleryOverlay) return;
@@ -3035,7 +2849,7 @@ class WidgetRailManager {
         this._renderTabIcons(); this._saveState();
     }
 
-    // ── REORDER ──────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ REORDER ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     _wireReorder(card) {
         card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', card.getAttribute('data-widget-id')); e.dataTransfer.effectAllowed = 'move'; card.style.opacity = '0.5'; });
@@ -3066,7 +2880,7 @@ class WidgetRailManager {
         this._saveState();
     }
 
-    // ── DETACH / DOCK ────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ DETACH / DOCK ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     _detachCard(card, id, savedPos = null) {
         this.state.floating[id] = savedPos || { left: 120, top: 120 };
@@ -3076,7 +2890,7 @@ class WidgetRailManager {
         card.style.position = 'fixed'; card.style.width = '320px';
         const header = card.querySelector('.widget-card-header'); if (header) header.draggable = false;
         if (!card.querySelector('.widget-snapback')) {
-            const sb = document.createElement('button'); sb.className = 'widget-snapback'; sb.title = 'Snap back to rail'; sb.textContent = '↩'; sb.style.marginLeft = '6px';
+            const sb = document.createElement('button'); sb.className = 'widget-snapback'; sb.title = 'Snap back to rail'; sb.textContent = 'Γå⌐'; sb.style.marginLeft = '6px';
             sb.addEventListener('click', (e) => { e.stopPropagation(); this._dockCard(card, id); });
             const act = card.querySelector('.widget-card-actions'); if (act) act.appendChild(sb);
         }
@@ -3114,7 +2928,7 @@ class WidgetRailManager {
         return { left, top };
     }
 
-    // ── SCROLL AUTO-EXPAND ───────────────────────────────────────────────────
+    // ΓöÇΓöÇ SCROLL AUTO-EXPAND ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     _wireScrollAutoExpand() {
         const workspace = document.getElementById('workspace'), paper = document.getElementById('paper');
@@ -3127,7 +2941,7 @@ class WidgetRailManager {
         }, { passive: true });
     }
 
-    // ── STATE ────────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ STATE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     _setCollapsed(collapsed, fromAuto = false) { this.state.collapsed = collapsed; this.rail.classList.toggle('collapsed', collapsed); if (!fromAuto) this._saveState(); }
     _setSide(side) { this.state.side = side; this.rail.dataset.side = side; this.rail.style.right = side === 'right' ? '0' : ''; this.rail.style.left = side === 'left' ? '0' : ''; }
@@ -3149,8 +2963,8 @@ class WidgetRailManager {
 }
 
 
-// ─── AUTH GUARD ──────────────────────────────────────────────────────────────
-// auth.js is loaded before this script. If no valid session → redirect to login.
+// ΓöÇΓöÇΓöÇ AUTH GUARD ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// auth.js is loaded before this script. If no valid session ΓåÆ redirect to login.
 (function () {
     const p = window.location.pathname.toLowerCase();
     const isLoginPage = p.endsWith('login.html') || p.endsWith('/login') || p.endsWith('/login/');
@@ -3159,7 +2973,7 @@ class WidgetRailManager {
         window.location.replace('login.html');
     }
 })();
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -3167,10 +2981,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 // --- CONSTANTS ---
 const MATH_KEYS = {
-    basic: ['+', '-', '=', '≈', '≠', '±', '×', '÷', '(', ')', '[', ']', '{', '}'],
+    basic: ['+', '-', '=', 'Γëê', 'Γëá', '┬▒', '├ù', '├╖', '(', ')', '[', ']', '{', '}'],
     trig: ['\\sin', '\\cos', '\\tan', '\\cot', '\\sec', '\\csc', '\\arcsin', '\\arccos', '\\arctan'],
-    calc: ['\\int', '\\iint', '\\oint', '\\partial', '\\nabla', '\\sum', '\\prod', '\\lim', '\\to', '∞', 'dx', 'dt'],
-    geom: ['\\perp', '\\parallel', '∠', '△', 'π', 'θ', 'α', 'β', 'φ', 'λ', 'Δ'],
+    calc: ['\\int', '\\iint', '\\oint', '\\partial', '\\nabla', '\\sum', '\\prod', '\\lim', '\\to', 'Γê₧', 'dx', 'dt'],
+    geom: ['\\perp', '\\parallel', 'Γêá', 'Γû│', '╧Ç', '╬╕', '╬▒', '╬▓', '╧å', '╬╗', '╬ö'],
     struct: ['\\frac{}{}', '^{}', '_{}', '\\sqrt{}', '\\vec{}', '\\bar{}', '\\hat{}']
 };
 
@@ -3245,12 +3059,7 @@ async function saveChapterToDB(chapter) {
     }
     chapter.updatedAt = new Date().toISOString();
 
-    if (!window.api || !window.api.auth.isLoggedIn()) {
-        if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('🔴 Saved locally (Not logged in)');
-        return;
-    }
-
-    if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('⏳ Saving to cloud...');
+    if (!window.api || !window.api.auth.isLoggedIn()) return;
 
     try {
         if (chapter._id) {
@@ -3270,15 +3079,8 @@ async function saveChapterToDB(chapter) {
             chapter._id = data.note._id;
             chapter.id = data.note._id; // Make the frontend ID match the backend _id
         }
-        
-        // Keep sync horizon updated so we don't fetch our own save
-        if (window.SYNC_ENGINE) {
-            window.SYNC_ENGINE.updateStatus('🟢 Synced');
-            window.SYNC_ENGINE.lastSync = new Date().toISOString();
-        }
     } catch (err) {
         console.error('Failed to save chapter to API:', err);
-        if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('🔴 Sync failed - Will retry');
     }
 }
 
@@ -3566,40 +3368,40 @@ function switchMathTab(category, btn) {
         let label = k.replace('\\', '');
 
         if (category === 'basic') {
-            if (k === '\\approx') label = '≈';
-            else if (k === '\\neq') label = '≠';
-            else if (k === '\\pm') label = '±';
-            else if (k === '\\times') label = '×';
-            else if (k === '\\div') label = '÷';
+            if (k === '\\approx') label = 'Γëê';
+            else if (k === '\\neq') label = 'Γëá';
+            else if (k === '\\pm') label = '┬▒';
+            else if (k === '\\times') label = '├ù';
+            else if (k === '\\div') label = '├╖';
         } else if (category === 'calc') {
-            if (k === '\\int') label = '∫';
-            else if (k === '\\sum') label = 'Σ';
-            else if (k === '\\prod') label = 'Π';
-            else if (k === '\\partial') label = '∂';
-            else if (k === '\\nabla') label = '∇';
-            else if (k === '\\infty') label = '∞';
+            if (k === '\\int') label = 'Γê½';
+            else if (k === '\\sum') label = '╬ú';
+            else if (k === '\\prod') label = '╬á';
+            else if (k === '\\partial') label = 'Γêé';
+            else if (k === '\\nabla') label = 'Γêç';
+            else if (k === '\\infty') label = 'Γê₧';
         } else if (category === 'geom') {
-            if (k === '\\pi') label = 'π';
-            else if (k === '\\theta') label = 'θ';
-            else if (k === '\\alpha') label = 'α';
-            else if (k === '\\beta') label = 'β';
-            else if (k === '\\phi') label = 'φ';
-            else if (k === '\\lambda') label = 'λ';
-            else if (k === '\\Delta') label = 'Δ';
-            else if (k === '\\perp') label = '⊥';
-            else if (k === '\\parallel') label = '∥';
-            else if (k === '\\angle') label = '∠';
-            else if (k === '\\triangle') label = '△';
+            if (k === '\\pi') label = '╧Ç';
+            else if (k === '\\theta') label = '╬╕';
+            else if (k === '\\alpha') label = '╬▒';
+            else if (k === '\\beta') label = '╬▓';
+            else if (k === '\\phi') label = '╧å';
+            else if (k === '\\lambda') label = '╬╗';
+            else if (k === '\\Delta') label = '╬ö';
+            else if (k === '\\perp') label = 'ΓèÑ';
+            else if (k === '\\parallel') label = 'ΓêÑ';
+            else if (k === '\\angle') label = 'Γêá';
+            else if (k === '\\triangle') label = 'Γû│';
         }
 
         if (k.includes('frac')) label = 'a/b';
-        else if (k.includes('sqrt')) label = '√';
-        else if (k.includes('^')) label = 'xʸ';
-        else if (k.includes('_')) label = 'xₙ';
-        else if (k === '\\int_{}^{}') label = '∫ₐᵇ';
-        else if (k === '\\vec{}') label = 'v⃗';
-        else if (k === '\\bar{}') label = 'x̄';
-        else if (k === '\\hat{}') label = 'x̂';
+        else if (k.includes('sqrt')) label = 'ΓêÜ';
+        else if (k.includes('^')) label = 'x╩╕';
+        else if (k.includes('_')) label = 'xΓéÖ';
+        else if (k === '\\int_{}^{}') label = 'Γê½ΓéÉß╡ç';
+        else if (k === '\\vec{}') label = 'vΓâù';
+        else if (k === '\\bar{}') label = 'x╠ä';
+        else if (k === '\\hat{}') label = 'x╠é';
 
         btn.innerText = label;
         btn.onclick = () => {
@@ -3694,7 +3496,7 @@ window.toggleMathMode = (forceOpen = false) => {
 };
 
 // --- DISCIPLINE TOOLBAR FUNCTIONS ---
-window.insertAlgoStep = () => { insertHtml(`<div class="chalk-code" contenteditable="true">1. Step description...<br>   ↳ Logic/Condition</div>`); }
+window.insertAlgoStep = () => { insertHtml(`<div class="chalk-code" contenteditable="true">1. Step description...<br>   Γå│ Logic/Condition</div>`); }
 window.insertComplexity = () => { insertHtml(`<span class="algo-badge" contenteditable="true">Time: O(n)</span>&nbsp;`); }
 
 window.insertTraceTable = () => {
@@ -3944,17 +3746,17 @@ window.insertAssumptions = () => { insertHtml(`<h3 style="color:#7f8c8d; border-
 
 // --- CONSTANTS TOOL LOGIC ---
 const ENG_CONSTANTS = {
-    'g': '9.81 m/s²',
+    'g': '9.81 m/s┬▓',
     'pi': '3.14159',
-    'π': '3.14159',
+    '╧Ç': '3.14159',
     'e': '2.71828',
-    'c': '3.00 × 10⁸ m/s',
-    'h': '6.626 × 10⁻³⁴ J·s',
-    'G': '6.674 × 10⁻¹¹ N·m²/kg²',
+    'c': '3.00 ├ù 10Γü╕ m/s',
+    'h': '6.626 ├ù 10Γü╗┬│Γü┤ J┬╖s',
+    'G': '6.674 ├ù 10Γü╗┬╣┬╣ N┬╖m┬▓/kg┬▓',
     'atm': '101,325 Pa',
-    'R': '8.314 J/(mol·K)',
-    'Na': '6.022 × 10²³ mol⁻¹',
-    'k': '1.380 × 10⁻²³ J/K'
+    'R': '8.314 J/(mol┬╖K)',
+    'Na': '6.022 ├ù 10┬▓┬│ molΓü╗┬╣',
+    'k': '1.380 ├ù 10Γü╗┬▓┬│ J/K'
 };
 
 window.insertConstants = () => {
@@ -4050,37 +3852,60 @@ window.importPdfToCanvas = async (input) => {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
 
+        // Get the current content area (where user edits)
         const contentArea = document.querySelector('.content-area');
         if (!contentArea) {
-            showToast("⚠️ Please create a page first");
+            showToast("ΓÜá∩╕Å Please create a page first");
             return;
         }
 
+        // Clear existing content and prepare for PDF
         contentArea.innerHTML = '';
         contentArea.style.position = 'relative';
 
-        const inlineContainer = document.createElement('div');
-        inlineContainer.className = 'inline-pdf-container';
-        inlineContainer.contentEditable = 'false'; // Keep selection logic intact
-        inlineContainer.dataset.hasPdf = 'true';
-        contentArea.appendChild(inlineContainer);
-        // Ensure user can still type in the content area outside the PDF
-        contentArea.contentEditable = 'true';
+        const pdfPagesData = [];
+        const pdfContainer = document.createElement('div');
+        pdfContainer.style.cssText = 'position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 20px;';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-page-render';
+            canvas.style.cssText = 'max-width: 100%; height: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: white;';
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+
+            // Create wrapper for each page
+            const pageWrapper = document.createElement('div');
+            pageWrapper.style.cssText = 'position: relative; width: 100%; display: flex; justify-content: center;';
+            pageWrapper.appendChild(canvas);
+            pdfContainer.appendChild(pageWrapper);
+
+            pdfPagesData.push(canvas.toDataURL('image/jpeg', 0.8));
+        }
+
+        // Inject PDF into content area
+        contentArea.appendChild(pdfContainer);
+        contentArea.contentEditable = 'true'; // Allow annotations on top
 
         const chapter = chapters.find(c => c.id === currentId);
         if (chapter) {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                chapter.pdfFileBase64 = reader.result; // Saves the base64 PDF string (much smaller than JPEGs)
-                chapter.content = contentArea.innerHTML;
-                await saveChapterToDB(chapter);
-                
-                await window.renderInlinePdf(chapter, inlineContainer, pdf);
-                setTimeout(resizeCanvas, 100);
-                showToast(`✓ PDF loaded: ${pdf.numPages} pages. Use mouse to highlight text!`);
-            };
+            chapter.pdfPages = pdfPagesData;
+            chapter.content = contentArea.innerHTML; // Save the PDF-injected content
+            await saveChapterToDB(chapter);
         }
+
+        setTimeout(resizeCanvas, 100);
+        showToast(`Γ£ô PDF loaded: ${pdf.numPages} pages. Click to add annotations!`);
 
     } catch (err) {
         console.error(err);
@@ -4088,306 +3913,8 @@ window.importPdfToCanvas = async (input) => {
     }
 };
 
-// --- RENDER INLINE PDF FOR 'ANNOTATE ON PAPER' ---
-window.renderInlinePdf = async (chapter, container, preloadedPdf = null) => {
-    if (!chapter.pdfFileBase64) return;
-    
-    container.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">⏳ Loading PDF pages...</div>';
-    
-    let pdf;
-    try {
-        if (preloadedPdf) {
-            pdf = preloadedPdf;
-        } else {
-            // Load from base64 string
-            const base64Data = chapter.pdfFileBase64.split(',')[1] || chapter.pdfFileBase64;
-            const pdfData = atob(base64Data);
-            const array = new Uint8Array(pdfData.length);
-            for (let i = 0; i < pdfData.length; i++) array[i] = pdfData.charCodeAt(i);
-            pdf = await pdfjsLib.getDocument(array).promise;
-        }
-    } catch (e) {
-        container.innerHTML = '<div style="text-align:center;padding:40px;color:#f55;">⚠️ Failed to load PDF</div>';
-        return;
-    }
-
-    container.innerHTML = '';
-    const containerWidth = (document.getElementById('sequentialStream')?.clientWidth || 800) - 40;
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const cssScale = Math.min(containerWidth / unscaledViewport.width, 3.5);
-        const cssViewport = page.getViewport({ scale: cssScale });
-        
-        const pixelRatio = window.devicePixelRatio || 1;
-        const renderViewport = page.getViewport({ scale: cssScale * pixelRatio });
-
-        const pageWrapper = document.createElement('div');
-        pageWrapper.className = 'pdf-page-wrapper';
-        pageWrapper.dataset.page = i;
-
-        // Render Canvas (High-DPI)
-        const canvas = document.createElement('canvas');
-        canvas.className = 'pdf-page-canvas';
-        canvas.style.width = cssViewport.width + 'px';
-        canvas.style.height = cssViewport.height + 'px';
-        canvas.width = renderViewport.width;
-        canvas.height = renderViewport.height;
-        const context = canvas.getContext('2d');
-        
-        // Setup Text Layer
-        const textLayerDiv = document.createElement('div');
-        textLayerDiv.className = 'pdf-text-layer textLayer';
-        textLayerDiv.style.width = cssViewport.width + 'px';
-        textLayerDiv.style.height = cssViewport.height + 'px';
-        textLayerDiv.style.setProperty('--scale-factor', cssViewport.scale);
-
-        pageWrapper.appendChild(canvas);
-        pageWrapper.appendChild(textLayerDiv);
-        container.appendChild(pageWrapper);
-
-        // Async render visual + text map
-        await page.render({ canvasContext: context, viewport: renderViewport }).promise;
-        
-        const textContent = await page.getTextContent();
-        await pdfjsLib.renderTextLayer({
-            textContentSource: textContent,
-            container: textLayerDiv,
-            viewport: cssViewport,
-            textDivs: []
-        }).promise;
-
-        // Reapply highlights
-        if (PdfViewer && PdfViewer._applyHighlightsToPage) {
-            // Temporarily mock PdfViewer annots to use the global chapter for rendering inline hits
-            const originalAnnots = PdfViewer._annots;
-            PdfViewer._annots = () => chapter.annotations || [];
-            PdfViewer._applyHighlightsToPage(i, textLayerDiv);
-            PdfViewer._annots = originalAnnots;
-        }
-    }
-    
-    // Resize the overlay drawing canvas over the new long PDF
-    setTimeout(resizeCanvas, 300);
-};
-
 let pendingPdfInput = null;
 
-/* =====================================================================
-   PDF SPLIT SCREEN VIEWER  (Phase 1 – Power Annotation)
-   ===================================================================== */
-
-// Module-level state for the split viewer
-const PdfViewer = {
-    pdfDoc:        null,
-    currentPage:   1,
-    totalPages:    0,
-    pageCanvases:  [],   // map: pageNum → canvas element
-    fileName:      '',
-    blobUrl:       null,
-
-    // Return the chapter's annotations array (initialised on demand)
-    _annots() {
-        const ch = chapters.find(c => c.id === currentId);
-        if (!ch) return [];
-        if (!ch.annotations) ch.annotations = [];
-        return ch.annotations;
-    },
-
-    // Persist chapter back to DB
-    async _save() {
-        const ch = chapters.find(c => c.id === currentId);
-        if (ch) await saveChapterToDB(ch);
-    },
-
-    // ── Open viewer ──────────────────────────────────────────────────
-    async open(file) {
-        this.fileName = file.name.replace(/\.[^.]+$/, '');
-        document.getElementById('pdfViewerTitle').textContent = '📄 ' + this.fileName;
-        document.getElementById('pdfViewerPages').innerHTML =
-            '<div style="text-align:center;padding:40px;color:#aaa;">⏳ Rendering PDF…</div>';
-        document.body.classList.add('split-mode');
-
-        const arrayBuffer = await file.arrayBuffer();
-        if (this.blobUrl) URL.revokeObjectURL(this.blobUrl);
-        this.blobUrl = null;
-
-        try {
-            this.pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        } catch (e) {
-            document.getElementById('pdfViewerPages').innerHTML =
-                '<div style="text-align:center;padding:40px;color:#f55;">⚠️ Could not read PDF.</div>';
-            return;
-        }
-
-        this.totalPages = this.pdfDoc.numPages;
-        this.currentPage = 1;
-        this.pageCanvases = {};
-
-        await this._renderAll();
-        this._updateNav();
-        this._reapplyHighlights();
-
-        showToast(`📖 ${this.fileName} — ${this.totalPages} pages`);
-    },
-
-    // ── Render all pages into #pdfViewerPages ────────────────────────
-    async _renderAll() {
-        const container = document.getElementById('pdfViewerPages');
-        container.innerHTML = '';
-
-        // Ensure the container has expanded completely before measuring.
-        // The split-mode CSS transition takes 0.3s, so we wait 350ms.
-        if (container.clientWidth < 100) {
-            await new Promise(r => setTimeout(r, 350));
-        }
-        this.viewerWidth = (container.clientWidth || 500) - 40;
-
-        for (let p = 1; p <= this.totalPages; p++) {
-            const pageEl = document.createElement('div');
-            pageEl.className = 'pdf-page-wrapper';
-            pageEl.dataset.page = p;
-
-            // Canvas
-            const canvas = document.createElement('canvas');
-            canvas.className = 'pdf-page-canvas';
-
-            // Text layer
-            const textLayerDiv = document.createElement('div');
-            textLayerDiv.className = 'pdf-text-layer';
-
-            pageEl.appendChild(canvas);
-            pageEl.appendChild(textLayerDiv);
-            container.appendChild(pageEl);
-            this.pageCanvases[p] = canvas;
-
-            // Render asynchronously but in order
-            await this._renderPage(p, canvas, textLayerDiv);
-        }
-    },
-
-    // ── Render a single page ─────────────────────────────────────────
-    async _renderPage(pageNum, canvas, textLayerDiv) {
-        const page = await this.pdfDoc.getPage(pageNum);
-        
-        // Logical CSS scale and viewport
-        const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const cssScale = Math.min(this.viewerWidth / unscaledViewport.width, 3.5); 
-        const cssViewport = page.getViewport({ scale: cssScale });
-
-        // Physical high-DPI render bounds
-        const pixelRatio = window.devicePixelRatio || 1;
-        const renderViewport = page.getViewport({ scale: cssScale * pixelRatio });
-
-        canvas.style.width  = cssViewport.width + 'px';
-        canvas.style.height = cssViewport.height + 'px';
-        canvas.width  = renderViewport.width;
-        canvas.height = renderViewport.height;
-
-        textLayerDiv.style.width  = cssViewport.width + 'px';
-        textLayerDiv.style.height = cssViewport.height + 'px';
-
-        await page.render({
-            canvasContext: canvas.getContext('2d'),
-            viewport: renderViewport
-        }).promise;
-
-        // Build text layer for selection (must use CSS viewport to map 1:1 visually)
-        const textContent = await page.getTextContent();
-        textLayerDiv.innerHTML = '';
-        textLayerDiv.className = 'pdf-text-layer textLayer';
-        textLayerDiv.style.setProperty('--scale-factor', cssViewport.scale);
-
-        await pdfjsLib.renderTextLayer({
-            textContentSource: textContent,
-            container:         textLayerDiv,
-            viewport:          cssViewport,
-            textDivs:          []
-        }).promise;
-
-        // Apply saved highlights to the newly rendered text layer
-        this._applyHighlightsToPage(pageNum, textLayerDiv);
-    },
-
-    // ── Re-apply highlights to a specific page's text layer ──────────
-    _applyHighlightsToPage(pageNum, textLayerDiv) {
-        const annots = this._annots().filter(a => a.page === pageNum && a.type === 'highlight');
-        if (!annots.length) return;
-
-        const spans = Array.from(textLayerDiv.querySelectorAll('span'));
-        annots.forEach(annot => {
-            const target = (annot.text || '').trim();
-            if (!target || target.length < 3) return;
-
-            // Simple match: if any span exactly contains or is part of the highlight
-            spans.forEach(span => {
-                if (span.textContent.includes(target) || target.includes(span.textContent.trim())) {
-                    span.classList.add('pdf-highlight-span');
-                }
-            });
-        });
-    },
-
-    // ── Navigation ───────────────────────────────────────────────────
-    scrollToPage(pageNum) {
-        pageNum = Math.max(1, Math.min(pageNum, this.totalPages));
-        this.currentPage = pageNum;
-        const el = document.querySelector(`.pdf-page-wrapper[data-page="${pageNum}"]`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        this._updateNav();
-    },
-
-    _updateNav() {
-        document.getElementById('pdfPageInfo').textContent =
-            this.totalPages ? `${this.currentPage} / ${this.totalPages}` : '— / —';
-    },
-
-    // Watch scrolling to update currentPage counter
-    _onScroll() {
-        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
-        const pagesArea = document.getElementById('pdfViewerPages');
-        const mid = pagesArea.scrollTop + pagesArea.clientHeight / 2;
-        let best = 1;
-        wrappers.forEach(w => {
-            if (w.offsetTop <= mid) best = parseInt(w.dataset.page);
-        });
-        if (best !== this.currentPage) {
-            this.currentPage = best;
-            this._updateNav();
-        }
-    },
-
-    // ── Highlights persistence ───────────────────────────────────────
-    _reapplyHighlights() {
-        // Re-mark spans that match saved annotation text on page load
-        // (Full span-based highlight is applied by the Highlight button live;
-        //  on reload we denote them as a visual reminder block.)
-        const annots = this._annots();
-        if (!annots.length) return;
-        // Simple: add a sticky note marker at the top of the pane listing highlights
-        let noticeHtml = '<div class="pdf-annot-notice">📌 ' +
-            annots.length + ' saved highlight(s) in this document</div>';
-        const container = document.getElementById('pdfViewerPages');
-        if (!container.querySelector('.pdf-annot-notice')) {
-            container.insertAdjacentHTML('afterbegin', noticeHtml);
-        }
-    },
-
-    // ── Close ────────────────────────────────────────────────────────
-    close() {
-        document.body.classList.remove('split-mode');
-        document.getElementById('pdfViewerPages').innerHTML = '';
-        document.getElementById('pdfViewerTitle').textContent = '📄 PDF Reader';
-        document.getElementById('pdfPageInfo').textContent = '— / —';
-        document.getElementById('pdfSelectionBar').style.display = 'none';
-        this.pdfDoc = null;
-        this.pageCanvases = {};
-        if (this.blobUrl) { URL.revokeObjectURL(this.blobUrl); this.blobUrl = null; }
-    }
-};
-
-// — Existing modal helpers (unchanged) —
 window.loadLecturePdf = (input) => {
     if (!input.files || !input.files[0]) return;
     pendingPdfInput = input;
@@ -4408,181 +3935,15 @@ window.resolvePdfMode = (mode) => {
     if (mode === 'annotate') {
         importPdfToCanvas(pendingPdfInput);
     } else {
-        // UPGRADED: use the new interactive viewer instead of iframe
         const file = pendingPdfInput.files[0];
-        PdfViewer.open(file).catch(err => {
-            console.error('PDF viewer error:', err);
-            showToast('⚠️ Error opening PDF');
-        });
+        const url = URL.createObjectURL(file);
+        document.getElementById('lectureFrame').src = url;
+        document.body.classList.add('split-mode');
+        showToast("Lecture Loaded in Split View");
     }
     document.getElementById('pdfModeModal').style.display = 'none';
-    if (pendingPdfInput) { pendingPdfInput.value = ''; pendingPdfInput = null; }
+    pendingPdfInput = null;
 };
-
-// — Wire up viewer controls on DOM ready —
-(function initPdfViewerControls() {
-    function attachOnce(id, event, handler) {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener(event, handler);
-    }
-
-    function setup() {
-        // Close
-        attachOnce('pdfViewerClose', 'click', () => PdfViewer.close());
-
-        // Prev / Next
-        attachOnce('pdfPrevPage', 'click', () => PdfViewer.scrollToPage(PdfViewer.currentPage - 1));
-        attachOnce('pdfNextPage', 'click', () => PdfViewer.scrollToPage(PdfViewer.currentPage + 1));
-
-        // Scroll tracking
-        const pagesArea = document.getElementById('pdfViewerPages');
-        if (pagesArea) {
-            pagesArea.addEventListener('scroll', () => PdfViewer._onScroll(), { passive: true });
-        }
-
-        // ── Selection toolbar ──────────────────────────────────────
-        const selBar = document.getElementById('pdfSelectionBar');
-
-        // Draws amber overlay rects over all selected text spans
-        function drawSelectionOverlay() {
-            // Clear any previous overlays
-            document.querySelectorAll('.pdf-sel-overlay').forEach(el => el.remove());
-
-            const sel = window.getSelection();
-            if (!sel || !sel.rangeCount || !sel.toString().trim()) return;
-
-            for (let ri = 0; ri < sel.rangeCount; ri++) {
-                const range = sel.getRangeAt(ri);
-                const rects = Array.from(range.getClientRects());
-
-                rects.forEach(cr => {
-                    // Find which page wrapper this rect sits inside
-                    const pages = document.querySelectorAll('.pdf-page-wrapper');
-                    let host = null;
-                    pages.forEach(p => {
-                        const pr = p.getBoundingClientRect();
-                        if (cr.top >= pr.top - 2 && cr.bottom <= pr.bottom + 2) host = p;
-                    });
-                    if (!host) return;
-
-                    const hostRect = host.getBoundingClientRect();
-                    const overlay = document.createElement('div');
-                    overlay.className = 'pdf-sel-overlay';
-                    overlay.style.cssText = [
-                        'position:absolute',
-                        `left:${cr.left - hostRect.left}px`,
-                        `top:${cr.top - hostRect.top}px`,
-                        `width:${cr.width}px`,
-                        `height:${cr.height}px`,
-                        'pointer-events:none',
-                        'z-index:10'
-                    ].join(';');
-                    host.appendChild(overlay);
-                });
-            }
-        }
-
-        function clearSelectionOverlay() {
-            document.querySelectorAll('.pdf-sel-overlay').forEach(el => el.remove());
-        }
-
-        document.addEventListener('mouseup', (e) => {
-            // Only trigger if we are selecting text inside a PDF page
-            const pageWrapper = e.target.closest('.pdf-page-wrapper') || e.target.closest('.pdf-text-layer');
-            if (!pageWrapper) return;
-
-            const selText = window.getSelection()?.toString().trim();
-            if (!selText) {
-                selBar.style.display = 'none';
-                clearSelectionOverlay();
-                return;
-            }
-
-            // Draw visual overlay over selected text
-            drawSelectionOverlay();
-
-            // Position toolbar near cursor globally
-            selBar.style.display = 'flex';
-            selBar.style.left = Math.min(e.clientX + 10, window.innerWidth - 180) + 'px';
-            selBar.style.top  = Math.max(10, e.clientY - 48) + 'px';
-        });
-
-        document.addEventListener('mousedown', (e) => {
-            if (!selBar.contains(e.target)) {
-                selBar.style.display = 'none';
-                clearSelectionOverlay();
-            }
-        });
-
-        // Also expose clearSelectionOverlay so Highlight/Clone buttons can call it
-        PdfViewer._clearSelOverlay = clearSelectionOverlay;
-
-        // Highlight button
-        attachOnce('pdfHighlightBtn', 'click', () => {
-            const sel = window.getSelection();
-            if (!sel || !sel.rangeCount || !sel.toString().trim()) return;
-            const selectedText = sel.toString().trim();
-            const range = sel.getRangeAt(0);
-
-            // Wrap selected spans in a <mark>
-            const mark = document.createElement('mark');
-            mark.className = 'pdf-highlight';
-            try { range.surroundContents(mark); } catch { /* partial selection — skip wrapping */ }
-
-            // Persist annotation
-            const pageEl = sel.anchorNode?.parentElement?.closest('.pdf-page-wrapper');
-            const page = pageEl ? parseInt(pageEl.dataset.page) : PdfViewer.currentPage;
-            const annots = PdfViewer._annots();
-            annots.push({ type: 'highlight', page, text: selectedText.slice(0, 200) });
-            PdfViewer._save();
-
-            sel.removeAllRanges();
-            selBar.style.display = 'none';
-            PdfViewer._clearSelOverlay?.();
-            showToast('🖊 Highlight saved');
-        });
-
-        // Clone to Note button
-        attachOnce('pdfCloneBtn', 'click', async () => {
-            const selText = window.getSelection()?.toString().trim();
-            if (!selText) return;
-
-            const pageEl = window.getSelection()?.anchorNode?.parentElement?.closest('.pdf-page-wrapper');
-            const page = pageEl ? parseInt(pageEl.dataset.page) : PdfViewer.currentPage;
-            const citation = `<em style="font-size:0.75rem;opacity:0.65;">— From <strong>${PdfViewer.fileName}</strong>, p.${page}</em>`;
-            const blockquote = `<blockquote class="pdf-cloned-quote">${selText}${citation}</blockquote><p><br></p>`;
-
-            // Insert into the active note's content area
-            const activeArea = document.querySelector(`#page-block-${currentId} .content-area`)
-                            || document.querySelector('.content-area');
-            if (activeArea) {
-                activeArea.focus();
-                document.execCommand('insertHTML', false, blockquote);
-                // Save the chapter
-                const ch = chapters.find(c => c.id === currentId);
-                if (ch) {
-                    ch.content = activeArea.innerHTML;
-                    await saveChapterToDB(ch);
-                }
-            }
-
-            // Also save as annotation
-            const annots = PdfViewer._annots();
-            annots.push({ type: 'cloned', page, text: selText.slice(0, 200), noteId: currentId });
-            await PdfViewer._save();
-
-            window.getSelection()?.removeAllRanges();
-            selBar.style.display = 'none';
-            showToast('📋 Text cloned to note!');
-        });
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', setup);
-    } else {
-        setup();
-    }
-})();
 
 // --- TOOLBAR SWITCHING ---
 function updateToolVisibility(chapter) {
@@ -4638,7 +3999,7 @@ window.insertCSCodeBlock = () => {
                         </div>
                         <div>
                             <span style="font-size:0.7rem; opacity:0.7; margin-right:5px;">Editable</span>
-                            <button class="cs-format-btn" onclick="formatCodeBlock(this)">⚡ Format</button>
+                            <button class="cs-format-btn" onclick="formatCodeBlock(this)">ΓÜí Format</button>
                         </div>
                     </div>
                     <div class="cs-code-editor language-javascript" contenteditable="true" onfocus="unformatCode(this)" onblur="formatCodeBlock(this)">// Write code here...</div>
@@ -4700,7 +4061,7 @@ window.openMetadataModal = () => {
     (chapter.tags || []).forEach(tag => {
         const chip = document.createElement('div');
         chip.className = 'tag-chip';
-        chip.innerHTML = `<span>#${tag}</span><span class="tag-remove" onclick="removeTagFromModal('${tag}')">×</span>`;
+        chip.innerHTML = `<span>#${tag}</span><span class="tag-remove" onclick="removeTagFromModal('${tag}')">├ù</span>`;
         tagsList.appendChild(chip);
     });
 
@@ -4995,7 +4356,7 @@ window.toggleTray = () => {
     const container = document.getElementById('trayContainer');
     const toggleBtn = document.getElementById('trayToggle');
     container.classList.toggle('collapsed', isTrayCollapsed);
-    toggleBtn.innerText = isTrayCollapsed ? '▶' : '◀';
+    toggleBtn.innerText = isTrayCollapsed ? 'Γû╢' : 'ΓùÇ';
 };
 
 window.toggleMobileSidebar = () => {
@@ -5009,7 +4370,7 @@ window.toggleFocusMode = () => {
     }
 };
 
-// Paper Appearance System — Themes (color) + Patterns (geometry), independent and per-note
+// Paper Appearance System ΓÇö Themes (color) + Patterns (geometry), independent and per-note
 
 const PAPER_THEMES = [
     { key: 'standard',    label: 'Standard',    color: '#fdfbf7', border: '#b0a898' },
@@ -5020,10 +4381,10 @@ const PAPER_THEMES = [
 ];
 
 const PAPER_PATTERNS = [
-    { key: 'grid-texture',   label: '⊞ Grid' },
-    { key: 'lined-texture',  label: '≡ Lines' },
-    { key: 'dotted-texture', label: '⁚ Dots' },
-    { key: 'plain-texture',  label: '○ Plain' },
+    { key: 'grid-texture',   label: 'Γè₧ Grid' },
+    { key: 'lined-texture',  label: 'Γëí Lines' },
+    { key: 'dotted-texture', label: 'ΓüÜ Dots' },
+    { key: 'plain-texture',  label: 'Γùï Plain' },
 ];
 
 function applyPaperAppearance(themeKey, patternKey, save = true) {
@@ -5052,7 +4413,7 @@ function applyPaperAppearance(themeKey, patternKey, save = true) {
     // Update button label
     const btn = document.getElementById('paperStyleBtn');
     const theme = PAPER_THEMES.find(t => t.key === themeKey) || PAPER_THEMES[0];
-    if (btn) btn.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${theme.color};border:1.5px solid ${theme.border};margin-right:5px;vertical-align:middle;"></span>📄 Appearance`;
+    if (btn) btn.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${theme.color};border:1.5px solid ${theme.border};margin-right:5px;vertical-align:middle;"></span>≡ƒôä Appearance`;
 }
 
 window.togglePaperStylePopover = (e) => {
@@ -5143,11 +4504,11 @@ window.toggleReadMode = () => {
     const btn = document.getElementById('readModeBtn');
     const editors = document.querySelectorAll('.content-area');
     if (isReadMode) {
-        btn.innerText = "🔒 Unlock / Edit";
+        btn.innerText = "≡ƒöÆ Unlock / Edit";
         editors.forEach(e => e.contentEditable = "false");
         showToast("Read Mode Enabled");
     } else {
-        btn.innerText = "🔓 Lock / Read";
+        btn.innerText = "≡ƒöô Lock / Read";
         editors.forEach(e => e.contentEditable = "true");
         showToast("Editing Enabled");
     }
@@ -5234,7 +4595,7 @@ function setupDragAndDrop() {
             editor.focus();
         }
 
-        // Handle Files — create resizable/draggable images
+        // Handle Files ΓÇö create resizable/draggable images
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             Array.from(files).forEach(file => {
@@ -5242,7 +4603,7 @@ function setupDragAndDrop() {
                     const reader = new FileReader();
                     reader.onload = (event) => {
                         insertResizableImage(event.target.result, editor);
-                        showToast('✓ Image added');
+                        showToast('Γ£ô Image added');
                     };
                     reader.readAsDataURL(file);
                 }
@@ -5572,7 +4933,7 @@ window.parseRawHtmlToSequence = function (htmlText) {
         title: title,
         content: content,
         sections: null,
-        tags: [],
+        tags: ['html-import'],
         category: 'Imported',
         author: 'Unknown',
         metadata: {
@@ -5698,14 +5059,14 @@ window.importData = (input) => {
                                 tags: importedData.tags,
                                 frontEndData: importedData
                             });
-                            showToast("✅ HTML imported to Library!");
+                            showToast("Γ£à HTML imported to Library!");
                             if (typeof openLibraryPanel === 'function') openLibraryPanel();
                         } catch (err) {
-                            showToast("❌ Failed to import HTML to Library");
+                            showToast("Γ¥î Failed to import HTML to Library");
                             console.error(err);
                         }
                     } else {
-                        showToast("❌ Please log in to import HTML directly to the Library.");
+                        showToast("Γ¥î Please log in to import HTML directly to the Library.");
                     }
                 } else {
                     await window.saveSharedNoteToSequence(importedData);
@@ -5748,84 +5109,29 @@ window.startFlashcardMode = () => {
 function generateFlashcards() {
     flashcards = [];
 
-    // --- Strategy 1: Template-Specific Scanning ---
-    
-    // A. Cornell Notes
-    document.querySelectorAll('.cornell-container').forEach(root => {
-        const cuesNode = root.querySelector('#cornellCues');
-        const notesNode = root.querySelector('#cornellNotes');
-        if (cuesNode && notesNode) {
-            // Find all cues (excluding the title)
-            const cues = Array.from(cuesNode.querySelectorAll('div, p')).filter(el => !el.classList.contains('cornell-cues-title') && el.innerText.trim());
-            if (cues.length > 0) {
-                // If there are specific cues, they serve as Questions. 
-                // The answer is the relevant content from the notes section.
-                // Simplified: use each cue as a Q, and the whole notes summary as A if no better match.
-                cues.forEach(cue => {
-                    flashcards.push({
-                        q: cue.innerText.trim(),
-                        a: notesNode.innerText.trim() 
-                    });
-                });
-            }
-        }
-    });
-
-    // B. Outlines
-    document.querySelectorAll('#outlineContent').forEach(root => {
-        const items = Array.from(root.querySelectorAll('.outline-item'));
-        let currentQ = null;
-        let currentA = '';
-        
-        items.forEach(item => {
-            if (item.classList.contains('level-1')) {
-                if (currentQ && currentA.trim()) flashcards.push({ q: currentQ, a: currentA.trim() });
-                currentQ = item.innerText.replace(/^[IVXLC\d]+\.\s*/i, '').trim(); // Remove Roman/Arabic numerals
-                currentA = '';
-            } else if (currentQ) {
-                currentA += item.innerText.trim() + '\n';
-            }
-        });
-        if (currentQ && currentA.trim()) flashcards.push({ q: currentQ, a: currentA.trim() });
-    });
-
-    // C. Mindmaps
-    document.querySelectorAll('.mindmap-container').forEach(root => {
-        const central = root.querySelector('.mindmap-node.central input')?.value;
-        const nodes = Array.from(root.querySelectorAll('.mindmap-node:not(.central) input'));
-        if (central && nodes.length > 0) {
-            nodes.forEach(node => {
-                if (node.value.trim()) {
-                    flashcards.push({ q: `Regarding ${central}:`, a: node.value.trim() });
-                }
-            });
-        }
-    });
-
-    // --- Strategy 2: Global Content Scanning ---
-    
-    // Scan ALL content areas (Standard notes and the rest of the stream)
-    const editors = document.querySelectorAll('.content-area, .sequence-editor-block');
+    // Scan ALL content areas in the stream
+    const editors = document.querySelectorAll('#sequentialStream .content-area');
 
     editors.forEach(editor => {
         // Strategy A: "Question :: Answer"
-        const blocks = editor.querySelectorAll('p, li, h1, h2, h3, h4, div, blockquote');
+        // We scan text content for '::'
+        // Simplification: iterate over block elements
+        const blocks = editor.querySelectorAll('p, li, h1, h2, h3, h4, div');
         blocks.forEach(block => {
             const text = block.innerText;
             if (text.includes('::')) {
                 const parts = text.split('::');
                 if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
-                    // Prevent duplicates from multiple selectors/strategies
-                    const q = parts[0].trim();
-                    const a = parts[1].trim();
-                    if (!flashcards.some(f => f.q === q && f.a === a)) {
-                        flashcards.push({ q, a });
-                    }
+                    flashcards.push({
+                        q: parts[0].trim(),
+                        a: parts[1].trim()
+                    });
                 }
             }
         });
 
         // Strategy B: Header (Q) -> Body (A)
+        // We iterate children directly
         const children = Array.from(editor.children);
         let currentQ = null;
         let currentA = '';
@@ -5835,23 +5141,29 @@ function generateFlashcards() {
             const tag = node.tagName.toLowerCase();
 
             if (['h1', 'h2', 'h3'].includes(tag)) {
+                // If we have a pending card, push it
                 if (currentQ && currentA.trim()) {
-                    if (!flashcards.some(f => f.q === currentQ)) {
-                        flashcards.push({ q: currentQ, a: currentA.trim() });
-                    }
+                    flashcards.push({ q: currentQ, a: currentA.trim() });
                 }
-                currentQ = node.innerText.trim();
+                // Start new card
+                currentQ = node.innerText;
                 currentA = '';
             } else if (currentQ) {
-                if (node.innerText.trim() && !node.innerText.includes('::')) {
-                    currentA += node.innerText.trim() + '\n';
+                // Append to answer if not a new header
+                // Skip empty text nodes if possible, but innerText handles it
+                if (node.innerText.trim()) {
+                    // Don't include lines that were already caught by "::" logic to avoid dupes?
+                    // For simplicity, we include them unless they are identical.
+                    if (!node.innerText.includes('::')) {
+                        currentA += node.innerText + '\n';
+                    }
                 }
             }
         }
+
+        // Push last card
         if (currentQ && currentA.trim()) {
-            if (!flashcards.some(f => f.q === currentQ)) {
-                flashcards.push({ q: currentQ, a: currentA.trim() });
-            }
+            flashcards.push({ q: currentQ, a: currentA.trim() });
         }
     });
 }
@@ -5861,7 +5173,7 @@ window.renderCard = () => {
 
     if (flashcards.length === 0) {
         cardEl.classList.remove('flipped');
-        document.getElementById('fcQuestion').innerHTML = '<div class="nb-empty-state" style="margin-top:20px; color:var(--ink-color);"><div class="nb-empty-state-icon">📇</div><div class="nb-empty-state-title">No Flashcards Found</div><div class="nb-empty-state-desc" style="font-size:0.9rem;">Type "Question :: Answer" or use Headings in your notes to auto-generate cards.</div></div>';
+        document.getElementById('fcQuestion').innerHTML = '<div class="nb-empty-state" style="margin-top:20px; color:var(--ink-color);"><div class="nb-empty-state-icon">≡ƒôç</div><div class="nb-empty-state-title">No Flashcards Found</div><div class="nb-empty-state-desc" style="font-size:0.9rem;">Type "Question :: Answer" or use Headings in your notes to auto-generate cards.</div></div>';
         document.getElementById('fcAnswer').innerText = '';
         document.getElementById('fcCounter').innerText = '0 / 0';
         return;
@@ -6001,7 +5313,7 @@ window.createWelcomeDemo = async () => {
 
     const content = `
         <div class="content-block text-block" style="max-width: 800px; line-height: 1.6;">
-            <h2 style="font-family: 'Caveat', cursive; font-size: 2.2rem; color: #3498db;">👋 Welcome to Academic Notebook!</h2>
+            <h2 style="font-family: 'Caveat', cursive; font-size: 2.2rem; color: #3498db;">≡ƒæï Welcome to Academic Notebook!</h2>
             <p>This is your infinite workspace. You can type freely, add drawings, and insert complex equations.</p>
             <p><br></p>
             <h3 style="font-family: 'Caveat', cursive; font-size: 1.8rem;">1. Math &amp; Science</h3>
@@ -6015,7 +5327,7 @@ window.createWelcomeDemo = async () => {
             <h3 style="font-family: 'Caveat', cursive; font-size: 1.8rem;">3. Quick Actions</h3>
             <p>Right-click this note in the sidebar on the left to explore the Context Menu. You can Rename, Duplicate, or Export notes easily. And yes, you can drag and drop notes to reorder them!</p>
             <p><br></p>
-            <p><em>Happy studying! 🚀</em></p>
+            <p><em>Happy studying! ≡ƒÜÇ</em></p>
         </div>
     `;
 
@@ -6023,7 +5335,7 @@ window.createWelcomeDemo = async () => {
     
     const demoChapter = {
         id: id,
-        title: "👋 Welcome to Academic Notebook",
+        title: "≡ƒæï Welcome to Academic Notebook",
         category: "General",
         tags: ["Welcome", "Tutorial"],
         content: content,
@@ -6069,7 +5381,7 @@ window.showEmptyPageHints = () => {
         hint.className = 'empty-page-hint';
         hint.style.cssText = 'opacity: 0.25; text-align: center; margin-top: 3rem; color: var(--ink-color); pointer-events: none; user-select: none; transition: opacity 0.3s;';
         hint.innerHTML = `
-                    <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">✍️ Tap to write</p>
+                    <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">Γ£ì∩╕Å Tap to write</p>
                     <p style="font-size: 0.9rem; opacity: 0.7;">or use the toolbar to add content</p>
                 `;
 
@@ -6116,7 +5428,7 @@ window.deleteChapter = async (id, event) => {
  * - Maintains aspect ratio during resize
  */
 window.createResizableDraggableImage = function (src) {
-    // Outer wrapper — positioned absolutely for free placement
+    // Outer wrapper ΓÇö positioned absolutely for free placement
     const wrapper = document.createElement('div');
     wrapper.className = 'rd-image-wrapper';
     wrapper.setAttribute('contenteditable', 'false');
@@ -6257,7 +5569,7 @@ window.createResizableDraggableImage = function (src) {
         handle.addEventListener('touchstart', onResizeStart, { passive: false });
     });
 
-    // Default size — let the image determine natural width up to a max
+    // Default size ΓÇö let the image determine natural width up to a max
     img.onload = function () {
         const maxW = 400;
         const naturalW = img.naturalWidth;
@@ -6338,7 +5650,7 @@ window.handleImageUpload = (e) => {
     const reader = new FileReader();
     reader.onload = (event) => {
         insertResizableImage(event.target.result);
-        showToast('✓ Image added');
+        showToast('Γ£ô Image added');
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -6346,24 +5658,6 @@ window.handleImageUpload = (e) => {
 
 // --- UPDATED LOAD CHAPTER ---
 function loadChapter(id) {
-    const existingBlock = document.getElementById(`page-block-${id}`);
-    if (existingBlock) {
-        currentId = id;
-        document.querySelectorAll('.sequence-editor-block').forEach(b => b.classList.remove('active-focus'));
-        existingBlock.classList.add('active-focus');
-        existingBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        
-        const chapter = chapters.find(c => c.id === id);
-        if (chapter) {
-            document.getElementById('pageTitle').value = chapter.title;
-            updateToolVisibility(chapter);
-            selectWritingTool(chapter.tool || 'pen', false);
-        }
-        renderSidebar();
-        document.getElementById('mainSidebar').classList.remove('open');
-        return;
-    }
-
     currentId = id;
     undoStack = []; redoStack = [];
     const chapter = chapters.find(c => c.id === id);
@@ -6571,12 +5865,12 @@ function debounceSave(chapter) {
                 document.getElementById('saveStatus').style.color = 'var(--save-color)';
             } catch (error) {
                 console.error('Save error:', error);
-                document.getElementById('saveStatus').innerText = '⚠️ Save failed';
+                document.getElementById('saveStatus').innerText = 'ΓÜá∩╕Å Save failed';
                 document.getElementById('saveStatus').style.color = '#e74c3c';
 
                 // Handle quota exceeded error
                 if (error.name === 'QuotaExceededError') {
-                    showToast('⚠️ Storage full! Please delete old notes.');
+                    showToast('ΓÜá∩╕Å Storage full! Please delete old notes.');
                 }
             } finally {
                 saveInProgress = false;
@@ -6849,7 +6143,7 @@ window.applyTemplate = async (key) => {
 
     const temps = {
         default: { title: "New Note", content: "<div>Start typing...</div>", isWhiteboard: false, type: PAGE_TYPES.NOTE },
-        meeting: { title: "Meeting: " + new Date().toLocaleDateString(), content: "<h2 class='styled-header'>Participants</h2><p>• </p><h2 class='styled-header'>Notes</h2><p></p><h2 class='styled-header'>Action Items</h2>", type: PAGE_TYPES.NOTE },
+        meeting: { title: "Meeting: " + new Date().toLocaleDateString(), content: "<h2 class='styled-header'>Participants</h2><p>ΓÇó </p><h2 class='styled-header'>Notes</h2><p></p><h2 class='styled-header'>Action Items</h2>", type: PAGE_TYPES.NOTE },
         journal: { title: "Entry: " + new Date().toLocaleDateString(), content: "<div class='sticky-note'>What happened today?</div>", type: PAGE_TYPES.NOTE },
         project: { title: "Project Tracker", content: "<h2 class='styled-header'>Phase 1</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Milestone</div></div>", type: PAGE_TYPES.PROJECT },
         eisenhower: {
@@ -6882,7 +6176,7 @@ window.applyTemplate = async (key) => {
         perio_case: { title: "Perio Charting", content: "<h2 class='styled-header'>Periodontal Status</h2><p>Pockets > 4mm: ...</p><h2 class='styled-header'>Diagnosis</h2><p>Stage: ... Grade: ...</p><h2 class='styled-header'>Treatment Plan</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Scaling & Root Planing</div></div>", type: PAGE_TYPES.PERIO_CASE },
         oral_radiology: { title: "Radiographic Report", content: "<h2 class='styled-header'>Image Type</h2><p>IOPA / OPG / CBCT</p><h2 class='styled-header'>Findings</h2><p>Radio-opacity/lucency: ...</p><h2 class='styled-header'>Interpretation</h2><p>...</p>", type: PAGE_TYPES.ORAL_RADIOLOGY },
         prob_sol: { title: "Problem Solution", content: "<h2 class='styled-header'>Problem Statement</h2><p>...</p><h2 class='styled-header'>Given & Assumptions</h2><p>...</p><h2 class='styled-header'>Diagram</h2><p>(Use Sketch Mode)</p><h2 class='styled-header'>Governing Equations</h2><p>...</p><h2 class='styled-header'>Solution</h2><p>...</p><h2 class='styled-header'>Final Answer</h2><div class='sticky-note'>Result: ...</div>", type: PAGE_TYPES.PROBLEM_SOLUTION },
-        circuit: { title: "Circuit Analysis", content: "<h2 class='styled-header'>Circuit Diagram</h2><div style='background:#e8f4f8; border-left:4px solid #3498db; padding:12px; margin:10px 0; border-radius:4px; font-size:0.85rem;'>💡 <strong>Instructions:</strong> Click the ⚡ Components button in the toolbar to open the component library. Drag components onto the canvas, then use sketch mode to draw wires between them. Double-click components to delete.</div><div id='circuitDiagramCanvas' style='position:relative; min-height:400px; background:#f8f9fa; border:2px solid #3498db; border-radius:8px; margin:15px 0;'><svg id='circuitSvg' style='position:absolute; width:100%; height:100%; pointer-events:none;'></svg><div id='circuitComponentsLayer' style='position:absolute; width:100%; height:100%;'></div></div><h2 class='styled-header'>Known Values</h2><p>R1 = ...</p><h2 class='styled-header'>Laws Applied</h2><p>KCL / KVL</p><h2 class='styled-header'>Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CIRCUIT_ANALYSIS },
+        circuit: { title: "Circuit Analysis", content: "<h2 class='styled-header'>Circuit Diagram</h2><div style='background:#e8f4f8; border-left:4px solid #3498db; padding:12px; margin:10px 0; border-radius:4px; font-size:0.85rem;'>≡ƒÆí <strong>Instructions:</strong> Click the ΓÜí Components button in the toolbar to open the component library. Drag components onto the canvas, then use sketch mode to draw wires between them. Double-click components to delete.</div><div id='circuitDiagramCanvas' style='position:relative; min-height:400px; background:#f8f9fa; border:2px solid #3498db; border-radius:8px; margin:15px 0;'><svg id='circuitSvg' style='position:absolute; width:100%; height:100%; pointer-events:none;'></svg><div id='circuitComponentsLayer' style='position:absolute; width:100%; height:100%;'></div></div><h2 class='styled-header'>Known Values</h2><p>R1 = ...</p><h2 class='styled-header'>Laws Applied</h2><p>KCL / KVL</p><h2 class='styled-header'>Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CIRCUIT_ANALYSIS },
         mech_sys: { title: "Mechanical System", content: "<h2 class='styled-header'>System Description</h2><p>...</p><h2 class='styled-header'>Free Body Diagram</h2><p>(Draw FBD)</p><h2 class='styled-header'>Equations of Motion</h2><p>F = ma...</p><h2 class='styled-header'>Solution</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.MECHANICAL_SYSTEM },
         struct: { title: "Structural Analysis", content: "<h2 class='styled-header'>Structure Description</h2><p>...</p><h2 class='styled-header'>Load Diagram</h2><p>...</p><h2 class='styled-header'>Calculations</h2><p>...</p><h2 class='styled-header'>Design Checks</h2><div class='checklist-item' contenteditable='false'><div class='checkbox-wrapper' contenteditable='false'><div class='checkbox'></div></div><div class='checklist-text' contenteditable='true'>Safety Factor OK</div></div>", type: PAGE_TYPES.STRUCTURAL_ANALYSIS },
         control: { title: "Control System", content: "<h2 class='styled-header'>Block Diagram</h2><p>...</p><h2 class='styled-header'>Transfer Function</h2><p>G(s) = ...</p><h2 class='styled-header'>Stability Analysis</h2><p>...</p>", isWhiteboard: true, type: PAGE_TYPES.CONTROL_SYSTEM },
@@ -6896,28 +6190,28 @@ window.applyTemplate = async (key) => {
                         <div class="cornell-header">
                             <input type="text" placeholder="Topic / Lecture Title" id="cornellTopic" class="cornell-topic" />
                             <div class="cornell-meta">
-                                <span>📅 <span id="cornellDate">${new Date().toLocaleDateString()}</span></span>
+                                <span>≡ƒôà <span id="cornellDate">${new Date().toLocaleDateString()}</span></span>
                                 <input type="text" placeholder="Source (optional)" id="cornellSource" style="border:none; background:transparent; flex:1;" />
                             </div>
                         </div>
                         <div class="cornell-cues" id="cornellCues">
-                            <div class="cornell-cues-title">🔑 Cues / Questions</div>
-                            <div style="font-size:0.8rem; opacity:0.7; margin-bottom:10px;">Select text → "🖌️ Highlight" or "Extract Cue"</div>
+                            <div class="cornell-cues-title">≡ƒöæ Cues / Questions</div>
+                            <div style="font-size:0.8rem; opacity:0.7; margin-bottom:10px;">Select text ΓåÆ "≡ƒûî∩╕Å Highlight" or "Extract Cue"</div>
                         </div>
                         <div class="cornell-notes" contenteditable="true" id="cornellNotes">
                             <p>Take your lecture notes here...</p>
-                            <p>• Use bullet points</p>
-                            <p>• Draw diagrams in sketch mode</p>
-                            <p>• Highlight key concepts, then extract as cues</p>
+                            <p>ΓÇó Use bullet points</p>
+                            <p>ΓÇó Draw diagrams in sketch mode</p>
+                            <p>ΓÇó Highlight key concepts, then extract as cues</p>
                         </div>
                         <div class="cornell-summary" contenteditable="true" id="cornellSummary">
-                            <div class="cornell-summary-title">📝 Summary</div>
+                            <div class="cornell-summary-title">≡ƒô¥ Summary</div>
                             <p>Summarize the key concepts in 2-3 sentences...</p>
                         </div>
                         <div class="cornell-toolbar">
-                            <button class="cornell-btn cornell-highlight-btn" onclick="highlightCornellText()">🖌️ Highlight</button>
+                            <button class="cornell-btn cornell-highlight-btn" onclick="highlightCornellText()">≡ƒûî∩╕Å Highlight</button>
                             <button class="cornell-btn" onclick="extractCornellCue()">Extract Cue</button>
-                            <button class="cornell-btn" onclick="toggleCornellStudyMode()">👁️ Study Mode</button>
+                            <button class="cornell-btn" onclick="toggleCornellStudyMode()">≡ƒæü∩╕Å Study Mode</button>
                         </div>
                     </div>`,
             type: PAGE_TYPES.CORNELL
@@ -6934,7 +6228,7 @@ window.applyTemplate = async (key) => {
                         <div class="zettel-wordcount" id="zettelWordcount">0 words</div>
                         
                         <div class="zettel-section">
-                            <div class="zettel-section-title">📚 Source / Context</div>
+                            <div class="zettel-section-title">≡ƒôÜ Source / Context</div>
                             <input type="text" placeholder="From: Book/Lecture/Thought..." style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; margin-bottom:8px;" />
                             <div class="zettel-tag-input" id="zettelTags">
                                 <span style="font-size:0.85rem; opacity:0.7;">Tags (min 2):</span>
@@ -6943,13 +6237,13 @@ window.applyTemplate = async (key) => {
                         </div>
                         
                         <div class="zettel-section">
-                            <div class="zettel-section-title">🔗 Links</div>
+                            <div class="zettel-section-title">≡ƒöù Links</div>
                             <div style="font-size:0.85rem; opacity:0.7; margin-bottom:8px;">Connect to other notes (bi-directional)</div>
                             <div id="zettelLinks"></div>
                         </div>
                         
                         <div class="zettel-section">
-                            <div class="zettel-section-title">⚡ Permanence Rating</div>
+                            <div class="zettel-section-title">ΓÜí Permanence Rating</div>
                             <div class="zettel-permanence">
                                 <label><input type="radio" name="zettelPerm" value="fleeting" /> Fleeting (raw capture)</label>
                                 <label><input type="radio" name="zettelPerm" value="literature" /> Literature (paraphrased)</label>
@@ -6966,11 +6260,11 @@ window.applyTemplate = async (key) => {
                         <div class="outline-header">
                             <input type="text" class="outline-title" placeholder="Chapter / Topic" />
                             <div class="outline-controls">
-                                <button class="cornell-btn" onclick="outdentOutlineItemUI()" title="Decrease Indent (Shift+Tab)">⇤</button>
-                                <button class="cornell-btn" onclick="indentOutlineItemUI()" title="Increase Indent (Tab)">⇥</button>
+                                <button class="cornell-btn" onclick="outdentOutlineItemUI()" title="Decrease Indent (Shift+Tab)">Γçñ</button>
+                                <button class="cornell-btn" onclick="indentOutlineItemUI()" title="Increase Indent (Tab)">ΓçÑ</button>
                                 <button class="cornell-btn" onclick="addOutlineItemUI()" title="Add Item (Enter)">+</button>
-                                <button class="cornell-btn" style="margin-left:8px;" onclick="collapseAllOutline()">↻ Collapse All</button>
-                                <button class="cornell-btn" onclick="expandAllOutline()">⊕ Expand All</button>
+                                <button class="cornell-btn" style="margin-left:8px;" onclick="collapseAllOutline()">Γå╗ Collapse All</button>
+                                <button class="cornell-btn" onclick="expandAllOutline()">Γèò Expand All</button>
                             </div>
                         </div>
                         <div id="outlineContent" contenteditable="true" style="outline:none;">
@@ -6982,7 +6276,7 @@ window.applyTemplate = async (key) => {
                             <div class="outline-item level-1"><span class="outline-label">II.</span> Main Topic</div>
                         </div>
                         <div style="margin-top:15px; padding:12px; background:rgba(149,165,166,0.1); border-radius:5px; font-size:0.85rem;">
-                            <strong>💡 Tip:</strong> Press <b>Enter</b> to add a new item. <b>Tab</b> to indent, <b>Backspace</b> (at start) or <b>Shift+Tab</b> to outdent. Max 4 levels.
+                            <strong>≡ƒÆí Tip:</strong> Press <b>Enter</b> to add a new item. <b>Tab</b> to indent, <b>Backspace</b> (at start) or <b>Shift+Tab</b> to outdent. Max 4 levels.
                         </div>
                     </div>`,
             type: PAGE_TYPES.OUTLINE
@@ -6993,8 +6287,8 @@ window.applyTemplate = async (key) => {
             content: `<div class="mindmap-container" id="mindmapContainer">
                         <div class="mindmap-toolbar">
                             <button class="cornell-btn" onclick="addMindmapNode()">+ Node</button>
-                            <button class="cornell-btn" onclick="addMindmapLink()">🔗 Link</button>
-                            <button class="cornell-btn" onclick="autoLayoutMindmap()">🎨 Organize</button>
+                            <button class="cornell-btn" onclick="addMindmapLink()">≡ƒöù Link</button>
+                            <button class="cornell-btn" onclick="autoLayoutMindmap()">≡ƒÄ¿ Organize</button>
                         </div>
                         <div class="mindmap-canvas" id="mindmapCanvas">
                             <div class="mindmap-node central" style="left:50%; top:50%; transform:translate(-50%,-50%);">
@@ -7013,7 +6307,7 @@ window.applyTemplate = async (key) => {
                         </div>
                         
                         <div class="sq3r-section" id="sq3rSurvey">
-                            <div class="sq3r-section-icon">📖</div>
+                            <div class="sq3r-section-icon">≡ƒôû</div>
                             <div class="sq3r-section-title">Survey (Skim First)</div>
                             <input type="text" placeholder="Headings noticed..." style="width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px;" />
                             <input type="text" placeholder="Key terms spotted..." style="width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px;" />
@@ -7025,7 +6319,7 @@ window.applyTemplate = async (key) => {
                         </div>
                         
                         <div class="sq3r-section" id="sq3rQuestion">
-                            <div class="sq3r-section-icon">❓</div>
+                            <div class="sq3r-section-icon">Γ¥ô</div>
                             <div class="sq3r-section-title">Question (Pre-read questions)</div>
                             <div style="font-size:0.85rem; margin-bottom:10px; opacity:0.8;">What do I expect to learn? (Min 3 questions)</div>
                             <div class="sq3r-question-item" contenteditable="true">1. </div>
@@ -7034,7 +6328,7 @@ window.applyTemplate = async (key) => {
                         </div>
                         
                         <div class="sq3r-section locked" id="sq3rRead">
-                            <div class="sq3r-section-icon">📝</div>
+                            <div class="sq3r-section-icon">≡ƒô¥</div>
                             <div class="sq3r-section-title">Read (Main Notes)</div>
                             <div contenteditable="true" style="min-height:200px; padding:12px; background:white; border-radius:5px;">
                                 Take comprehensive notes while reading...
@@ -7042,7 +6336,7 @@ window.applyTemplate = async (key) => {
                         </div>
                         
                         <div class="sq3r-section locked" id="sq3rRecite">
-                            <div class="sq3r-section-icon">🔁</div>
+                            <div class="sq3r-section-icon">≡ƒöü</div>
                             <div class="sq3r-section-title">Recite (Answer from Memory)</div>
                             <div style="font-size:0.85rem; margin-bottom:10px; opacity:0.8;">Answer your questions without looking</div>
                             <div class="sq3r-question-item" contenteditable="true">Answer 1: </div>
@@ -7052,12 +6346,12 @@ window.applyTemplate = async (key) => {
                         </div>
                         
                         <div class="sq3r-section locked" id="sq3rReview">
-                            <div class="sq3r-section-icon">📚</div>
+                            <div class="sq3r-section-icon">≡ƒôÜ</div>
                             <div class="sq3r-section-title">Review (Spaced Repetition)</div>
                             <div class="sq3r-review-tracker">
                                 <div>
                                     <strong>Confidence:</strong>
-                                    <div class="sq3r-stars" onclick="rateSQ3RConfidence(event)">★☆☆☆☆</div>
+                                    <div class="sq3r-stars" onclick="rateSQ3RConfidence(event)">ΓÿàΓÿåΓÿåΓÿåΓÿå</div>
                                 </div>
                                 <div>
                                     <div><strong>Last:</strong> Today</div>
@@ -7079,7 +6373,7 @@ window.applyTemplate = async (key) => {
                         <div class="feynman-step" id="feynmanStep1">
                             <div class="feynman-step-header">
                                 <div class="feynman-step-number">1</div>
-                                <div class="feynman-step-title">🎓 Study & Understand</div>
+                                <div class="feynman-step-title">≡ƒÄô Study & Understand</div>
                             </div>
                             <div contenteditable="true" style="min-height:150px; padding:12px; background:rgba(230,126,34,0.05); border-radius:5px;">
                                 Research and gather your initial understanding...
@@ -7089,13 +6383,13 @@ window.applyTemplate = async (key) => {
                         <div class="feynman-step locked" id="feynmanStep2">
                             <div class="feynman-step-header">
                                 <div class="feynman-step-number">2</div>
-                                <div class="feynman-step-title">👶 Explain Like I'm 12</div>
+                                <div class="feynman-step-title">≡ƒæ╢ Explain Like I'm 12</div>
                             </div>
                             <div contenteditable="true" id="feynmanSimple" oninput="checkFeynmanReadability()" style="min-height:200px; padding:12px; background:white; border-radius:5px;">
                                 Explain this concept in simple terms, as if teaching a child...
                             </div>
                             <div class="feynman-readability" id="feynmanReadability">
-                                <div>📊 Readability: <span id="feynmanScore">-</span></div>
+                                <div>≡ƒôè Readability: <span id="feynmanScore">-</span></div>
                                 <div style="font-size:0.85rem; opacity:0.8;">Target: Grade 6-8 level</div>
                             </div>
                         </div>
@@ -7103,119 +6397,11 @@ window.applyTemplate = async (key) => {
                         <div class="feynman-step locked" id="feynmanStep3">
                             <div class="feynman-step-header">
                                 <div class="feynman-step-number">3</div>
-                                <div class="feynman-step-title">🔍 Identify Gaps</div>
+                                <div class="feynman-step-title">≡ƒöì Identify Gaps</div>
                             </div>
                             <div style="font-size:0.85rem; margin-bottom:10px; opacity:0.8;">What couldn't you explain simply?</div>
                             <div class="feynman-gap-item" contenteditable="true">Gap 1: </div>
-                            <div class="feynman-gap-item" contenteditable="true">Gap 2: </div>
-                        </div>
-                        
-                        <div class="feynman-step locked" id="feynmanStep4">
-                            <div class="feynman-step-header">
-                                <div class="feynman-step-number">4</div>
-                                <div class="feynman-step-title">📖 Review & Simplify</div>
-                            </div>
-                            <div contenteditable="true" style="min-height:150px; padding:12px; background:rgba(46,204,113,0.05); border-radius:5px;">
-                                Return to source material, address gaps, refine your explanation...
-                            </div>
-                            <div class="feynman-iteration">Iteration #<span id="feynmanIterationCount">1</span></div>
-                        </div>
-                    </div>`,
-            type: PAGE_TYPES.FEYNMAN
-        }
-    };
-
-    const selected = temps[key];
-    if (selected) {
-        document.getElementById('pageTitle').value = selected.title;
-
-        // Apply to the ACTIVE chapter's content area
-        const activeBlock = document.getElementById(`page-block-${currentId}`);
-        const contentArea = activeBlock ? activeBlock.querySelector('.content-area') : document.querySelector('.content-area');
-        if (contentArea) {
-            contentArea.innerHTML = selected.content;
-        }
-
-        if (selected.isWhiteboard) {
-            chapter.isWhiteboard = true;
-            document.getElementById('paper').classList.add('infinite');
-        } else {
-            chapter.isWhiteboard = false;
-            document.getElementById('paper').classList.remove('infinite');
-        }
-
-        let disc = 'general';
-        if (['algo', 'codeStudy', 'sysDesign', 'project', 'logicGates'].includes(key)) disc = 'cs';
-        if (['anatomy', 'disease', 'drug', 'physio', 'pathway', 'lab'].includes(key)) disc = 'medical';
-        if (['dental_anatomy', 'oral_pathology', 'dental_procedure', 'dental_case', 'prostho_plan', 'endo_case', 'perio_case', 'oral_radiology'].includes(key)) disc = 'medical';
-        if (['prob_sol', 'circuit', 'mech_sys', 'struct', 'control', 'process', 'lab_exp'].includes(key)) disc = 'engineering';
-
-        // Advanced templates can be used in any discipline
-        if (['cornell', 'zettelkasten', 'outline', 'mindmap', 'sq3r', 'feynman'].includes(key)) {
-            // Keep existing discipline or set to general
-            disc = chapter.metadata?.discipline || 'general';
-        }
-
-        chapter.metadata.discipline = disc;
-        chapter.metadata.type = selected.type || PAGE_TYPES.NOTE;
-
-        if (disc === 'engineering') {
-            if (key === 'circuit' || key === 'control') chapter.metadata.branch = 'Electrical';
-            else if (key === 'mech_sys') chapter.metadata.branch = 'Mechanical';
-            else if (key === 'struct') chapter.metadata.branch = 'Civil';
-            else if (key === 'process') chapter.metadata.branch = 'Industrial';
-            else chapter.metadata.branch = 'General';
-        }
-
-        await saveChapterToDB(chapter);
-        renderSidebar();
-        updateToolVisibility(chapter);
-
-        // Initialize Logic Gates Simulator if this template was selected
-        if (key === 'logicGates') {
-            setTimeout(() => initLogicGatesSimulator(), 100);
-        }
-
-        // Initialize advanced template features
-        if (['cornell', 'zettelkasten', 'sq3r', 'feynman'].includes(key)) {
-            setTimeout(() => {
-                const cornellNotes = document.getElementById('cornellNotes');
-                if (cornellNotes) cornellNotes.addEventListener('input', checkCornellNotesLength);
-
-                const zettelContent = document.getElementById('zettelContent');
-                if (zettelContent) checkZettelWordCount();
-
-                const feynmanSimple = document.getElementById('feynmanSimple');
-                if (feynmanSimple) feynmanSimple.addEventListener('input', checkFeynmanReadability);
-            }, 100);
-        }
-
-        // Initialize outline template
-        if (key === 'outline') {
-            setTimeout(() => {
-                if (typeof initOutlineTemplate === 'function') {
-                    initOutlineTemplate();
-                }
-            }, 100);
-        }
-
-        // Initialize mindmap template
-        if (key === 'mindmap') {
-            setTimeout(() => {
-                if (typeof initMindmapTemplate === 'function') {
-                    initMindmapTemplate();
-                }
-            }, 100);
-        }
-
-        // Circuit symbols tray will be toggled via Components button
-        // No auto-initialization needed
-    }
-    toggleTemplates();
-    resizeCanvas();
-};
-
-/* ==================== GLOBAL FULL-TEXT SEARCH ENGINE ==================== */
+                            <div class="feyn/* ==================== GLOBAL FULL-TEXT SEARCH ENGINE ==================== */
 window.searchNotes = (query) => {
     if (!query) {
         // Return everything with an empty snippet
@@ -7287,7 +6473,7 @@ window.searchNotes = (query) => {
 window.renderSidebar = () => {
     const list = document.getElementById('chapterList');
     const searchInput = document.getElementById('sidebarSearch');
-    const searchStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const searchStr = searchInput ? searchInput.value.trim() : '';
     const categoryFilter = document.getElementById('categoryFilter').value;
     list.innerHTML = '';
 
@@ -7329,7 +6515,7 @@ window.renderSidebar = () => {
     if (filtered.length === 0) {
         const isSearch = searchStr !== '' || categoryFilter !== 'all';
         const msg = isSearch ? "No notes matching your search or filter." : "Create your first note to get started.";
-        const icon = isSearch ? '🔍' : '📝';
+        const icon = isSearch ? '≡ƒöì' : '≡ƒô¥';
         const title = isSearch ? 'No Results' : "It's a bit empty here";
         const btnHtml = !isSearch ? '<button class="nb-empty-state-btn" onclick="createNewChapter()">+ New Note</button>' : '';
         
@@ -7365,7 +6551,7 @@ window.renderSidebar = () => {
                             <div style="margin-top:4px; display:flex;">${tagsHtml}</div>
                             ${catBadge}
                         </div>
-                        <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">🗑️</button>
+                        <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">≡ƒùæ∩╕Å</button>
                     `;
             list.appendChild(li);
         });
@@ -7375,9 +6561,89 @@ window.renderSidebar = () => {
     if (typeof renderTagsSidebar === 'function') {
         renderTagsSidebar(); 
     }
+};eplace('#', '')));
+        const matchesSearch = titleMatch || tagMatch;
+
+        // Smart Filtering based on Discipline or Category
+        let matchesCat = true;
+        if (categoryFilter !== 'all') {
+            if (['Algorithms', 'Systems', 'Projects'].includes(categoryFilter)) {
+                matchesCat = (ch.category === categoryFilter);
+                if (ch.metadata?.type === PAGE_TYPES.ALGORITHM && categoryFilter === 'Algorithms') matchesCat = true;
+                if (ch.metadata?.type === PAGE_TYPES.SYSTEM && categoryFilter === 'Systems') matchesCat = true;
+                if (ch.metadata?.type === PAGE_TYPES.PROJECT && categoryFilter === 'Projects') matchesCat = true;
+            } else if (['Anatomy', 'Pathology', 'Pharmacology', 'Clinical'].includes(categoryFilter)) {
+                if (ch.metadata?.discipline !== 'medical') return false;
+                if (categoryFilter === 'Anatomy' && ch.metadata?.type !== PAGE_TYPES.ANATOMY) matchesCat = false;
+                if (categoryFilter === 'Pathology' && ch.metadata?.type !== PAGE_TYPES.DISEASE) matchesCat = false;
+                if (categoryFilter === 'Pharmacology' && ch.metadata?.type !== PAGE_TYPES.DRUG) matchesCat = false;
+                if (categoryFilter === 'Clinical' && ![PAGE_TYPES.CLINICAL_CASE, PAGE_TYPES.LAB].includes(ch.metadata?.type)) matchesCat = false;
+            } else if (['Dental Anatomy', 'Procedures', 'Dental Cases'].includes(categoryFilter)) {
+                if (ch.metadata?.discipline !== 'medical') return false;
+                if (categoryFilter === 'Dental Anatomy' && ch.metadata?.type !== PAGE_TYPES.DENTAL_ANATOMY) matchesCat = false;
+                if (categoryFilter === 'Procedures' && ![PAGE_TYPES.DENTAL_PROCEDURE, PAGE_TYPES.PROSTHO_PLAN].includes(ch.metadata?.type)) matchesCat = false;
+                if (categoryFilter === 'Dental Cases' && ![PAGE_TYPES.DENTAL_CASE, PAGE_TYPES.ENDO_CASE, PAGE_TYPES.PERIO_CASE, PAGE_TYPES.ORAL_RADIOLOGY, PAGE_TYPES.ORAL_PATHOLOGY].includes(ch.metadata?.type)) matchesCat = false;
+
+            } else if (['Electrical', 'Mechanical', 'Civil', 'Electronics', 'Mechatronics', 'Industrial'].includes(categoryFilter)) {
+                if (ch.metadata?.discipline !== 'engineering') return false;
+                if (ch.metadata?.branch !== categoryFilter) matchesCat = false;
+            } else if (categoryFilter === 'General') {
+                matchesCat = ch.metadata?.discipline === 'general';
+            }
+        }
+
+        return matchesSearch && matchesCat;
+    });
+
+    if (filtered.length === 0) {
+        const isSearch = searchStr !== '' || categoryFilter !== 'all';
+        const msg = isSearch ? "No notes matching your search or filter." : "Create your first note to get started.";
+        const icon = isSearch ? '≡ƒöì' : '≡ƒô¥';
+        const title = isSearch ? 'No Results' : "It's a bit empty here";
+        const btnHtml = !isSearch ? '<button class="nb-empty-state-btn" onclick="createNewChapter()">+ New Note</button>' : '';
+        
+        list.innerHTML = 
+            '<div class="nb-empty-state" style="margin-top:20px;">' +
+                '<div class="nb-empty-state-icon">' + icon + '</div>' +
+                '<div class="nb-empty-state-title">' + title + '</div>' +
+                '<div class="nb-empty-state-desc">' + msg + '</div>' +
+                btnHtml +
+            '</div>';
+    } else {
+        filtered.forEach(ch => {
+        const li = document.createElement('li');
+        li.className = `nav-item ${ch.id === currentId ? 'active' : ''}`;
+
+        const cleanContent = (ch.content || '').replace(/<[^>]*>?/gm, '');
+        let snippet = cleanContent.substring(0, 60) + (cleanContent.length > 60 ? '...' : '');
+
+        let tagsHtml = (ch.tags || []).map(t => `<span class="tag-mini">#${t}</span>`).join('');
+        let catBadge = '';
+        const disp = ch.metadata?.discipline || ch.category;
+        if (disp && disp !== 'general' && categoryFilter === 'all') {
+            catBadge = `<div class="cat-badge">${disp.toUpperCase()}</div>`;
+        }
+
+        li.innerHTML = `
+                    <div class="nav-info" onclick="loadChapter('${ch.id}')">
+                        <div class="nav-item-title">${ch.title || 'Untitled'}</div>
+                        <div class="nav-item-snippet">${snippet}</div>
+                        <div style="margin-top:4px; display:flex;">${tagsHtml}</div>
+                        ${catBadge}
+                    </div>
+                    <button class="btn-delete" onclick="deleteChapter('${ch.id}', event)" title="Delete Page">≡ƒùæ∩╕Å</button>
+                `;
+        list.appendChild(li);
+        });
+    }
+
+    // Refresh tags sidebar when sidebar updates
+    if (typeof renderTagsSidebar === 'function') {
+        renderTagsSidebar(); 
+    }
 };
 
-// ─── USER PROFILE WIDGET ─────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ USER PROFILE WIDGET ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function renderUserProfile() {
     const bar = document.getElementById('userProfileBar');
@@ -7399,13 +6665,13 @@ function renderUserProfile() {
             <div class="up-email">${isGuest ? 'Temporary session' : user.email}</div>
         </div>
         <div class="up-actions">
-            ${!isGuest ? `<button class="up-btn" onclick="openAccountModal()" title="Account settings">⚙️</button>` : ''}
-            <button class="up-btn up-logout" onclick="window.AUTH.logout()" title="Sign out">↩️</button>
+            ${!isGuest ? `<button class="up-btn" onclick="openAccountModal()" title="Account settings">ΓÜÖ∩╕Å</button>` : ''}
+            <button class="up-btn up-logout" onclick="window.AUTH.logout()" title="Sign out">Γå⌐∩╕Å</button>
         </div>
     `;
 }
 
-// ─── ACCOUNT SETTINGS MODAL ──────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ ACCOUNT SETTINGS MODAL ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function openAccountModal() {
     // Remove existing if present
@@ -7420,7 +6686,7 @@ function openAccountModal() {
     modal.className = 'floating-pane';
     modal.style.cssText = 'display:block; width:310px; z-index:3000; top:260px; right:20px;';
     modal.innerHTML = `
-        <h3 style="margin-bottom:15px; font-family:'Caveat',cursive; font-size:1.3rem;">👤 Account</h3>
+        <h3 style="margin-bottom:15px; font-family:'Caveat',cursive; font-size:1.3rem;">≡ƒæñ Account</h3>
 
         <div class="meta-group" style="margin-bottom:12px;">
             <label class="meta-label">Display Name</label>
@@ -7438,13 +6704,13 @@ function openAccountModal() {
             <input class="meta-value" id="accNewPw" type="password" placeholder="New password (min 6)" style="margin-bottom:6px;"/>
             <input class="meta-value" id="accConfPw" type="password" placeholder="Confirm new password" style="margin-bottom:8px;"/>
             <button class="tool-btn" style="background:var(--save-color); color:white; justify-content:center;"
-                    onclick="savePassword()">🔒 Update Password</button>
+                    onclick="savePassword()">≡ƒöÆ Update Password</button>
             <div id="accMsg" style="font-size:0.8rem; margin-top:6px; display:none;"></div>
         </div>
 
         <div class="meta-group" style="border-top:1px dashed #ddd; padding-top:12px; margin-top:4px;">
             <button class="tool-btn btn-danger" style="justify-content:center;"
-                    onclick="confirmDeleteAccount()">⚠ Delete Account & All Notes</button>
+                    onclick="confirmDeleteAccount()">ΓÜá Delete Account & All Notes</button>
         </div>
 
         <button class="tool-btn" style="margin-top:10px; background:#eee;"
@@ -7460,7 +6726,7 @@ async function saveDisplayName() {
     if (!name) return;
     window.AUTH.updateDisplayName(name);
     renderUserProfile();
-    showToast('✓ Name updated');
+    showToast('Γ£ô Name updated');
 }
 
 async function savePassword() {
@@ -7472,7 +6738,7 @@ async function savePassword() {
     msgEl.style.display = 'none';
 
     if (newPw !== confPw) {
-        msgEl.textContent = '❌ Passwords do not match.';
+        msgEl.textContent = 'Γ¥î Passwords do not match.';
         msgEl.style.color = '#e74c3c';
         msgEl.style.display = 'block';
         return;
@@ -7481,25 +6747,25 @@ async function savePassword() {
     const result = await window.AUTH.updatePassword(oldPw, newPw);
     msgEl.style.display = 'block';
     if (result.ok) {
-        msgEl.textContent = '✓ Password updated!';
+        msgEl.textContent = 'Γ£ô Password updated!';
         msgEl.style.color = '#27ae60';
         ['accOldPw', 'accNewPw', 'accConfPw'].forEach(id => document.getElementById(id).value = '');
     } else {
-        msgEl.textContent = '❌ ' + result.error;
+        msgEl.textContent = 'Γ¥î ' + result.error;
         msgEl.style.color = '#e74c3c';
     }
 }
 
 async function confirmDeleteAccount() {
-    if (!confirm('⚠️ This will permanently delete your account and ALL notes. This cannot be undone.\n\nAre you sure?')) return;
+    if (!confirm('ΓÜá∩╕Å This will permanently delete your account and ALL notes. This cannot be undone.\n\nAre you sure?')) return;
     await window.AUTH.deleteAccount(); // redirects to login
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 window.toggleDarkMode = () => {
     const isDark = document.body.classList.toggle('dark-mode');
-    document.getElementById('darkModeToggle').innerText = isDark ? '☀️' : '🌙';
+    document.getElementById('darkModeToggle').innerText = isDark ? 'ΓÿÇ∩╕Å' : '≡ƒîÖ';
 };
 
 window.showToast = (msg) => {
@@ -7510,7 +6776,7 @@ window.showToast = (msg) => {
 };
 
 // --- PWA LOGIC ---
-const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#2c3e50"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="300">📝</text></svg>`;
+const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#2c3e50"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="300">≡ƒô¥</text></svg>`;
 const iconUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(iconSVG)}`;
 
 document.getElementById('appIcon').href = iconUrl;
@@ -7625,7 +6891,7 @@ function updatePomodoroDisplay() {
 
     // Update page title if timer is running
     if (pomodoroInterval && !pomodoroPaused) {
-        document.title = `${timeString} - ${pomodoroMode === 'focus' ? '🍅 Focus' : '☕ Break'}`;
+        document.title = `${timeString} - ${pomodoroMode === 'focus' ? '≡ƒìà Focus' : 'Γÿò Break'}`;
     }
 }
 
@@ -7643,9 +6909,9 @@ function startPomodoro() {
 
     // Show encouraging toast
     if (pomodoroMode === 'focus') {
-        showToast("🍅 Focus session started! You've got this!");
+        showToast("≡ƒìà Focus session started! You've got this!");
     } else {
-        showToast("☕ Break time! Relax and recharge.");
+        showToast("Γÿò Break time! Relax and recharge.");
     }
 
     pomodoroInterval = setInterval(() => {
@@ -7673,14 +6939,14 @@ function startPomodoro() {
                     pomodoroTimeLeft = 5 * 60; // 5 minute break
                     pomodoroTotalTime = 5 * 60;
                     document.getElementById('pomodoroMode').innerText = 'Break Time';
-                    showToast("🎉 Great work! You completed a focus session! Time for a 5-minute break.");
+                    showToast("≡ƒÄë Great work! You completed a focus session! Time for a 5-minute break.");
                     disableDnd();
                 } else {
                     pomodoroMode = 'focus';
                     pomodoroTimeLeft = 25 * 60; // 25 minute focus
                     pomodoroTotalTime = 25 * 60;
                     document.getElementById('pomodoroMode').innerText = 'Focus Time';
-                    showToast("☕ Break over! Ready for another focus session?");
+                    showToast("Γÿò Break over! Ready for another focus session?");
                 }
 
                 document.getElementById('pomodoroStartBtn').style.display = 'inline-block';
@@ -7699,14 +6965,14 @@ function pausePomodoro() {
     const pauseBtn = document.getElementById('pomodoroPauseBtn');
 
     if (pomodoroPaused) {
-        pauseBtn.innerHTML = '▶️ Resume';
+        pauseBtn.innerHTML = 'Γû╢∩╕Å Resume';
         pauseBtn.title = 'Resume timer';
-        document.title = '⏸️ Paused - Academic Notebook';
-        showToast("⏸️ Timer paused");
+        document.title = 'ΓÅ╕∩╕Å Paused - Academic Notebook';
+        showToast("ΓÅ╕∩╕Å Timer paused");
     } else {
-        pauseBtn.innerHTML = '⏸️ Pause';
+        pauseBtn.innerHTML = 'ΓÅ╕∩╕Å Pause';
         pauseBtn.title = 'Pause timer';
-        showToast("▶️ Timer resumed");
+        showToast("Γû╢∩╕Å Timer resumed");
     }
 }
 
@@ -7731,7 +6997,7 @@ function resetPomodoro() {
     disableDnd();
 
     if (wasRunning) {
-        showToast("🔄 Timer reset to 25 minutes");
+        showToast("≡ƒöä Timer reset to 25 minutes");
     }
 }
 
@@ -7753,7 +7019,7 @@ function enableDnd() {
     // But allow the DND overlay to be clickable
     document.getElementById('dndOverlay').style.pointerEvents = 'auto';
 
-    showToast("🔇 Do Not Disturb mode enabled");
+    showToast("≡ƒöç Do Not Disturb mode enabled");
 }
 
 function disableDnd() {
@@ -7846,7 +7112,7 @@ function initLogicGatesSimulator() {
     container.innerHTML = `
                 <div class="logic-toolbar">
                     <button class="logic-gate-btn" onclick="addLogicInput()">
-                        <span>🟢</span> Add Input
+                        <span>≡ƒƒó</span> Add Input
                     </button>
                     <button class="logic-gate-btn" onclick="addLogicGate('AND')">AND Gate</button>
                     <button class="logic-gate-btn" onclick="addLogicGate('OR')">OR Gate</button>
@@ -7855,16 +7121,16 @@ function initLogicGatesSimulator() {
                     <button class="logic-gate-btn" onclick="addLogicGate('NOR')">NOR Gate</button>
                     <button class="logic-gate-btn" onclick="addLogicGate('XOR')">XOR Gate</button>
                     <button class="logic-gate-btn" onclick="addLogicOutput()">
-                        <span>🟡</span> Add Output
+                        <span>≡ƒƒí</span> Add Output
                     </button>
                 </div>
                 <div class="logic-info">
-                    💡 <strong>Instructions:</strong> Add inputs and gates, drag them to position, click inputs to toggle ON/OFF (green/red), and connect gates by clicking them in sequence. Add outputs to see final results.
+                    ≡ƒÆí <strong>Instructions:</strong> Add inputs and gates, drag them to position, click inputs to toggle ON/OFF (green/red), and connect gates by clicking them in sequence. Add outputs to see final results.
                 </div>
                 <div class="logic-canvas-area" id="logicCanvas"></div>
                 <div class="logic-controls">
-                    <button class="logic-control-btn" onclick="evaluateCircuit()">▶ Evaluate Circuit</button>
-                    <button class="logic-control-btn danger" onclick="clearCircuit()">🗑️ Clear All</button>
+                    <button class="logic-control-btn" onclick="evaluateCircuit()">Γû╢ Evaluate Circuit</button>
+                    <button class="logic-control-btn danger" onclick="clearCircuit()">≡ƒùæ∩╕Å Clear All</button>
                 </div>
             `;
 
@@ -8118,7 +7384,7 @@ window.initLogicGatesSimulator = initLogicGatesSimulator;
 // ==================== KNOWLEDGE BASE SYSTEM ====================
 const knowledgeBaseData = {
     cs: {
-        title: "💻 Computer Science Reference",
+        title: "≡ƒÆ╗ Computer Science Reference",
         categories: [
             {
                 name: "Algorithmic Complexity (Big-O)",
@@ -8129,8 +7395,8 @@ const knowledgeBaseData = {
                                 <tr><td>O(log n)</td><td>Logarithmic</td><td>Binary search</td></tr>
                                 <tr><td>O(n)</td><td>Linear</td><td>Linear scan, simple loop</td></tr>
                                 <tr><td>O(n log n)</td><td>Linearithmic</td><td>Merge sort, heap sort</td></tr>
-                                <tr><td>O(n²)</td><td>Quadratic</td><td>Nested loops, bubble sort</td></tr>
-                                <tr><td>O(2ⁿ)</td><td>Exponential</td><td>Recursive Fibonacci</td></tr>
+                                <tr><td>O(n┬▓)</td><td>Quadratic</td><td>Nested loops, bubble sort</td></tr>
+                                <tr><td>O(2Γü┐)</td><td>Exponential</td><td>Recursive Fibonacci</td></tr>
                             </table>
                         `
             },
@@ -8152,7 +7418,7 @@ const knowledgeBaseData = {
                 name: "OS & Systems Concepts",
                 content: `
                             <div class="kb-section-header">Process States</div>
-                            <div>New → Ready → Running → Waiting → Terminated</div>
+                            <div>New ΓåÆ Ready ΓåÆ Running ΓåÆ Waiting ΓåÆ Terminated</div>
                             
                             <div class="kb-section-header">Scheduling Algorithms</div>
                             <div>FCFS, SJF, Priority, Round Robin</div>
@@ -8272,18 +7538,18 @@ const knowledgeBaseData = {
         ]
     },
     medical: {
-        title: "⚕️ Medical & Dental Reference",
+        title: "ΓÜò∩╕Å Medical & Dental Reference",
         categories: [
             {
                 name: "Normal Lab Values (Adult)",
                 content: `
                             <div class="kb-section-header">CBC (Complete Blood Count)</div>
                             <ul class="kb-list">
-                                <li>WBC: 4,500 - 11,000 /µL</li>
-                                <li>RBC: 4.5 - 5.5 M/µL (M), 4.0 - 5.0 M/µL (F)</li>
+                                <li>WBC: 4,500 - 11,000 /┬╡L</li>
+                                <li>RBC: 4.5 - 5.5 M/┬╡L (M), 4.0 - 5.0 M/┬╡L (F)</li>
                                 <li>Hemoglobin: 13.5-17.5 g/dL (M), 12.0-15.5 g/dL (F)</li>
                                 <li>Hematocrit: 41-50% (M), 36-44% (F)</li>
-                                <li>Platelets: 150,000 - 450,000 /µL</li>
+                                <li>Platelets: 150,000 - 450,000 /┬╡L</li>
                             </ul>
                             
                             <div class="kb-section-header">Basic Metabolic Panel (BMP)</div>
@@ -8305,7 +7571,7 @@ const knowledgeBaseData = {
                                 <li><strong>Heart Rate:</strong> 60 - 100 bpm</li>
                                 <li><strong>Blood Pressure:</strong> &lt; 120/80 mmHg</li>
                                 <li><strong>Respiratory Rate:</strong> 12 - 20 breaths/min</li>
-                                <li><strong>Temperature:</strong> 36.5°C - 37.2°C (97.7°F - 99°F)</li>
+                                <li><strong>Temperature:</strong> 36.5┬░C - 37.2┬░C (97.7┬░F - 99┬░F)</li>
                                 <li><strong>SpO2:</strong> 95% - 100%</li>
                             </ul>
                         `
@@ -8334,34 +7600,34 @@ const knowledgeBaseData = {
         ]
     },
     engineering: {
-        title: "⚙️ Engineering Reference",
+        title: "ΓÜÖ∩╕Å Engineering Reference",
         categories: [
             {
                 name: "Material Properties",
                 content: `
                             <div class="kb-section-header">Structural Steel</div>
                             <ul class="kb-list">
-                                <li>Density: 7,850 kg/m³</li>
+                                <li>Density: 7,850 kg/m┬│</li>
                                 <li>Young's Modulus (E): 200 GPa</li>
                                 <li>Yield Strength: 250 MPa</li>
                             </ul>
                             
                             <div class="kb-section-header">Aluminum (6061)</div>
                             <ul class="kb-list">
-                                <li>Density: 2,700 kg/m³</li>
+                                <li>Density: 2,700 kg/m┬│</li>
                                 <li>Young's Modulus (E): 69 GPa</li>
                                 <li>Yield Strength: ~240 MPa (T6)</li>
                             </ul>
                             
                             <div class="kb-section-header">Concrete</div>
                             <ul class="kb-list">
-                                <li>Density: 2,400 kg/m³</li>
+                                <li>Density: 2,400 kg/m┬│</li>
                                 <li>Compressive Strength: 20 - 40 MPa</li>
                             </ul>
                             
                             <div class="kb-section-header">Water</div>
                             <ul class="kb-list">
-                                <li>Density: 1,000 kg/m³</li>
+                                <li>Density: 1,000 kg/m┬│</li>
                             </ul>
                         `
             },
@@ -8369,13 +7635,13 @@ const knowledgeBaseData = {
                 name: "Fundamental Constants",
                 content: `
                             <ul class="kb-list">
-                                <li><strong>g</strong> (Gravity): 9.81 m/s²</li>
-                                <li><strong>c</strong> (Speed of Light): 3.00 × 10⁸ m/s</li>
-                                <li><strong>G</strong> (Gravitational): 6.674 × 10⁻¹¹ N·m²/kg²</li>
-                                <li><strong>R</strong> (Gas Constant): 8.314 J/(mol·K)</li>
-                                <li><strong>h</strong> (Planck): 6.626 × 10⁻³⁴ J·s</li>
-                                <li><strong>k</strong> (Boltzmann): 1.380 × 10⁻²³ J/K</li>
-                                <li><strong>Na</strong> (Avogadro): 6.022 × 10²³ mol⁻¹</li>
+                                <li><strong>g</strong> (Gravity): 9.81 m/s┬▓</li>
+                                <li><strong>c</strong> (Speed of Light): 3.00 ├ù 10Γü╕ m/s</li>
+                                <li><strong>G</strong> (Gravitational): 6.674 ├ù 10Γü╗┬╣┬╣ N┬╖m┬▓/kg┬▓</li>
+                                <li><strong>R</strong> (Gas Constant): 8.314 J/(mol┬╖K)</li>
+                                <li><strong>h</strong> (Planck): 6.626 ├ù 10Γü╗┬│Γü┤ J┬╖s</li>
+                                <li><strong>k</strong> (Boltzmann): 1.380 ├ù 10Γü╗┬▓┬│ J/K</li>
+                                <li><strong>Na</strong> (Avogadro): 6.022 ├ù 10┬▓┬│ molΓü╗┬╣</li>
                                 <li><strong>Atm. Pressure:</strong> 101,325 Pa</li>
                             </ul>
                         `
@@ -8386,11 +7652,11 @@ const knowledgeBaseData = {
                             <table class="kb-table">
                                 <tr><th>Category</th><th>Conversion</th></tr>
                                 <tr><td>Length</td><td>1 in = 2.54 cm | 1 ft = 0.3048 m</td></tr>
-                                <tr><td>Force</td><td>1 lbf ≈ 4.448 N</td></tr>
-                                <tr><td>Mass</td><td>1 lb ≈ 0.4536 kg</td></tr>
-                                <tr><td>Pressure</td><td>1 psi ≈ 6,895 Pa | 1 bar = 100 kPa</td></tr>
-                                <tr><td>Energy</td><td>1 BTU ≈ 1,055 J | 1 cal = 4.184 J</td></tr>
-                                <tr><td>Power</td><td>1 hp ≈ 746 W</td></tr>
+                                <tr><td>Force</td><td>1 lbf Γëê 4.448 N</td></tr>
+                                <tr><td>Mass</td><td>1 lb Γëê 0.4536 kg</td></tr>
+                                <tr><td>Pressure</td><td>1 psi Γëê 6,895 Pa | 1 bar = 100 kPa</td></tr>
+                                <tr><td>Energy</td><td>1 BTU Γëê 1,055 J | 1 cal = 4.184 J</td></tr>
+                                <tr><td>Power</td><td>1 hp Γëê 746 W</td></tr>
                             </table>
                         `
             },
@@ -8444,7 +7710,7 @@ function updateKnowledgeBase(discipline) {
                     <div class="kb-category">
                         <div class="kb-category-title" onclick="toggleKbCategory('${categoryId}')">
                             <span>${category.name}</span>
-                            <span class="kb-arrow" id="${categoryId}-arrow">▼</span>
+                            <span class="kb-arrow" id="${categoryId}-arrow">Γû╝</span>
                         </div>
                         <div class="kb-content" id="${categoryId}">
                             ${category.content}
@@ -8604,7 +7870,7 @@ function handleConnectionClick(componentId, pointType, inputIndex = 0) {
     if (!wiringMode) {
         wiringMode = true;
         wiringStart = { componentId, pointType, inputIndex };
-        showToast('🔌 Click destination to complete wire');
+        showToast('≡ƒöî Click destination to complete wire');
     } else {
         // Complete the wire
         const wireEnd = { componentId, pointType, inputIndex };
@@ -8616,16 +7882,16 @@ function handleConnectionClick(componentId, pointType, inputIndex = 0) {
                 to: wireEnd.componentId,
                 toInputIndex: wireEnd.inputIndex
             });
-            showToast('✓ Wire connected');
+            showToast('Γ£ô Wire connected');
         } else if (wiringStart.pointType === 'input' && wireEnd.pointType === 'output') {
             logicSimulator.wires.push({
                 from: wireEnd.componentId,
                 to: wiringStart.componentId,
                 toInputIndex: wiringStart.inputIndex
             });
-            showToast('✓ Wire connected');
+            showToast('Γ£ô Wire connected');
         } else {
-            showToast('⚠️ Connect output to input');
+            showToast('ΓÜá∩╕Å Connect output to input');
         }
 
         wiringMode = false;
@@ -8768,7 +8034,7 @@ const circuitSymbols = [
 
 // Default electrical properties for each component type
 const COMPONENT_DEFAULTS = {
-    resistor: { resistance: 100, unit: 'Ω' },
+    resistor: { resistance: 100, unit: '╬⌐' },
     capacitor: { resistance: 1000000, unit: 'F', capacitance: 0.000001 },
     inductor: { resistance: 0.1, unit: 'H', inductance: 0.01 },
     battery: { voltage: 9, resistance: 0.01, unit: 'V' },
@@ -8776,7 +8042,7 @@ const COMPONENT_DEFAULTS = {
     diode: { resistance: 5, forwardDrop: 0.7, unit: '' },
     led: { resistance: 20, forwardDrop: 2.0, unit: '' },
     switch: { closed: false, resistance: Infinity, unit: '' },
-    bulb: { resistance: 50, unit: 'Ω', ratedCurrent: 0.18 },
+    bulb: { resistance: 50, unit: '╬⌐', ratedCurrent: 0.18 },
     voltmeter: { resistance: 10000000, unit: 'V', reading: 0 },
     ammeter: { resistance: 0.001, unit: 'A', reading: 0 }
 };
@@ -8792,7 +8058,7 @@ function initCircuitSymbolsTray() {
     const tray = document.createElement('div');
     tray.className = 'circuit-symbols-tray';
     tray.innerHTML = `
-                <div class="circuit-symbols-title">⚡ Components</div>
+                <div class="circuit-symbols-title">ΓÜí Components</div>
                 ${circuitSymbols.map(symbol => `
                     <div class="circuit-symbol-item" draggable="true" data-symbol="${symbol.name}">
                         <svg class="circuit-symbol-svg" viewBox="0 0 40 40">
@@ -8861,7 +8127,7 @@ function renderCircuitComponent(component) {
             if (index > -1) {
                 circuitComponents.splice(index, 1);
                 div.remove();
-                showToast('✓ Component removed');
+                showToast('Γ£ô Component removed');
             }
         }
     };
@@ -8928,7 +8194,7 @@ document.addEventListener('keydown', (e) => {
                     el.remove();
                 }
             });
-            showToast(`✓ ${selected.length} component(s) deleted`);
+            showToast(`Γ£ô ${selected.length} component(s) deleted`);
         }
     }
 
@@ -8940,7 +8206,7 @@ document.addEventListener('keydown', (e) => {
             if (confirm('Clear all circuit components?')) {
                 circuitComponents = [];
                 layer.innerHTML = '';
-                showToast('✓ All components cleared');
+                showToast('Γ£ô All components cleared');
             }
         }
     }
@@ -8955,7 +8221,7 @@ let cornellStudyMode = false;
 window.highlightCornellText = function () {
     const cornellNotes = document.getElementById('cornellNotes');
     if (!cornellNotes) {
-        showToast('⚠️ Cornell Notes area not found');
+        showToast('ΓÜá∩╕Å Cornell Notes area not found');
         return;
     }
 
@@ -8963,7 +8229,7 @@ window.highlightCornellText = function () {
     const selectedText = selection.toString().trim();
 
     if (!selectedText) {
-        showToast('⚠️ Select text in Notes first, then click Highlight');
+        showToast('ΓÜá∩╕Å Select text in Notes first, then click Highlight');
         return;
     }
 
@@ -8971,7 +8237,7 @@ window.highlightCornellText = function () {
     if (!selection.rangeCount) return;
     const range = selection.getRangeAt(0);
     if (!cornellNotes.contains(range.commonAncestorContainer)) {
-        showToast('⚠️ Select text inside the Notes area');
+        showToast('ΓÜá∩╕Å Select text inside the Notes area');
         return;
     }
 
@@ -8988,7 +8254,7 @@ window.highlightCornellText = function () {
     }
 
     selection.removeAllRanges();
-    showToast('🖌️ Text highlighted! Click "Extract Cue" to add as cue');
+    showToast('≡ƒûî∩╕Å Text highlighted! Click "Extract Cue" to add as cue');
 };
 
 window.extractCornellCue = function () {
@@ -9009,20 +8275,20 @@ window.extractCornellCue = function () {
     // MODE 1: If user has text selected, extract that as a cue
     if (selectedText) {
         addCueItem(selectedText, false);
-        showToast('✓ Cue extracted from selection');
+        showToast('Γ£ô Cue extracted from selection');
         return;
     }
 
     // MODE 2: Extract from all un-extracted highlighted <mark> elements
     const cornellNotes = document.getElementById('cornellNotes');
     if (!cornellNotes) {
-        showToast('⚠️ Select text or highlight text first');
+        showToast('ΓÜá∩╕Å Select text or highlight text first');
         return;
     }
 
     const marks = cornellNotes.querySelectorAll('mark.cornell-highlight:not([data-cue-extracted])');
     if (marks.length === 0) {
-        showToast('⚠️ Select text or use 🖌️ Highlight first');
+        showToast('ΓÜá∩╕Å Select text or use ≡ƒûî∩╕Å Highlight first');
         return;
     }
 
@@ -9038,7 +8304,7 @@ window.extractCornellCue = function () {
     });
 
     if (count > 0) {
-        showToast(`✓ ${count} cue${count > 1 ? 's' : ''} extracted from highlights`);
+        showToast(`Γ£ô ${count} cue${count > 1 ? 's' : ''} extracted from highlights`);
     }
 };
 
@@ -9050,9 +8316,9 @@ window.toggleCornellStudyMode = function () {
     container.classList.toggle('cornell-study-mode');
 
     if (cornellStudyMode) {
-        showToast("👁️ Study Mode: Notes hidden. Test yourself!");
+        showToast("≡ƒæü∩╕Å Study Mode: Notes hidden. Test yourself!");
     } else {
-        showToast("📝 Normal Mode: Notes visible");
+        showToast("≡ƒô¥ Normal Mode: Notes visible");
     }
 };
 
@@ -9067,7 +8333,7 @@ function checkCornellNotesLength() {
             summary.contentEditable = 'true';
             summary.style.opacity = '1';
             summary.style.cursor = 'text';
-            summary.innerHTML = '<div class="cornell-summary-title">📝 Summary</div><div contenteditable="true">Summarize your notes in 2-3 sentences...</div>';
+            summary.innerHTML = '<div class="cornell-summary-title">≡ƒô¥ Summary</div><div contenteditable="true">Summarize your notes in 2-3 sentences...</div>';
         }
     }
 }
@@ -9091,7 +8357,7 @@ window.checkZettelWordCount = function () {
             counter.textContent += ' (good range)';
         } else if (wordCount > 500) {
             counter.classList.add('error');
-            counter.textContent += ' ⚠️ Consider splitting this note';
+            counter.textContent += ' ΓÜá∩╕Å Consider splitting this note';
         }
     }
 };
@@ -9102,12 +8368,12 @@ window.addZettelTag = function (tagText) {
     const tagsContainer = document.getElementById('zettelTags');
     const tag = document.createElement('span');
     tag.className = 'zettel-tag';
-    tag.innerHTML = `${tagText} <span class="zettel-tag-remove" onclick="this.parentElement.remove()">×</span>`;
+    tag.innerHTML = `${tagText} <span class="zettel-tag-remove" onclick="this.parentElement.remove()">├ù</span>`;
 
     tagsContainer.insertBefore(tag, tagsContainer.lastElementChild);
     zettelTags.push(tagText);
 
-    showToast("✓ Tag added");
+    showToast("Γ£ô Tag added");
 };
 
 
@@ -9115,7 +8381,7 @@ window.addZettelTag = function (tagText) {
 let sq3rCurrentStep = 1;
 
 window.compareSQ3RAnswers = function () {
-    showToast("📊 Comparing answers with notes...");
+    showToast("≡ƒôè Comparing answers with notes...");
 };
 
 window.rateSQ3RConfidence = function (event) {
@@ -9127,7 +8393,7 @@ window.rateSQ3RConfidence = function (event) {
 
     let starHTML = '';
     for (let i = 1; i <= 5; i++) {
-        starHTML += i <= rating ? '★' : '☆';
+        starHTML += i <= rating ? 'Γÿà' : 'Γÿå';
     }
     stars.innerHTML = starHTML;
 
@@ -9194,7 +8460,7 @@ function highlightJargon(element) {
     });
 
     if (hasJargon) {
-        showToast("⚠️ Potential jargon detected - try simpler words");
+        showToast("ΓÜá∩╕Å Potential jargon detected - try simpler words");
     }
 }
 
@@ -9226,12 +8492,12 @@ const MAX_PINS = 5;
 
 // Reference type icons
 const REF_ICONS = {
-    definition: '📖',
-    formula: '📐',
-    table: '📊',
-    checklist: '✅',
-    code: '💻',
-    fact: '🎯'
+    definition: '≡ƒôû',
+    formula: '≡ƒôÉ',
+    table: '≡ƒôè',
+    checklist: 'Γ£à',
+    code: '≡ƒÆ╗',
+    fact: '≡ƒÄ»'
 };
 
 // Initialize My References
@@ -9280,7 +8546,7 @@ function renderMyReferences() {
     if (myReferences.length === 0) {
         container.innerHTML = `
                     <div class="my-refs-empty">
-                        <div class="my-refs-empty-icon">💡</div>
+                        <div class="my-refs-empty-icon">≡ƒÆí</div>
                         <div class="my-refs-empty-title">Build Your Personal Cheat Sheet</div>
                         <div class="my-refs-empty-text">
                             Save important facts from notes or create custom references.
@@ -9318,7 +8584,7 @@ function renderMyReferences() {
     if (pinned.length > 0) {
         html += `
                     <div class="my-refs-section-title">
-                        📌 Pinned <span class="my-refs-count">(${pinned.length})</span>
+                        ≡ƒôî Pinned <span class="my-refs-count">(${pinned.length})</span>
                     </div>
                 `;
         pinned.forEach(ref => {
@@ -9328,25 +8594,25 @@ function renderMyReferences() {
 
     // By Discipline
     if (unpinned.length > 0) {
-        html += `<div class="my-refs-section-title" style="margin-top: 20px;">🏷️ By Discipline</div>`;
+        html += `<div class="my-refs-section-title" style="margin-top: 20px;">≡ƒÅ╖∩╕Å By Discipline</div>`;
 
         if (byDiscipline.cs.length > 0) {
-            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">💻 Computer Science (${byDiscipline.cs.length})</div>`;
+            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">≡ƒÆ╗ Computer Science (${byDiscipline.cs.length})</div>`;
             byDiscipline.cs.forEach(ref => html += renderRefItem(ref));
         }
 
         if (byDiscipline.medical.length > 0) {
-            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">⚕️ Medical (${byDiscipline.medical.length})</div>`;
+            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">ΓÜò∩╕Å Medical (${byDiscipline.medical.length})</div>`;
             byDiscipline.medical.forEach(ref => html += renderRefItem(ref));
         }
 
         if (byDiscipline.engineering.length > 0) {
-            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">⚙️ Engineering (${byDiscipline.engineering.length})</div>`;
+            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">ΓÜÖ∩╕Å Engineering (${byDiscipline.engineering.length})</div>`;
             byDiscipline.engineering.forEach(ref => html += renderRefItem(ref));
         }
 
         if (byDiscipline.custom.length > 0) {
-            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">📝 Custom (${byDiscipline.custom.length})</div>`;
+            html += `<div class="my-refs-section-title" style="font-size: 0.75rem; margin-left: 10px;">≡ƒô¥ Custom (${byDiscipline.custom.length})</div>`;
             byDiscipline.custom.forEach(ref => html += renderRefItem(ref));
         }
     }
@@ -9356,10 +8622,10 @@ function renderMyReferences() {
 
 // Render individual reference item
 function renderRefItem(ref) {
-    const icon = REF_ICONS[ref.type] || '📄';
+    const icon = REF_ICONS[ref.type] || '≡ƒôä';
     const preview = getRefPreview(ref);
     const pinnedClass = ref.pinned ? 'pinned' : '';
-    const pinIcon = ref.pinned ? '📌' : '📍';
+    const pinIcon = ref.pinned ? '≡ƒôî' : '≡ƒôì';
     const pinActive = ref.pinned ? 'active' : '';
 
     const tagsHtml = ref.tags && ref.tags.length > 0
@@ -9407,7 +8673,7 @@ async function togglePin(id) {
     const pinnedCount = myReferences.filter(r => r.pinned).length;
 
     if (!ref.pinned && pinnedCount >= MAX_PINS) {
-        showToast(`⚠️ Maximum ${MAX_PINS} pinned items. Unpin others first.`);
+        showToast(`ΓÜá∩╕Å Maximum ${MAX_PINS} pinned items. Unpin others first.`);
         return;
     }
 
@@ -9416,7 +8682,7 @@ async function togglePin(id) {
 
     await saveMyReference(ref);
     renderMyReferences();
-    showToast(ref.pinned ? '📌 Pinned' : '📍 Unpinned');
+    showToast(ref.pinned ? '≡ƒôî Pinned' : '≡ƒôì Unpinned');
 }
 
 // Open modal for create/edit/view
@@ -9488,10 +8754,10 @@ function renderRefForm(ref) {
                 <div class="ref-form-group">
                     <label class="ref-form-label">Discipline</label>
                     <select class="ref-form-select" id="refDiscipline">
-                        <option value="cs" ${ref?.discipline === 'cs' ? 'selected' : ''}>💻 Computer Science</option>
-                        <option value="medical" ${ref?.discipline === 'medical' ? 'selected' : ''}>⚕️ Medical</option>
-                        <option value="engineering" ${ref?.discipline === 'engineering' ? 'selected' : ''}>⚙️ Engineering</option>
-                        <option value="custom" ${ref?.discipline === 'custom' ? 'selected' : ''}>📝 Custom</option>
+                        <option value="cs" ${ref?.discipline === 'cs' ? 'selected' : ''}>≡ƒÆ╗ Computer Science</option>
+                        <option value="medical" ${ref?.discipline === 'medical' ? 'selected' : ''}>ΓÜò∩╕Å Medical</option>
+                        <option value="engineering" ${ref?.discipline === 'engineering' ? 'selected' : ''}>ΓÜÖ∩╕Å Engineering</option>
+                        <option value="custom" ${ref?.discipline === 'custom' ? 'selected' : ''}>≡ƒô¥ Custom</option>
                     </select>
                 </div>
                 
@@ -9501,7 +8767,7 @@ function renderRefForm(ref) {
                         ${ref?.tags?.map(tag => `
                             <span class="ref-tag-chip">
                                 ${tag}
-                                <span class="ref-tag-remove" onclick="removeTag('${tag}')">×</span>
+                                <span class="ref-tag-remove" onclick="removeTag('${tag}')">├ù</span>
                             </span>
                         `).join('') || ''}
                         <input type="text" class="ref-tag-input" id="refTagInput" placeholder="Add tag..." onkeypress="if(event.key==='Enter'){event.preventDefault();addTag();}" />
@@ -9512,7 +8778,7 @@ function renderRefForm(ref) {
                 <div class="ref-form-group">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                         <input type="checkbox" id="refPinned" ${ref?.pinned ? 'checked' : ''} />
-                        <span>📌 Pin for quick access</span>
+                        <span>≡ƒôî Pin for quick access</span>
                     </label>
                 </div>
             `;
@@ -9626,21 +8892,21 @@ window.addTag = function () {
     if (!tag) return;
 
     const container = document.getElementById('refTagContainer');
-    const existingTags = Array.from(container.querySelectorAll('.ref-tag-chip')).map(el => el.textContent.replace('×', '').trim());
+    const existingTags = Array.from(container.querySelectorAll('.ref-tag-chip')).map(el => el.textContent.replace('├ù', '').trim());
 
     if (existingTags.includes(tag)) {
-        showToast('⚠️ Tag already added');
+        showToast('ΓÜá∩╕Å Tag already added');
         return;
     }
 
     if (existingTags.length >= 10) {
-        showToast('⚠️ Maximum 10 tags per reference');
+        showToast('ΓÜá∩╕Å Maximum 10 tags per reference');
         return;
     }
 
     const chip = document.createElement('span');
     chip.className = 'ref-tag-chip';
-    chip.innerHTML = `${tag} <span class="ref-tag-remove" onclick="this.parentElement.remove()">×</span>`;
+    chip.innerHTML = `${tag} <span class="ref-tag-remove" onclick="this.parentElement.remove()">├ù</span>`;
 
     container.insertBefore(chip, input);
     input.value = '';
@@ -9652,7 +8918,7 @@ window.saveRef = async function () {
     const title = document.getElementById('refTitle').value.trim();
 
     if (!title) {
-        showToast('⚠️ Title is required');
+        showToast('ΓÜá∩╕Å Title is required');
         return;
     }
 
@@ -9701,7 +8967,7 @@ window.saveRef = async function () {
     }
 
     const tags = Array.from(document.querySelectorAll('.ref-tag-chip')).map(el =>
-        el.textContent.replace('×', '').trim()
+        el.textContent.replace('├ù', '').trim()
     );
 
     const reference = {
@@ -9731,7 +8997,7 @@ window.saveRef = async function () {
     await saveMyReference(reference);
     renderMyReferences();
     closeRefModal();
-    showToast('✓ Reference saved');
+    showToast('Γ£ô Reference saved');
 };
 
 // View reference
@@ -9770,8 +9036,8 @@ function renderRefDetail(ref) {
         case 'fact':
             contentHtml = `
                         <div>${ref.content.fact}</div>
-                        ${ref.content.mnemonic ? `<div style="margin-top: 10px;">💡 <strong>Mnemonic:</strong> ${ref.content.mnemonic}</div>` : ''}
-                        ${ref.content.exam_tip ? `<div style="margin-top: 10px;">📝 <strong>Exam Tip:</strong> ${ref.content.exam_tip}</div>` : ''}
+                        ${ref.content.mnemonic ? `<div style="margin-top: 10px;">≡ƒÆí <strong>Mnemonic:</strong> ${ref.content.mnemonic}</div>` : ''}
+                        ${ref.content.exam_tip ? `<div style="margin-top: 10px;">≡ƒô¥ <strong>Exam Tip:</strong> ${ref.content.exam_tip}</div>` : ''}
                     `;
             break;
         case 'code':
@@ -9786,7 +9052,7 @@ function renderRefDetail(ref) {
                         <ul style="list-style: none; padding: 0;">
                             ${ref.content.items.map(item => `
                                 <li style="padding: 8px; background: rgba(52,152,219,0.05); margin-bottom: 5px; border-radius: 4px;">
-                                    ${item.checked ? '✓' : '☐'} ${item.text}
+                                    ${item.checked ? 'Γ£ô' : 'ΓÿÉ'} ${item.text}
                                 </li>
                             `).join('')}
                         </ul>
@@ -9841,7 +9107,7 @@ window.deleteRef = async function (id) {
     myReferences = myReferences.filter(r => r.id !== id);
     renderMyReferences();
     closeRefModal();
-    showToast('✓ Reference deleted');
+    showToast('Γ£ô Reference deleted');
 };
 
 // Save from highlighted text in notes
@@ -9850,7 +9116,7 @@ window.saveToMyReferences = function () {
     const selectedText = selection.toString().trim();
 
     if (!selectedText) {
-        showToast('⚠️ Select text first');
+        showToast('ΓÜá∩╕Å Select text first');
         return;
     }
 
@@ -10095,7 +9361,7 @@ function updateCircuitElementHTML(element, compData) {
         }
     } else if (type === 'bulb') {
         if (compData.powered && compData.voltageDrop > 0) {
-            // Glowing bulb — intensity based on voltage across the bulb
+            // Glowing bulb ΓÇö intensity based on voltage across the bulb
             const maxVoltage = (compData.resistance || 50) * (compData.ratedCurrent || 0.18);
             const intensity = Math.min(compData.voltageDrop / maxVoltage, 1);
             const glowColor = `rgba(255, 235, 59, ${0.2 + intensity * 0.8})`;
@@ -10109,7 +9375,7 @@ function updateCircuitElementHTML(element, compData) {
                 <line x1="28" y1="20" x2="35" y2="20" stroke="#2c3e50" stroke-width="2"/>
             </svg>`;
         } else {
-            // Bulb OFF — dark, no glow
+            // Bulb OFF ΓÇö dark, no glow
             svgHtml = `<svg viewBox="0 0 40 40" width="50" height="50">
                 <circle cx="20" cy="20" r="8" fill="#e0e0e0" stroke="#999" stroke-width="2"/>
                 <line x1="14" y1="14" x2="26" y2="26" stroke="#999" stroke-width="1.5"/>
@@ -10137,10 +9403,10 @@ function updateCircuitElementHTML(element, compData) {
 
     // Build value label
     let valueLabel = '';
-    if (type === 'resistor') valueLabel = `${compData.resistance}Ω`;
+    if (type === 'resistor') valueLabel = `${compData.resistance}╬⌐`;
     else if (type === 'battery') valueLabel = `${compData.voltage}V`;
-    else if (type === 'bulb') valueLabel = `${compData.resistance}Ω`;
-    else if (type === 'switch') valueLabel = compData.closed ? '🟢 Closed' : '🔴 Open';
+    else if (type === 'bulb') valueLabel = `${compData.resistance}╬⌐`;
+    else if (type === 'switch') valueLabel = compData.closed ? '≡ƒƒó Closed' : '≡ƒö┤ Open';
     else if (type === 'voltmeter') valueLabel = `${compData.reading.toFixed(2)}V`;
     else if (type === 'ammeter') valueLabel = `${(compData.reading * 1000).toFixed(1)}mA`;
 
@@ -10152,7 +9418,7 @@ function updateCircuitElementHTML(element, compData) {
         ${svgHtml}
         <div class="circuit-element-label">${compData.name}</div>
         ${valueLabel ? `<div class="circuit-value-label">${valueLabel}</div>` : ''}
-        <button class="circuit-element-delete" onclick="deleteCircuitComponent('${compData.id}')">×</button>
+        <button class="circuit-element-delete" onclick="deleteCircuitComponent('${compData.id}')">├ù</button>
         <div class="circuit-connection-point top" data-point="top" onclick="startConnection(event, '${compData.id}', 'top')"></div>
         <div class="circuit-connection-point bottom" data-point="bottom" onclick="startConnection(event, '${compData.id}', 'bottom')"></div>
         <div class="circuit-connection-point left" data-point="left" onclick="startConnection(event, '${compData.id}', 'left')"></div>
@@ -10175,7 +9441,7 @@ function addComponentInteraction(element, compData) {
             // Re-attach interaction since innerHTML was replaced
             addSwitchClickHandler(element, compData);
             simulateCircuit();
-            showToast(compData.closed ? '🟢 Switch closed' : '🔴 Switch opened');
+            showToast(compData.closed ? '≡ƒƒó Switch closed' : '≡ƒö┤ Switch opened');
         });
     }
 
@@ -10185,12 +9451,12 @@ function addComponentInteraction(element, compData) {
             if (e.target.classList.contains('circuit-connection-point') ||
                 e.target.classList.contains('circuit-element-delete')) return;
             e.stopPropagation();
-            const newVal = prompt(`Set resistance (Ω):`, compData.resistance);
+            const newVal = prompt(`Set resistance (╬⌐):`, compData.resistance);
             if (newVal !== null && !isNaN(parseFloat(newVal)) && parseFloat(newVal) > 0) {
                 compData.resistance = parseFloat(newVal);
                 updateCircuitElementHTML(element, compData);
                 simulateCircuit();
-                showToast(`Resistance set to ${compData.resistance}Ω`);
+                showToast(`Resistance set to ${compData.resistance}╬⌐`);
             }
         });
     }
@@ -10231,7 +9497,7 @@ function simulateCircuit() {
     });
 
     // Build adjacency map from wires
-    // Open switches break the circuit — exclude their connections
+    // Open switches break the circuit ΓÇö exclude their connections
     const openSwitchIds = new Set(
         circuitComponents.filter(c => c.type === 'switch' && !c.closed).map(c => c.id)
     );
@@ -10242,7 +9508,7 @@ function simulateCircuit() {
     });
 
     circuitWires.forEach(wire => {
-        // Skip wires connected to an open switch — circuit is broken there
+        // Skip wires connected to an open switch ΓÇö circuit is broken there
         if (openSwitchIds.has(wire.comp1) || openSwitchIds.has(wire.comp2)) return;
 
         if (adjacency[wire.comp1] && adjacency[wire.comp2]) {
@@ -10277,7 +9543,7 @@ function simulateCircuit() {
                 } else if (comp.type === 'switch' && !comp.closed) {
                     hasOpenSwitch = true;
                 } else if (comp.type === 'voltmeter') {
-                    // Voltmeter has very high resistance — don't add for parallel measurement
+                    // Voltmeter has very high resistance ΓÇö don't add for parallel measurement
                     // but still track it
                 } else {
                     totalResistance += comp.resistance || 0;
@@ -10655,7 +9921,7 @@ window.createNewChapter = async () => {
     // Save to IndexedDB asynchronously (don't block UI)
     saveChapterToDB(newChapter).catch(err => console.error('Save failed:', err));
 
-    showToast('✓ New page created');
+    showToast('Γ£ô New page created');
 };
 
 // Add a new page to the stream with the same tag (MULTI-PAGE STREAM)
@@ -10692,7 +9958,7 @@ window.addPageToStream = async () => {
     // Update sidebar
     requestAnimationFrame(() => renderSidebar());
 
-    showToast('✓ Page added to stream');
+    showToast('Γ£ô Page added to stream');
 };
 
 // ===== VIRTUAL SCROLLING MANAGER =====
@@ -10860,14 +10126,6 @@ class VirtualScrollManager {
         contentArea.innerHTML = chapter.content || '&lt;p&gt;Start typing...&lt;/p&gt;';
         contentArea.dataset.chapterId = chapter.id;
 
-        if (chapter.pdfFileBase64) {
-            const inlineContainer = contentArea.querySelector('.inline-pdf-container');
-            if (inlineContainer && window.renderInlinePdf) {
-                // Pre-render lazily
-                window.renderInlinePdf(chapter, inlineContainer).catch(console.error);
-            }
-        }
-
         if (index > 0) {
             contentArea.style.paddingTop = '1rem';
         }
@@ -10916,7 +10174,7 @@ class PageDetailsGesture {
         } else {
             document.addEventListener('click', (e) => this._onCtrlClick(e));
         }
-        console.log('✅ PageDetailsGesture initialized (' + (isTouch ? 'long-press 2s' : 'Ctrl+Click') + ')');
+        console.log('Γ£à PageDetailsGesture initialized (' + (isTouch ? 'long-press 2s' : 'Ctrl+Click') + ')');
     }
 
     _onTouchStart(e) {
@@ -11122,21 +10380,25 @@ window.renderSidebar = () => {
     const list = document.getElementById('chapterList');
     if (!list) return;
 
-    const searchStr = (document.getElementById('sidebarSearch')?.value || '').trim();
+    const searchStr = (document.getElementById('sidebarSearch')?.value || '').toLowerCase();
     const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
 
     list.innerHTML = '';
 
-    // Use the global full-text search engine to get matches with snippets
-    const searchResults = window.searchNotes ? window.searchNotes(searchStr) : chapters;
+    // Filter chapters
+    const filtered = chapters.filter(ch => {
+        const titleMatch = (ch.title || '').toLowerCase().includes(searchStr);
+        const tagMatch = (ch.tags || []).some(t => t.toLowerCase().includes(searchStr.replace('#', '')));
+        const matchesSearch = titleMatch || tagMatch;
 
-    // Further filter by category
-    const filtered = searchResults.filter(ch => {
+        if (!matchesSearch) return false;
+
         if (categoryFilter === 'all') return true;
 
         const disc = ch.metadata?.discipline;
         const branch = ch.metadata?.branch;
 
+        // Match category filter
         if (categoryFilter === 'General' && disc === 'general') return true;
         if (categoryFilter === 'Projects' && ch.metadata?.type === 'project') return true;
         if (categoryFilter === 'Algorithms' && disc === 'cs') return true;
@@ -11150,33 +10412,35 @@ window.renderSidebar = () => {
         return false;
     });
 
-    // Group chapters by their first tag
+    // Group chapters by their first tag (for better organization)
     const grouped = {};
     const untagged = [];
 
     filtered.forEach(ch => {
         if (ch.tags && ch.tags.length > 0) {
             const primaryTag = ch.tags[0];
-            if (!grouped[primaryTag]) grouped[primaryTag] = [];
+            if (!grouped[primaryTag]) {
+                grouped[primaryTag] = [];
+            }
             grouped[primaryTag].push(ch);
         } else {
             untagged.push(ch);
         }
     });
 
-    const escapedQuery = searchStr.replace(/'/g, "\\'");
-
-    const renderItem = (ch) => renderChapterItem(ch, list, searchStr ? ch._matchSnippet : null, escapedQuery);
-
     // Render grouped chapters (by tag) with visual separation
     const sortedTags = Object.keys(grouped).sort();
     sortedTags.forEach((tag, index) => {
+        // Add visual separator between tag groups (except before first group)
         if (index > 0) {
             const separator = document.createElement('li');
             separator.style.cssText = 'height: 15px; list-style: none; pointer-events: none;';
             list.appendChild(separator);
         }
-        grouped[tag].forEach(ch => renderItem(ch));
+
+        grouped[tag].forEach(ch => {
+            renderChapterItem(ch, list);
+        });
     });
 
     // Add separator before untagged if there are tagged items
@@ -11186,13 +10450,13 @@ window.renderSidebar = () => {
         list.appendChild(separator);
     }
 
-    untagged.forEach(ch => renderItem(ch));
+    // Render untagged chapters at the end
+    untagged.forEach(ch => {
+        renderChapterItem(ch, list);
+    });
 
     if (filtered.length === 0) {
-        const isSearch = searchStr !== '' || categoryFilter !== 'all';
-        list.innerHTML = isSearch
-            ? '<li style="opacity: 0.5; text-align: center; padding: 20px;">No pages found</li>'
-            : '<li style="opacity: 0.5; text-align: center; padding: 20px;">Create your first note!</li>';
+        list.innerHTML = '<li style="opacity: 0.5; text-align: center; padding: 20px;">No pages found</li>';
     }
 
     // Update tag cloud
@@ -11200,7 +10464,7 @@ window.renderSidebar = () => {
 };
 
 // Helper function to render a single chapter item
-function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
+function renderChapterItem(ch, list) {
     const li = document.createElement('li');
     li.className = 'chapter-item';
     li.dataset.cid = ch.id;
@@ -11213,17 +10477,19 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
         }
     });
 
-    // ── Drag-and-Drop reordering ──────────────────────────────────────────
+    // ΓöÇΓöÇ Drag-and-Drop reordering ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     li.draggable = true;
 
     li.addEventListener('dragstart', (e) => {
         window._dndDragId = ch.id;
+        // Use setTimeout so the browser renders the ghost before we dim
         setTimeout(() => li.classList.add('dragging'), 0);
         e.dataTransfer.effectAllowed = 'move';
     });
 
     li.addEventListener('dragend', () => {
         li.classList.remove('dragging');
+        // Clean up any leftover drag-over highlights
         document.querySelectorAll('.chapter-item.drag-over')
             .forEach(el => el.classList.remove('drag-over'));
     });
@@ -11231,6 +10497,7 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
     li.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        // Highlight only this target
         document.querySelectorAll('.chapter-item.drag-over')
             .forEach(el => el.classList.remove('drag-over'));
         if (window._dndDragId !== ch.id) li.classList.add('drag-over');
@@ -11246,6 +10513,7 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
         const draggedId = window._dndDragId;
         if (!draggedId || draggedId === ch.id) return;
 
+        // Reorder the chapters array
         const fromIdx = chapters.findIndex(c => c.id === draggedId);
         const toIdx   = chapters.findIndex(c => c.id === ch.id);
         if (fromIdx === -1 || toIdx === -1) return;
@@ -11253,6 +10521,7 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
         const [moved] = chapters.splice(fromIdx, 1);
         chapters.splice(toIdx, 0, moved);
 
+        // Persist order
         saveSortOrder();
         renderSidebar();
     });
@@ -11260,21 +10529,13 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
     // Create content wrapper
     const contentDiv = document.createElement('div');
     contentDiv.className = 'chapter-item-content';
-    contentDiv.onclick = () => loadChapter(ch.id, escapedQuery);
+    contentDiv.onclick = () => loadChapter(ch.id);
 
     // Title
     const titleDiv = document.createElement('div');
     titleDiv.className = 'chapter-item-title';
     titleDiv.textContent = ch.title || 'Untitled';
     contentDiv.appendChild(titleDiv);
-
-    // Search snippet (shown only during active search)
-    if (matchSnippet) {
-        const snippetDiv = document.createElement('div');
-        snippetDiv.className = 'search-snippet';
-        snippetDiv.innerHTML = matchSnippet;
-        contentDiv.appendChild(snippetDiv);
-    }
 
     // Add tags if present
     if (ch.tags && ch.tags.length > 0) {
@@ -11289,9 +10550,9 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
     // Share button (publish to library)
     const shareBtn = document.createElement('button');
     shareBtn.className = 'chapter-share-btn';
-    shareBtn.innerHTML = '📤';
+    shareBtn.innerHTML = '≡ƒôñ';
     shareBtn.title = window.LIBRARY && window.LIBRARY.isPublished(ch.id)
-        ? 'Published — click to unpublish'
+        ? 'Published ΓÇö click to unpublish'
         : 'Share to library';
     if (window.LIBRARY && window.LIBRARY.isPublished(ch.id)) {
         shareBtn.classList.add('published');
@@ -11309,7 +10570,7 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
     if (hasOriginalHtml || isLibraryCloneWithOriginal) {
         const styledBtn = document.createElement('button');
         styledBtn.className = 'chapter-styled-btn';
-        styledBtn.innerHTML = '🎨';
+        styledBtn.innerHTML = '≡ƒÄ¿';
         styledBtn.title = 'View original HTML style';
         styledBtn.onclick = (e) => {
             e.stopPropagation();
@@ -11327,7 +10588,7 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
     // Delete button with trash icon
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'chapter-delete-btn';
-    deleteBtn.innerHTML = '🗑️';
+    deleteBtn.innerHTML = '≡ƒùæ∩╕Å';
     deleteBtn.title = 'Delete page';
     deleteBtn.onclick = (e) => {
         e.stopPropagation();
@@ -11338,7 +10599,7 @@ function renderChapterItem(ch, list, matchSnippet = null, escapedQuery = '') {
     list.appendChild(li);
 }
 
-// ─── PUBLISH TO SHARED LIBRARY ───────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ PUBLISH TO SHARED LIBRARY ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 window.publishToLibrary = async function (chapterId) {
     if (!window.LIBRARY || !window.api || !window.api.auth.isLoggedIn()) {
@@ -11351,17 +10612,17 @@ window.publishToLibrary = async function (chapterId) {
 
     const user = window.api.auth.getCurrentUser();
 
-    // If already published → offer to unpublish
+    // If already published ΓåÆ offer to unpublish
     if (window.LIBRARY.isPublished(chapterId)) {
         const entry = await window.LIBRARY.getByChapterId(chapterId);
         if (entry) {
             if (!confirm(`"${chapter.title}" is already in the library.\n\nRemove it from the library?`)) return;
             const result = await window.LIBRARY.deleteEntry(entry.id, user._id, chapterId);
             if (result.ok) {
-                showToast('📤 Removed from library');
+                showToast('≡ƒôñ Removed from library');
                 renderSidebar(); // refresh share button state
             } else {
-                showToast('❌ ' + result.error);
+                showToast('Γ¥î ' + result.error);
             }
         }
         return;
@@ -11370,19 +10631,19 @@ window.publishToLibrary = async function (chapterId) {
     // Make sure there's something worth sharing
     const raw = (chapter.content || '').replace(/<[^>]+>/g, '').trim();
     if (!chapter.title || chapter.title === 'Untitled Page') {
-        showToast('❌ Add a title to this note before sharing');
+        showToast('Γ¥î Add a title to this note before sharing');
         return;
     }
     if (raw.length < 10) {
-        showToast('❌ Note is too short to share');
+        showToast('Γ¥î Note is too short to share');
         return;
     }
 
-    // ── Capture multi-page stream sections ───────────────────────────────────
+    // ΓöÇΓöÇ Capture multi-page stream sections ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     // When the stream has more than one page loaded (e.g. all pages sharing the
     // same tag), we capture each page as a section so the library can render
     // it in the cheat-sheet format.  The original chapter.content is NOT
-    // modified — sections are a read-only snapshot stored alongside the entry.
+    // modified ΓÇö sections are a read-only snapshot stored alongside the entry.
     let sections = null;
     const streamBlocks = document.querySelectorAll('#sequentialStream .sequence-editor-block');
 
@@ -11415,11 +10676,11 @@ window.publishToLibrary = async function (chapterId) {
             });
         });
     }
-    // ─────────────────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     const result = await window.LIBRARY.publish({ ...chapter, sections }, user);
     if (result.ok) {
-        showToast('📤 Published to library!');
+        showToast('≡ƒôñ Published to library!');
         renderSidebar(); // refresh share button state
 
         // Offer to jump to library panel
@@ -11429,11 +10690,11 @@ window.publishToLibrary = async function (chapterId) {
             }
         }, 500);
     } else {
-        showToast('❌ ' + result.error);
+        showToast('Γ¥î ' + result.error);
     }
 };
 
-// ─── PENDING CLONE HANDLER ───────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ PENDING CLONE HANDLER ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // When user clones a note from the library, it's stored as a pending clone
 // in localStorage. initApp picks it up here and saves it as a real chapter.
 
@@ -11454,7 +10715,7 @@ async function checkPendingClone() {
             await saveChapterToDB(clone);
             renderSidebar();
             loadChapter(clone.id);
-            showToast(`📋 "${clone.title}" cloned into your notebook!`);
+            showToast(`≡ƒôï "${clone.title}" cloned into your notebook!`);
         }
     } catch (e) {
         console.warn('Pending clone restore failed:', e);
@@ -11464,7 +10725,7 @@ async function checkPendingClone() {
 // Expose for the embedded library panel's clone action
 window._checkPendingClone = checkPendingClone;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 // Delete a chapter (OPTIMIZED + UNDO)
 window.deleteChapter = async (id) => {
@@ -11516,7 +10777,7 @@ window.deleteChapter = async (id) => {
         requestAnimationFrame(() => renderSidebar());
     }
 
-    showToast('✓ Page deleted');
+    showToast('Γ£ô Page deleted');
 };
 
 
@@ -11583,7 +10844,7 @@ function applyHitHighlights(query) {
 }
 
 // Core logic detached to allow animation wrapping
-function executeLoadChapterLogic(chapter, id, highlightQuery = '') {
+function executeLoadChapterLogic(chapter, id, highlightQuery) {
     currentId = id;
 
     // Get the primary tag of this chapter
@@ -11661,14 +10922,6 @@ function executeLoadChapterLogic(chapter, id, highlightQuery = '') {
             contentArea.contentEditable = 'true';
             contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
             contentArea.dataset.chapterId = ch.id;
-
-            if (ch.pdfFileBase64) {
-                const inlineContainer = contentArea.querySelector('.inline-pdf-container');
-                if (inlineContainer && window.renderInlinePdf) {
-                    // Start rendering asynchronously so we don't block the UI thread
-                    window.renderInlinePdf(ch, inlineContainer).catch(console.error);
-                }
-            }
 
             // Adjust padding for subsequent pages if they have a title
             if (index > 0) {
@@ -11796,7 +11049,7 @@ window.showToast = (message) => {
     }, 3000);
 };
 
-// Setup drag and drop for images (fallback — workspace-level handler)
+// Setup drag and drop for images (fallback ΓÇö workspace-level handler)
 window.setupDragAndDrop = () => {
     const workspace = document.getElementById('workspace');
     if (!workspace) return;
@@ -11822,7 +11075,7 @@ window.setupDragAndDrop = () => {
                 saveCurrentToCloud();
             };
             reader.readAsDataURL(file);
-            showToast('✓ Image added');
+            showToast('Γ£ô Image added');
         }
     });
 };
@@ -12169,7 +11422,7 @@ window.addMindmapLink = function () {
     const nodes = document.querySelectorAll('.mindmap-node');
     nodes.forEach(n => n.classList.add('linkable'));
 
-    showToast('🔗 Linking mode: Click first node, then second node');
+    showToast('≡ƒöù Linking mode: Click first node, then second node');
 };
 
 function handleMindmapNodeClick(nodeId) {
@@ -12182,13 +11435,13 @@ function handleMindmapNodeClick(nodeId) {
             // Setup drag-to-link
             setupDragToLink(firstElement, nodeId);
         }
-        showToast('✓ First node selected. Drag to second node...');
+        showToast('Γ£ô First node selected. Drag to second node...');
     } else {
         // Second node selected - create link
         const secondNode = nodeId;
 
         if (mindmapState.firstNode === secondNode) {
-            showToast('⚠️ Cannot link node to itself');
+            showToast('ΓÜá∩╕Å Cannot link node to itself');
             return;
         }
 
@@ -12252,7 +11505,7 @@ function createMindmapLink(fromId, toId) {
     // Update line position
     updateMindmapLink(line, fromNode, toNode);
 
-    showToast('✓ Link created!');
+    showToast('Γ£ô Link created!');
 }
 
 function updateMindmapLink(line, fromNode, toNode) {
@@ -12428,7 +11681,7 @@ window.autoLayoutMindmap = function () {
         container.scrollTop = startY - (container.clientHeight / 2);
     }
 
-    showToast('🌳 Tree Layout applied!');
+    showToast('≡ƒî│ Tree Layout applied!');
 };
 
 // Initialize mindmap when template is loaded
@@ -12520,7 +11773,7 @@ window.initMindmapTemplate = function () {
 // ==================== OUTLINE TEMPLATE FUNCTIONS ====================
 
 // Outline label generators for each level
-// Level 1 → Roman numerals, Level 2 → Uppercase, Level 3 → Numbers, Level 4 → Lowercase
+// Level 1 ΓåÆ Roman numerals, Level 2 ΓåÆ Uppercase, Level 3 ΓåÆ Numbers, Level 4 ΓåÆ Lowercase
 const outlineLabelGenerators = {
     1: (index) => {
         const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
@@ -12685,7 +11938,7 @@ function getPreviousOutlineItem(item, container) {
 }
 
 // ================================================================
-//  RENUMBER OUTLINE — counter-array approach
+//  RENUMBER OUTLINE ΓÇö counter-array approach
 //  Tracks counters per level, resets deeper counters on level change.
 // ================================================================
 function renumberOutline(container) {
@@ -12720,11 +11973,11 @@ function renumberOutline(container) {
 }
 
 // ================================================================
-//  COLLAPSE / EXPAND — per-item toggle arrows (▶ / ▼)
+//  COLLAPSE / EXPAND ΓÇö per-item toggle arrows (Γû╢ / Γû╝)
 // ================================================================
 
 /**
- * Checks if an item has "children" — i.e., the next sibling items have a
+ * Checks if an item has "children" ΓÇö i.e., the next sibling items have a
  * deeper level. Children are all consecutive items with level > this item's
  * level, stopping when a same-or-higher level is hit.
  */
@@ -12738,14 +11991,14 @@ function getOutlineChildren(item, container) {
         if (getItemLevel(items[i]) > level) {
             children.push(items[i]);
         } else {
-            break; // Same or higher level — stop
+            break; // Same or higher level ΓÇö stop
         }
     }
     return children;
 }
 
 /**
- * Add or remove toggle arrows (▶/▼) on items that have children.
+ * Add or remove toggle arrows (Γû╢/Γû╝) on items that have children.
  * Called after every renumber.
  */
 function refreshOutlineToggles(container) {
@@ -12778,7 +12031,7 @@ function refreshOutlineToggles(container) {
             }
             // Set arrow direction based on collapsed state
             const isCollapsed = item.classList.contains('outline-collapsed');
-            toggleBtn.textContent = isCollapsed ? '▶' : '▼';
+            toggleBtn.textContent = isCollapsed ? 'Γû╢' : 'Γû╝';
             item.classList.add('has-children');
         } else {
             // Remove toggle if item has no children
@@ -12816,7 +12069,7 @@ function collapseOutlineItem(item, container) {
 
     // Update toggle arrow
     const toggleBtn = item.querySelector('.outline-toggle-btn');
-    if (toggleBtn) toggleBtn.textContent = '▶';
+    if (toggleBtn) toggleBtn.textContent = 'Γû╢';
 }
 
 /**
@@ -12841,7 +12094,7 @@ function expandOutlineItem(item, container) {
 
         // If we're skipping because of a nested collapsed parent
         if (skipUntilLevel > 0 && childLevel > skipUntilLevel) {
-            // Keep hidden — nested under a collapsed item
+            // Keep hidden ΓÇö nested under a collapsed item
             continue;
         }
 
@@ -12858,11 +12111,11 @@ function expandOutlineItem(item, container) {
 
     // Update toggle arrow
     const toggleBtn = item.querySelector('.outline-toggle-btn');
-    if (toggleBtn) toggleBtn.textContent = '▼';
+    if (toggleBtn) toggleBtn.textContent = 'Γû╝';
 }
 
 /**
- * Collapse All — collapse every item that has children, hide all non-level-1 items.
+ * Collapse All ΓÇö collapse every item that has children, hide all non-level-1 items.
  */
 window.collapseAllOutline = function () {
     const container = document.getElementById('outlineContent');
@@ -12880,7 +12133,7 @@ window.collapseAllOutline = function () {
         if (hasChildren) {
             item.classList.add('outline-collapsed');
             const toggleBtn = item.querySelector('.outline-toggle-btn');
-            if (toggleBtn) toggleBtn.textContent = '▶';
+            if (toggleBtn) toggleBtn.textContent = 'Γû╢';
         }
     });
 
@@ -12888,7 +12141,7 @@ window.collapseAllOutline = function () {
 };
 
 /**
- * Expand All — show every item and clear all collapsed states.
+ * Expand All ΓÇö show every item and clear all collapsed states.
  */
 window.expandAllOutline = function () {
     const container = document.getElementById('outlineContent');
@@ -12901,7 +12154,7 @@ window.expandAllOutline = function () {
         item.classList.remove('outline-collapsed');
 
         const toggleBtn = item.querySelector('.outline-toggle-btn');
-        if (toggleBtn) toggleBtn.textContent = '▼';
+        if (toggleBtn) toggleBtn.textContent = 'Γû╝';
     });
 
     showToast('Expanded all levels');
@@ -13005,7 +12258,7 @@ function handleOutlineKeydown(e) {
         if (!prevItem) return;
 
         // GUARD: cannot jump more than 1 level deeper than previous sibling
-        // This ensures logical hierarchy — you can't go from level-1 to level-3
+        // This ensures logical hierarchy ΓÇö you can't go from level-1 to level-3
         const prevLevel = getItemLevel(prevItem);
         if (level + 1 > prevLevel + 1) return;
 
@@ -13062,7 +12315,7 @@ function handleOutlineKeydown(e) {
             renumberOutline(outlineContent);
             placeCursorAtEnd(newItem);
         } else {
-            // No current item — create a level-1 item
+            // No current item ΓÇö create a level-1 item
             const newItem = createOutlineItem(1);
             outlineContent.appendChild(newItem);
             renumberOutline(outlineContent);
@@ -13096,7 +12349,7 @@ function handleOutlineKeydown(e) {
                     placeCursorAtEnd(prevItem);
                 }
             }
-            // At level 1 with content → allow normal browser backspace (do nothing)
+            // At level 1 with content ΓåÆ allow normal browser backspace (do nothing)
         }
     }
 }
@@ -13215,7 +12468,7 @@ async function initApp() {
             initializeAdvancedFeatures();
         } catch (err) {
             console.warn('Some advanced features may not be available:', err.message);
-            showToast(`⚠️ ${err.message} - check console for details`);
+            showToast(`ΓÜá∩╕Å ${err.message} - check console for details`);
         }
 
         // Launch onboarding tour for first-time users
@@ -13225,7 +12478,7 @@ async function initApp() {
 
     } catch (err) {
         console.error('Critical error initializing app:', err);
-        showToast('⚠️ Some features may not work correctly');
+        showToast('ΓÜá∩╕Å Some features may not work correctly');
     }
 }
 
@@ -13240,9 +12493,9 @@ function initializeAdvancedFeatures() {
     try {
         lassoSelector = new LassoSelector();
         lassoSelector.initialize();
-        console.log('✅ Lasso Selection initialized');
+        console.log('Γ£à Lasso Selection initialized');
     } catch (err) {
-        console.error('❌ Lasso Selection failed:', err);
+        console.error('Γ¥î Lasso Selection failed:', err);
         failures.push('Lasso Selection');
     }
 
@@ -13251,9 +12504,9 @@ function initializeAdvancedFeatures() {
         shapeRecognizer = new ShapeRecognizer();
         shapeRecognizer.initialize();
         shapeRecognizer.setSensitivity('moderate');
-        console.log('✅ Shape Recognition initialized');
+        console.log('Γ£à Shape Recognition initialized');
     } catch (err) {
-        console.error('❌ Shape Recognition failed:', err);
+        console.error('Γ¥î Shape Recognition failed:', err);
         failures.push('Shape Recognition');
     }
 
@@ -13261,17 +12514,17 @@ function initializeAdvancedFeatures() {
     try {
         const pageDetailsGesture = new PageDetailsGesture();
         pageDetailsGesture.initialize();
-        console.log('✅ Page Details Gesture initialized');
+        console.log('Γ£à Page Details Gesture initialized');
     } catch (err) {
-        console.error('❌ Page Details Gesture failed:', err);
+        console.error('Γ¥î Page Details Gesture failed:', err);
         failures.push('Page Details Gesture');
     }
 
     if (failures.length > 0) {
-        console.warn(`⚠️ Some features unavailable: ${failures.join(', ')}`);
-        // Don't throw — let Phase 2 and Phase 3 still initialize
+        console.warn(`ΓÜá∩╕Å Some features unavailable: ${failures.join(', ')}`);
+        // Don't throw ΓÇö let Phase 2 and Phase 3 still initialize
     } else {
-        console.log('✅ All Phase 1 Advanced Features initialized successfully');
+        console.log('Γ£à All Phase 1 Advanced Features initialized successfully');
     }
 }
 
@@ -13290,7 +12543,7 @@ function toggleLassoSelection() {
     const btn = document.getElementById('lassoBtn');
     if (btn) btn.classList.toggle('active', isActive);
 
-    showToast(isActive ? 'Lasso Selection Active — Draw to select elements' : 'Lasso Selection Disabled');
+    showToast(isActive ? 'Lasso Selection Active ΓÇö Draw to select elements' : 'Lasso Selection Disabled');
 }
 
 function toggleShapeRecognition() {
@@ -13376,7 +12629,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Update initializeAdvancedFeatures to include audio recorder
 const originalInitAdvanced = initializeAdvancedFeatures;
 initializeAdvancedFeatures = function () {
-    // Run Phase 1 — but don't let its throws block Phase 2
+    // Run Phase 1 ΓÇö but don't let its throws block Phase 2
     try { originalInitAdvanced(); } catch (e) { /* Phase 1 partial failures already logged */ }
 
     // Initialize Audio Recorder
@@ -13386,7 +12639,7 @@ initializeAdvancedFeatures = function () {
         if (window.widgetRail) {
             window.widgetRail.attachAudioRecorder(audioRecorder);
         }
-        console.log('✅ Audio Recorder initialized');
+        console.log('Γ£à Audio Recorder initialized');
     } catch (err) {
         console.error('Error initializing audio recorder:', err);
     }
@@ -13409,7 +12662,7 @@ let pageDetailsGesture = null;
 // Update initializeAdvancedFeatures to include Phase 3
 const originalInitAdvanced2 = initializeAdvancedFeatures;
 initializeAdvancedFeatures = function () {
-    // Run Phase 2 — but don't let its throws block Phase 3
+    // Run Phase 2 ΓÇö but don't let its throws block Phase 3
     try { originalInitAdvanced2(); } catch (e) { /* Phase 2 partial failures already logged */ }
 
     // Initialize Scribble Eraser
@@ -13417,7 +12670,7 @@ initializeAdvancedFeatures = function () {
         scribbleEraser = new ScribbleEraser();
         scribbleEraser.initialize();
         scribbleEraser.setSensitivity('medium');
-        console.log('✅ Scribble Eraser initialized');
+        console.log('Γ£à Scribble Eraser initialized');
     } catch (err) {
         console.error('Error initializing scribble eraser:', err);
     }
@@ -13426,7 +12679,7 @@ initializeAdvancedFeatures = function () {
     try {
         pageDetailsGesture = new PageDetailsGesture();
         pageDetailsGesture.initialize();
-        console.log('✅ Page Details Gesture initialized');
+        console.log('Γ£à Page Details Gesture initialized');
     } catch (err) {
         console.error('Error initializing page details gesture:', err);
     }
@@ -13628,10 +12881,10 @@ function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = 'nb-toast ' + type;
     
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-    if (type === 'warning') icon = '⚠️';
+    let icon = 'Γä╣∩╕Å';
+    if (type === 'success') icon = 'Γ£à';
+    if (type === 'error') icon = 'Γ¥î';
+    if (type === 'warning') icon = 'ΓÜá∩╕Å';
     
     toast.innerHTML = '<span class="nb-toast-icon">' + icon + '</span><span class="nb-toast-msg">' + message + '</span>';
     
@@ -13681,12 +12934,12 @@ window.showToast = showToast;
     function buildMenu(chapterId) {
         menu.innerHTML = '';
         const actions = [
-            { icon: '✏️', label: 'Rename',    cls: '',       fn: () => { hide(); renameChapterInline(chapterId); } },
-            { icon: '👯', label: 'Duplicate', cls: '',       fn: () => { hide(); duplicateChapter(chapterId); } },
+            { icon: 'Γ£Å∩╕Å', label: 'Rename',    cls: '',       fn: () => { hide(); renameChapterInline(chapterId); } },
+            { icon: '≡ƒæ»', label: 'Duplicate', cls: '',       fn: () => { hide(); duplicateChapter(chapterId); } },
             { sep: true },
-            { icon: '📥', label: 'Export JSON', cls: '',     fn: () => { hide(); exportChapterJSON(chapterId); } },
+            { icon: '≡ƒôÑ', label: 'Export JSON', cls: '',     fn: () => { hide(); exportChapterJSON(chapterId); } },
             { sep: true },
-            { icon: '🗑️', label: 'Delete',   cls: 'danger', fn: () => { hide(); window.deleteChapter(chapterId); } },
+            { icon: '≡ƒùæ∩╕Å', label: 'Delete',   cls: 'danger', fn: () => { hide(); window.deleteChapter(chapterId); } },
         ];
 
         actions.forEach(a => {
@@ -13710,7 +12963,7 @@ window.showToast = showToast;
         _activeChapterId = chapterId;
         buildMenu(chapterId);
 
-        // Position menu — nudge inward if it would overflow viewport
+        // Position menu ΓÇö nudge inward if it would overflow viewport
         const vw = window.innerWidth, vh = window.innerHeight;
         let x = e.clientX, y = e.clientY;
         menu.classList.add('visible');
@@ -13733,10 +12986,10 @@ window.duplicateChapter = async function (id) {
     chapters.unshift(copy);
     await saveChapterToDB(copy);
     renderSidebar();
-    showToast('👯 Duplicated: ' + copy.title, 'success');
+    showToast('≡ƒæ» Duplicated: ' + copy.title, 'success');
 };
 
-// Inline rename — makes the title editable in the sidebar
+// Inline rename ΓÇö makes the title editable in the sidebar
 window.renameChapterInline = function (id) {
     const li = document.querySelector(`.chapter-item[data-cid="${id}"]`);
     if (!li) { showToast('Switch to this note first to rename'); return; }
@@ -13763,7 +13016,7 @@ window.renameChapterInline = function (id) {
                 const pageTitleEl = document.getElementById('pageTitle');
                 if (pageTitleEl) pageTitleEl.value = ch.title;
             }
-            showToast('✏️ Renamed', 'success');
+            showToast('Γ£Å∩╕Å Renamed', 'success');
         }
         renderSidebar();
     }
@@ -13786,7 +13039,7 @@ window.exportChapterJSON = function (id) {
     a.download = (ch.title || 'note').replace(/[^a-z0-9]/gi, '_') + '.json';
     a.click();
     URL.revokeObjectURL(url);
-    showToast('📥 Exported: ' + (ch.title || 'note'), 'success');
+    showToast('≡ƒôÑ Exported: ' + (ch.title || 'note'), 'success');
 };
 
 // Persist the current in-memory order of chapters to the database
@@ -13794,7 +13047,7 @@ window.exportChapterJSON = function (id) {
 function saveSortOrder() {
     chapters.forEach((ch, i) => {
         ch.sortOrder = i;
-        // Fire-and-forget — don't block the UI
+        // Fire-and-forget ΓÇö don't block the UI
         saveChapterToDB(ch).catch(err => console.warn('sortOrder save failed', err));
     });
 }
@@ -13804,27 +13057,27 @@ function saveSortOrder() {
     const TOUR_STEPS = [
         {
             target: '#mainSidebar',
-            title: '📚 Your Notes Live Here',
+            title: '≡ƒôÜ Your Notes Live Here',
             desc: 'Create, organize, search and drag-reorder your notes. Right-click any note for quick actions like rename, duplicate, and export.'
         },
         {
             target: '.tool-bar',
-            title: '🖊️ Writing Tools',
-            desc: 'Pick your style — pen, pencil, marker, highlighter, brush, or chalk. Each one changes how your text looks and feels.'
+            title: '≡ƒûè∩╕Å Writing Tools',
+            desc: 'Pick your style ΓÇö pen, pencil, marker, highlighter, brush, or chalk. Each one changes how your text looks and feels.'
         },
         {
             target: '#sequentialStream',
-            title: '📝 The Editor',
+            title: '≡ƒô¥ The Editor',
             desc: 'Your infinite workspace. Type, paste images, add equations with the math keyboard, or insert interactive circuit diagrams.'
         },
         {
             target: '#_auto_130',
-            title: '📋 Templates',
+            title: '≡ƒôï Templates',
             desc: 'Quick-start with Cornell Notes, Zettelkasten, algorithms, medical anatomy, dental procedures, engineering circuits, and more.'
         },
         {
             target: '#sketchCanvas',
-            title: '✏️ Sketch Mode',
+            title: 'Γ£Å∩╕Å Sketch Mode',
             desc: 'Toggle with Ctrl+M to draw diagrams, annotate, and sketch directly on your notes. Use the eraser, undo/redo, and different brush styles.'
         }
     ];
@@ -13920,7 +13173,7 @@ function saveSortOrder() {
             `<div class="tour-actions">` +
                 `<button class="tour-btn tour-btn-skip" id="tourSkip">${isLast ? '' : 'Skip'}</button>` +
                 `<div class="tour-dots">${dots}</div>` +
-                `<button class="tour-btn tour-btn-next" id="tourNext">${isLast ? 'Get Started! 🚀' : 'Next →'}</button>` +
+                `<button class="tour-btn tour-btn-next" id="tourNext">${isLast ? 'Get Started! ≡ƒÜÇ' : 'Next ΓåÆ'}</button>` +
             `</div>`;
 
         document.getElementById('tourNext').addEventListener('click', () => {
@@ -13935,7 +13188,7 @@ function saveSortOrder() {
         if (_spotlight)  _spotlight.remove();
         if (_tooltip)   _tooltip.remove();
         localStorage.setItem('nb_onboarded', '1');
-        showToast('🎉 Welcome to Academic Notebook!', 'success');
+        showToast('≡ƒÄë Welcome to Academic Notebook!', 'success');
     }
 
     window.startTour = function () {
@@ -13946,7 +13199,7 @@ function saveSortOrder() {
     // Allow re-triggering from console or a settings menu
     window.resetTour = function () {
         localStorage.removeItem('nb_onboarded');
-        showToast('Tour reset — reload the page to see it again');
+        showToast('Tour reset ΓÇö reload the page to see it again');
     };
 })();
 
@@ -13956,12 +13209,12 @@ function saveSortOrder() {
     const _undoStack = [];
     const _redoStack = [];
 
-    // ── Floating UI bar ──
+    // ΓöÇΓöÇ Floating UI bar ΓöÇΓöÇ
     const bar = document.createElement('div');
     bar.className = 'undo-redo-bar';
     bar.innerHTML =
-        '<button class="undo-redo-btn disabled" id="globalUndoBtn" title="Undo (Ctrl+Z)">↩</button>' +
-        '<button class="undo-redo-btn disabled" id="globalRedoBtn" title="Redo (Ctrl+Y)">↪</button>';
+        '<button class="undo-redo-btn disabled" id="globalUndoBtn" title="Undo (Ctrl+Z)">Γå⌐</button>' +
+        '<button class="undo-redo-btn disabled" id="globalRedoBtn" title="Redo (Ctrl+Y)">Γå¬</button>';
     document.body.appendChild(bar);
 
     function refreshButtons() {
@@ -13971,7 +13224,7 @@ function saveSortOrder() {
         if (rb) rb.classList.toggle('disabled', _redoStack.length === 0);
     }
 
-    // ── Core API ──
+    // ΓöÇΓöÇ Core API ΓöÇΓöÇ
     window.pushUndo = function (action) {
         _undoStack.push(action);
         if (_undoStack.length > MAX_STACK) _undoStack.shift();
@@ -13985,7 +13238,7 @@ function saveSortOrder() {
         try { action.undo(); } catch (e) { console.warn('Undo failed', e); }
         _redoStack.push(action);
         refreshButtons();
-        showToast('↩ Undo: ' + (action.label || action.type));
+        showToast('Γå⌐ Undo: ' + (action.label || action.type));
     };
 
     window.globalRedo = function () {
@@ -13994,14 +13247,14 @@ function saveSortOrder() {
         try { action.redo(); } catch (e) { console.warn('Redo failed', e); }
         _undoStack.push(action);
         refreshButtons();
-        showToast('↪ Redo: ' + (action.label || action.type));
+        showToast('Γå¬ Redo: ' + (action.label || action.type));
     };
 
     // Button clicks
     document.getElementById('globalUndoBtn').addEventListener('click', () => globalUndo());
     document.getElementById('globalRedoBtn').addEventListener('click', () => globalRedo());
 
-    // ── Keyboard shortcuts (Ctrl+Z / Ctrl+Y) ──
+    // ΓöÇΓöÇ Keyboard shortcuts (Ctrl+Z / Ctrl+Y) ΓöÇΓöÇ
     // Only intercept when focus is NOT inside a contentEditable (let browser handle text undo)
     document.addEventListener('keydown', function (e) {
         if (!e.ctrlKey && !e.metaKey) return;
@@ -14040,17 +13293,17 @@ document.addEventListener('keydown', function(e) {
                 // Optionally open sidebar if not open
                 const sidebar = document.getElementById('mainSidebar');
                 if (sidebar) sidebar.classList.add('open');
-                showToast('🔍 Search focused');
+                showToast('≡ƒöì Search focused');
                 break;
             case 's':
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof window.saveCurrentToCloud === 'function') {
                     window.saveCurrentToCloud();
-                    showToast('💾 Saved manually');
+                    showToast('≡ƒÆ╛ Saved manually');
                 } else if (typeof saveCurrentToCloud === 'function') {
                     saveCurrentToCloud();
-                    showToast('💾 Saved manually');
+                    showToast('≡ƒÆ╛ Saved manually');
                 }
                 break;
             case 'm':
@@ -14097,7 +13350,7 @@ function toggleShortcutsModal() {
 
     modal.innerHTML = 
         '<div class="nb-shortcuts-modal">' +
-            '<h3 style="margin-bottom: 15px; font-family: Caveat, cursive; font-size: 1.5rem;">⌨️ Keyboard Shortcuts</h3>' +
+            '<h3 style="margin-bottom: 15px; font-family: Caveat, cursive; font-size: 1.5rem;">Γî¿∩╕Å Keyboard Shortcuts</h3>' +
             '<ul style="list-style: none; padding: 0; margin: 0; font-family: sans-serif; font-size: 0.9rem;">' +
                 '<li style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee;">' +
                     '<span><b>Cmd/Ctrl + P</b></span>' +
@@ -14131,7 +13384,6 @@ function toggleShortcutsModal() {
 window.toggleShortcutsModal = toggleShortcutsModal;
 
 /* ==================== COMMAND PALETTE (Ctrl+K) ==================== */
-/* ==================== COMMAND PALETTE (Ctrl+K) ==================== */
 function initCommandPalette() {
     const overlay = document.getElementById('cmdPaletteOverlay');
     const input = document.getElementById('cmdPaletteInput');
@@ -14143,27 +13395,27 @@ function initCommandPalette() {
 
     // Static commands
     const staticCommands = [
-        { id: 'cmd_new', title: 'New Page', category: 'Action', icon: '📄', execute: () => { createNewChapter(); } },
-        { id: 'cmd_focus', title: 'Toggle Focus Mode', category: 'Action', icon: '🍅', execute: () => { toggleFocusMode(); } },
-        { id: 'cmd_dark', title: 'Toggle Dark Mode', category: 'Action', icon: '🌙', execute: () => { toggleDarkMode(); } },
-        { id: 'cmd_pdf', title: 'Export to PDF', category: 'Action', icon: '🖨️', execute: () => { window.print(); } },
-        { id: 'cmd_sketch', title: 'Toggle Sketch Mode', category: 'Tool', icon: '✏️', execute: () => { window.toggleSketchMode(); } },
-        { id: 'cmd_math', title: 'Insert Math Block', category: 'Tool', icon: '∑', execute: () => { addMathBlock(); } },
-        { id: 'cmd_flashcard', title: 'Flashcards', category: 'Tool', icon: '🗂️', execute: () => { startFlashcardMode(); } },
-        { id: 'cmd_templates', title: 'Open Templates', category: 'Tool', icon: '📋', execute: () => { 
+        { id: 'cmd_new', title: 'New Page', category: 'Action', icon: '≡ƒôä', execute: () => { createNewChapter(); } },
+        { id: 'cmd_focus', title: 'Toggle Focus Mode', category: 'Action', icon: '≡ƒìà', execute: () => { toggleFocusMode(); } },
+        { id: 'cmd_dark', title: 'Toggle Dark Mode', category: 'Action', icon: '≡ƒîÖ', execute: () => { toggleDarkMode(); } },
+        { id: 'cmd_pdf', title: 'Export to PDF', category: 'Action', icon: '≡ƒû¿∩╕Å', execute: () => { window.print(); } },
+        { id: 'cmd_sketch', title: 'Toggle Sketch Mode', category: 'Tool', icon: 'Γ£Å∩╕Å', execute: () => { window.toggleSketchMode(); } },
+        { id: 'cmd_math', title: 'Insert Math Block', category: 'Tool', icon: 'Γêæ', execute: () => { addMathBlock(); } },
+        { id: 'cmd_flashcard', title: 'Flashcards', category: 'Tool', icon: '≡ƒùé∩╕Å', execute: () => { startFlashcardMode(); } },
+        { id: 'cmd_templates', title: 'Open Templates', category: 'Tool', icon: '≡ƒôï', execute: () => { 
             const panel = document.getElementById('templatesPanel');
             if(panel) panel.classList.toggle('open');
         } },
-        { id: 'cmd_lib', title: 'Open Library', category: 'Tool', icon: '📚', execute: () => { 
+        { id: 'cmd_lib', title: 'Open Library', category: 'Tool', icon: '≡ƒôÜ', execute: () => { 
             const panel = document.getElementById('libraryPanel');
             if(panel) panel.classList.add('lib-open');
         } },
-        { id: 'cmd_appearance', title: 'Change Appearance', category: 'Tool', icon: '🎨', execute: () => { togglePaperStylePopover(); } },
+        { id: 'cmd_appearance', title: 'Change Appearance', category: 'Tool', icon: '≡ƒÄ¿', execute: () => { togglePaperStylePopover(); } },
         // Ink colors
-        { id: 'cmd_ink_blue', title: 'Switch to Blue Ink', category: 'Ink', icon: '🔵', execute: () => { selectWritingTool('pen'); setPencilColor('#3498db'); } },
-        { id: 'cmd_ink_red', title: 'Switch to Red Ink', category: 'Ink', icon: '🔴', execute: () => { selectWritingTool('pen'); setPencilColor('#e74c3c'); } },
-        { id: 'cmd_ink_green', title: 'Switch to Green Ink', category: 'Ink', icon: '🟢', execute: () => { selectWritingTool('pen'); setPencilColor('#2ecc71'); } },
-        { id: 'cmd_ink_black', title: 'Switch to Black Ink', category: 'Ink', icon: '⚫', execute: () => { selectWritingTool('pen'); setPencilColor('#1a1a1a'); } },
+        { id: 'cmd_ink_blue', title: 'Switch to Blue Ink', category: 'Ink', icon: '≡ƒö╡', execute: () => { selectWritingTool('pen'); setPencilColor('#3498db'); } },
+        { id: 'cmd_ink_red', title: 'Switch to Red Ink', category: 'Ink', icon: '≡ƒö┤', execute: () => { selectWritingTool('pen'); setPencilColor('#e74c3c'); } },
+        { id: 'cmd_ink_green', title: 'Switch to Green Ink', category: 'Ink', icon: '≡ƒƒó', execute: () => { selectWritingTool('pen'); setPencilColor('#2ecc71'); } },
+        { id: 'cmd_ink_black', title: 'Switch to Black Ink', category: 'Ink', icon: 'ΓÜ½', execute: () => { selectWritingTool('pen'); setPencilColor('#1a1a1a'); } },
     ];
 
     function buildIndex(queryText) {
@@ -14184,7 +13436,7 @@ function initCommandPalette() {
                 id: 'note_' + ch.id,
                 title: ch.title || 'Untitled',
                 category: 'Note',
-                icon: '📝',
+                icon: '≡ƒô¥',
                 snippet: ch._matchSnippet,
                 execute: () => { loadChapter(ch.id, queryText); }
             }));
@@ -14199,7 +13451,7 @@ function initCommandPalette() {
                         id: 'note_' + ch.id,
                         title: ch.title || 'Untitled',
                         category: 'Note',
-                        icon: '📝',
+                        icon: '≡ƒô¥',
                         execute: () => { loadChapter(ch.id); }
                     });
                 }
@@ -14259,25 +13511,17 @@ function initCommandPalette() {
             selectedEl.scrollIntoView({ block: 'nearest' });
         }
 
-        // Attach click + hover handlers via event delegation to avoid re-render race conditions
-        resultsContainer.onclick = (e) => {
-            const item = e.target.closest('.cmd-result-item');
-            if (!item) return;
-            const idx = parseInt(item.getAttribute('data-index'));
-            executeResult(filtered[idx]);
-        };
-        resultsContainer.onmousemove = (e) => {
-            const item = e.target.closest('.cmd-result-item');
-            if (!item) return;
-            const idx = parseInt(item.getAttribute('data-index'));
-            if (idx !== selectedIndex) {
-                selectedIndex = idx;
-                // Highlight without full re-render to avoid breaking click
-                resultsContainer.querySelectorAll('.cmd-result-item').forEach((el, i) => {
-                    el.classList.toggle('selected', i === selectedIndex);
-                });
-            }
-        };
+        // Attach click handlers
+        resultsContainer.querySelectorAll('.cmd-result-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const idx = parseInt(el.getAttribute('data-index'));
+                executeResult(filtered[idx]);
+            });
+            el.addEventListener('mouseenter', () => {
+                selectedIndex = parseInt(el.getAttribute('data-index'));
+                renderResults(input.value);
+            });
+        });
     }
 
     function executeResult(item) {
@@ -14487,7 +13731,7 @@ function initBiDirectionalLinking() {
             matches.slice(0, 15).forEach((ch, idx) => { // limit to top 15
                 const title = ch.title || 'Untitled';
                 html += `<div class="link-suggester-item ${idx === selectedIndex ? 'selected' : ''}" data-id="${ch.id}" data-title="${title}">
-                            📄 ${title}
+                            ≡ƒôä ${title}
                         </div>`;
             });
         }
@@ -14632,11 +13876,11 @@ window.renderBacklinks = () => {
 
     const html = `
         <div class="backlinks-container" contenteditable="false">
-            <div class="backlinks-title">🔗 Linked Mentions <span>(${backlinks.length})</span></div>
+            <div class="backlinks-title">≡ƒöù Linked Mentions <span>(${backlinks.length})</span></div>
             <div class="backlinks-list">
                 ${backlinks.map(bl => `
                     <div class="backlink-item" onclick="saveCurrentToCloud(); loadChapter('${bl.id}')">
-                        <span class="backlink-item-icon">📄</span>
+                        <span class="backlink-item-icon">≡ƒôä</span>
                         <span class="backlink-item-title">${bl.title}</span>
                     </div>
                 `).join('')}

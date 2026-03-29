@@ -107,148 +107,9 @@ class AuthManager {
 window.OAUTH_CONFIG = {};
 
 // ─────────────────────────────────────────────
+//  GLOBAL SINGLETON
+// ─────────────────────────────────────────────
 window.AUTH = new AuthManager();
-
-// ─────────────────────────────────────────────
-// REAL-TIME CLOUD SYNC ENGINE
-// ─────────────────────────────────────────────
-class SyncEngine {
-    constructor() {
-        this.lastSync = new Date().toISOString();
-        this.intervalId = null;
-        this.isEnabled = true;
-        
-        window.addEventListener('online', () => {
-            this.updateStatus('☁️ Back online, syncing...');
-            this.forceSync();
-        });
-        
-        window.addEventListener('offline', () => {
-            this.updateStatus('🔴 Offline (Saving locally)');
-        });
-        
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                this.forceSync();
-            }
-        });
-    }
-
-    start(intervalMs = 5000) {
-        if (!window.api || !window.api.auth.isLoggedIn()) return;
-        this.updateStatus('🟢 Synced');
-        this.intervalId = setInterval(() => this.performSync(), intervalMs);
-    }
-
-    stop() {
-        if (this.intervalId) clearInterval(this.intervalId);
-    }
-
-    updateStatus(msg) {
-        const statusEl = document.getElementById('saveStatus');
-        if (statusEl) statusEl.textContent = msg;
-    }
-    
-    forceSync() {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = setInterval(() => this.performSync(), 5000);
-        }
-        this.performSync();
-    }
-
-    async performSync() {
-        if (!navigator.onLine || !this.isEnabled || !window.api || !window.api.auth.isLoggedIn()) return;
-        
-        try {
-            const data = await window.api.sync(this.lastSync);
-            this.lastSync = data.syncTime || new Date().toISOString();
-            
-            if (data.notes && data.notes.length > 0) {
-                this.processIncomingUpdates(data.notes);
-            }
-        } catch (err) {
-            console.warn('Background sync failed:', err);
-        }
-    }
-
-    processIncomingUpdates(incomingNotes) {
-        let needsSidebarRender = false;
-
-        incomingNotes.forEach(serverNote => {
-            const incomingData = serverNote.frontEndData || serverNote;
-            const existingIndex = chapters.findIndex(c => c.id === incomingData.id);
-            
-            if (existingIndex === -1) {
-                // New note from another device
-                chapters.push(incomingData);
-                needsSidebarRender = true;
-            } else {
-                // Update existing note
-                // ONLY update if server timestamp is strictly newer
-                const localDate = new Date(chapters[existingIndex].updatedAt || 0);
-                const serverDate = new Date(incomingData.updatedAt || 0);
-                
-                if (serverDate > localDate) {
-                    chapters[existingIndex] = incomingData;
-                    needsSidebarRender = true;
-                    
-                    // If the updated note is CURRENTLY open on screen
-                    if (incomingData.id === currentId) {
-                        this.handleActiveDocumentUpdate(incomingData);
-                    }
-                }
-            }
-        });
-
-        if (needsSidebarRender) {
-            renderSidebar();
-            renderTagCloud();
-        }
-    }
-    
-    handleActiveDocumentUpdate(newData) {
-        const contentArea = document.querySelector(`.content-area[data-chapter-id="${newData.id}"]`) || document.querySelector('.content-area');
-        if (!contentArea) return;
-        
-        // Check if user is actively typing in it
-        const isTyping = document.activeElement && contentArea.contains(document.activeElement);
-        
-        if (isTyping) {
-            // Unobtrusive banner (avoid Edit Wars)
-            this.showConflictBanner();
-        } else {
-            // Safe to hot-swap content
-            contentArea.innerHTML = newData.content || '<p>Start typing...</p>';
-            
-            // Brief visual flash
-            contentArea.style.transition = 'background 0.3s';
-            contentArea.style.background = 'rgba(46, 204, 113, 0.15)';
-            setTimeout(() => contentArea.style.background = 'transparent', 300);
-            
-            this.updateStatus('✨ Remote changes applied');
-            setTimeout(() => this.updateStatus('🟢 Synced'), 3000);
-        }
-    }
-    
-    showConflictBanner() {
-        let banner = document.getElementById('syncConflictBanner');
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'syncConflictBanner';
-            banner.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:10px 20px; border-radius:20px; box-shadow:0 4px 15px rgba(0,0,0,0.2); z-index:9999; display:flex; gap:15px; align-items:center; animation: popIn 0.3s ease-out;';
-            banner.innerHTML = `
-                <span>✨ Note updated remotely.</span>
-                <button onclick="location.reload()" style="background:white; color:var(--primary); border:none; padding:4px 10px; border-radius:12px; cursor:pointer; font-weight:bold;">Refresh</button>
-                <button onclick="this.parentElement.remove()" style="background:transparent; color:white; border:1px solid white; padding:4px 10px; border-radius:12px; cursor:pointer;">Ignore</button>
-            `;
-            document.body.appendChild(banner);
-        }
-    }
-}
-
-window.SYNC_ENGINE = new SyncEngine();
-window.SYNC_ENGINE.start(5000);
 /**
  * SharedLibrary — Local shared notes library
  *
@@ -3245,12 +3106,7 @@ async function saveChapterToDB(chapter) {
     }
     chapter.updatedAt = new Date().toISOString();
 
-    if (!window.api || !window.api.auth.isLoggedIn()) {
-        if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('🔴 Saved locally (Not logged in)');
-        return;
-    }
-
-    if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('⏳ Saving to cloud...');
+    if (!window.api || !window.api.auth.isLoggedIn()) return;
 
     try {
         if (chapter._id) {
@@ -3270,15 +3126,8 @@ async function saveChapterToDB(chapter) {
             chapter._id = data.note._id;
             chapter.id = data.note._id; // Make the frontend ID match the backend _id
         }
-        
-        // Keep sync horizon updated so we don't fetch our own save
-        if (window.SYNC_ENGINE) {
-            window.SYNC_ENGINE.updateStatus('🟢 Synced');
-            window.SYNC_ENGINE.lastSync = new Date().toISOString();
-        }
     } catch (err) {
         console.error('Failed to save chapter to API:', err);
-        if (window.SYNC_ENGINE) window.SYNC_ENGINE.updateStatus('🔴 Sync failed - Will retry');
     }
 }
 
@@ -4050,126 +3899,65 @@ window.importPdfToCanvas = async (input) => {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
 
+        // Get the current content area (where user edits)
         const contentArea = document.querySelector('.content-area');
         if (!contentArea) {
             showToast("⚠️ Please create a page first");
             return;
         }
 
+        // Clear existing content and prepare for PDF
         contentArea.innerHTML = '';
         contentArea.style.position = 'relative';
 
-        const inlineContainer = document.createElement('div');
-        inlineContainer.className = 'inline-pdf-container';
-        inlineContainer.contentEditable = 'false'; // Keep selection logic intact
-        inlineContainer.dataset.hasPdf = 'true';
-        contentArea.appendChild(inlineContainer);
-        // Ensure user can still type in the content area outside the PDF
-        contentArea.contentEditable = 'true';
+        const pdfPagesData = [];
+        const pdfContainer = document.createElement('div');
+        pdfContainer.style.cssText = 'position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 20px;';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-page-render';
+            canvas.style.cssText = 'max-width: 100%; height: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: white;';
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+
+            // Create wrapper for each page
+            const pageWrapper = document.createElement('div');
+            pageWrapper.style.cssText = 'position: relative; width: 100%; display: flex; justify-content: center;';
+            pageWrapper.appendChild(canvas);
+            pdfContainer.appendChild(pageWrapper);
+
+            pdfPagesData.push(canvas.toDataURL('image/jpeg', 0.8));
+        }
+
+        // Inject PDF into content area
+        contentArea.appendChild(pdfContainer);
+        contentArea.contentEditable = 'true'; // Allow annotations on top
 
         const chapter = chapters.find(c => c.id === currentId);
         if (chapter) {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                chapter.pdfFileBase64 = reader.result; // Saves the base64 PDF string (much smaller than JPEGs)
-                chapter.content = contentArea.innerHTML;
-                await saveChapterToDB(chapter);
-                
-                await window.renderInlinePdf(chapter, inlineContainer, pdf);
-                setTimeout(resizeCanvas, 100);
-                showToast(`✓ PDF loaded: ${pdf.numPages} pages. Use mouse to highlight text!`);
-            };
+            chapter.pdfPages = pdfPagesData;
+            chapter.content = contentArea.innerHTML; // Save the PDF-injected content
+            await saveChapterToDB(chapter);
         }
+
+        setTimeout(resizeCanvas, 100);
+        showToast(`✓ PDF loaded: ${pdf.numPages} pages. Click to add annotations!`);
 
     } catch (err) {
         console.error(err);
         showToast("Error reading PDF");
     }
-};
-
-// --- RENDER INLINE PDF FOR 'ANNOTATE ON PAPER' ---
-window.renderInlinePdf = async (chapter, container, preloadedPdf = null) => {
-    if (!chapter.pdfFileBase64) return;
-    
-    container.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">⏳ Loading PDF pages...</div>';
-    
-    let pdf;
-    try {
-        if (preloadedPdf) {
-            pdf = preloadedPdf;
-        } else {
-            // Load from base64 string
-            const base64Data = chapter.pdfFileBase64.split(',')[1] || chapter.pdfFileBase64;
-            const pdfData = atob(base64Data);
-            const array = new Uint8Array(pdfData.length);
-            for (let i = 0; i < pdfData.length; i++) array[i] = pdfData.charCodeAt(i);
-            pdf = await pdfjsLib.getDocument(array).promise;
-        }
-    } catch (e) {
-        container.innerHTML = '<div style="text-align:center;padding:40px;color:#f55;">⚠️ Failed to load PDF</div>';
-        return;
-    }
-
-    container.innerHTML = '';
-    const containerWidth = (document.getElementById('sequentialStream')?.clientWidth || 800) - 40;
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const cssScale = Math.min(containerWidth / unscaledViewport.width, 3.5);
-        const cssViewport = page.getViewport({ scale: cssScale });
-        
-        const pixelRatio = window.devicePixelRatio || 1;
-        const renderViewport = page.getViewport({ scale: cssScale * pixelRatio });
-
-        const pageWrapper = document.createElement('div');
-        pageWrapper.className = 'pdf-page-wrapper';
-        pageWrapper.dataset.page = i;
-
-        // Render Canvas (High-DPI)
-        const canvas = document.createElement('canvas');
-        canvas.className = 'pdf-page-canvas';
-        canvas.style.width = cssViewport.width + 'px';
-        canvas.style.height = cssViewport.height + 'px';
-        canvas.width = renderViewport.width;
-        canvas.height = renderViewport.height;
-        const context = canvas.getContext('2d');
-        
-        // Setup Text Layer
-        const textLayerDiv = document.createElement('div');
-        textLayerDiv.className = 'pdf-text-layer textLayer';
-        textLayerDiv.style.width = cssViewport.width + 'px';
-        textLayerDiv.style.height = cssViewport.height + 'px';
-        textLayerDiv.style.setProperty('--scale-factor', cssViewport.scale);
-
-        pageWrapper.appendChild(canvas);
-        pageWrapper.appendChild(textLayerDiv);
-        container.appendChild(pageWrapper);
-
-        // Async render visual + text map
-        await page.render({ canvasContext: context, viewport: renderViewport }).promise;
-        
-        const textContent = await page.getTextContent();
-        await pdfjsLib.renderTextLayer({
-            textContentSource: textContent,
-            container: textLayerDiv,
-            viewport: cssViewport,
-            textDivs: []
-        }).promise;
-
-        // Reapply highlights
-        if (PdfViewer && PdfViewer._applyHighlightsToPage) {
-            // Temporarily mock PdfViewer annots to use the global chapter for rendering inline hits
-            const originalAnnots = PdfViewer._annots;
-            PdfViewer._annots = () => chapter.annotations || [];
-            PdfViewer._applyHighlightsToPage(i, textLayerDiv);
-            PdfViewer._annots = originalAnnots;
-        }
-    }
-    
-    // Resize the overlay drawing canvas over the new long PDF
-    setTimeout(resizeCanvas, 300);
 };
 
 let pendingPdfInput = null;
@@ -4237,10 +4025,10 @@ const PdfViewer = {
         const container = document.getElementById('pdfViewerPages');
         container.innerHTML = '';
 
-        // Ensure the container has expanded completely before measuring.
-        // The split-mode CSS transition takes 0.3s, so we wait 350ms.
+        // Ensure the container has expanded before measuring
+        // (Transition from 0 to 50% takes 300ms, but we can measure after a bit)
         if (container.clientWidth < 100) {
-            await new Promise(r => setTimeout(r, 350));
+            await new Promise(r => setTimeout(r, 150));
         }
         this.viewerWidth = (container.clientWidth || 500) - 40;
 
@@ -4271,38 +4059,32 @@ const PdfViewer = {
     async _renderPage(pageNum, canvas, textLayerDiv) {
         const page = await this.pdfDoc.getPage(pageNum);
         
-        // Logical CSS scale and viewport
+        // Use stored viewer width for consistent scaling
         const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const cssScale = Math.min(this.viewerWidth / unscaledViewport.width, 3.5); 
-        const cssViewport = page.getViewport({ scale: cssScale });
+        const dynamicScale = Math.min(this.viewerWidth / unscaledViewport.width, 1.5); 
+        
+        const viewport = page.getViewport({ scale: dynamicScale });
 
-        // Physical high-DPI render bounds
-        const pixelRatio = window.devicePixelRatio || 1;
-        const renderViewport = page.getViewport({ scale: cssScale * pixelRatio });
-
-        canvas.style.width  = cssViewport.width + 'px';
-        canvas.style.height = cssViewport.height + 'px';
-        canvas.width  = renderViewport.width;
-        canvas.height = renderViewport.height;
-
-        textLayerDiv.style.width  = cssViewport.width + 'px';
-        textLayerDiv.style.height = cssViewport.height + 'px';
+        canvas.width  = viewport.width;
+        canvas.height = viewport.height;
+        textLayerDiv.style.width  = viewport.width + 'px';
+        textLayerDiv.style.height = viewport.height + 'px';
 
         await page.render({
             canvasContext: canvas.getContext('2d'),
-            viewport: renderViewport
+            viewport
         }).promise;
 
-        // Build text layer for selection (must use CSS viewport to map 1:1 visually)
+        // Build text layer for selection
         const textContent = await page.getTextContent();
         textLayerDiv.innerHTML = '';
         textLayerDiv.className = 'pdf-text-layer textLayer';
-        textLayerDiv.style.setProperty('--scale-factor', cssViewport.scale);
+        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
 
         await pdfjsLib.renderTextLayer({
             textContentSource: textContent,
             container:         textLayerDiv,
-            viewport:          cssViewport,
+            viewport,
             textDivs:          []
         }).promise;
 
@@ -4486,11 +4268,7 @@ window.resolvePdfMode = (mode) => {
             document.querySelectorAll('.pdf-sel-overlay').forEach(el => el.remove());
         }
 
-        document.addEventListener('mouseup', (e) => {
-            // Only trigger if we are selecting text inside a PDF page
-            const pageWrapper = e.target.closest('.pdf-page-wrapper') || e.target.closest('.pdf-text-layer');
-            if (!pageWrapper) return;
-
+        pagesArea && pagesArea.addEventListener('mouseup', (e) => {
             const selText = window.getSelection()?.toString().trim();
             if (!selText) {
                 selBar.style.display = 'none';
@@ -4501,10 +4279,11 @@ window.resolvePdfMode = (mode) => {
             // Draw visual overlay over selected text
             drawSelectionOverlay();
 
-            // Position toolbar near cursor globally
+            // Position toolbar near cursor
+            const rect = pagesArea.getBoundingClientRect();
             selBar.style.display = 'flex';
-            selBar.style.left = Math.min(e.clientX + 10, window.innerWidth - 180) + 'px';
-            selBar.style.top  = Math.max(10, e.clientY - 48) + 'px';
+            selBar.style.left = Math.min(e.clientX - rect.left, rect.width - 200) + 'px';
+            selBar.style.top  = (e.clientY - rect.top - 48) + 'px';
         });
 
         document.addEventListener('mousedown', (e) => {
@@ -5572,7 +5351,7 @@ window.parseRawHtmlToSequence = function (htmlText) {
         title: title,
         content: content,
         sections: null,
-        tags: [],
+        tags: ['html-import'],
         category: 'Imported',
         author: 'Unknown',
         metadata: {
@@ -6346,24 +6125,6 @@ window.handleImageUpload = (e) => {
 
 // --- UPDATED LOAD CHAPTER ---
 function loadChapter(id) {
-    const existingBlock = document.getElementById(`page-block-${id}`);
-    if (existingBlock) {
-        currentId = id;
-        document.querySelectorAll('.sequence-editor-block').forEach(b => b.classList.remove('active-focus'));
-        existingBlock.classList.add('active-focus');
-        existingBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        
-        const chapter = chapters.find(c => c.id === id);
-        if (chapter) {
-            document.getElementById('pageTitle').value = chapter.title;
-            updateToolVisibility(chapter);
-            selectWritingTool(chapter.tool || 'pen', false);
-        }
-        renderSidebar();
-        document.getElementById('mainSidebar').classList.remove('open');
-        return;
-    }
-
     currentId = id;
     undoStack = []; redoStack = [];
     const chapter = chapters.find(c => c.id === id);
@@ -10860,14 +10621,6 @@ class VirtualScrollManager {
         contentArea.innerHTML = chapter.content || '&lt;p&gt;Start typing...&lt;/p&gt;';
         contentArea.dataset.chapterId = chapter.id;
 
-        if (chapter.pdfFileBase64) {
-            const inlineContainer = contentArea.querySelector('.inline-pdf-container');
-            if (inlineContainer && window.renderInlinePdf) {
-                // Pre-render lazily
-                window.renderInlinePdf(chapter, inlineContainer).catch(console.error);
-            }
-        }
-
         if (index > 0) {
             contentArea.style.paddingTop = '1rem';
         }
@@ -11661,14 +11414,6 @@ function executeLoadChapterLogic(chapter, id, highlightQuery = '') {
             contentArea.contentEditable = 'true';
             contentArea.innerHTML = ch.content || '<p>Start typing...</p>';
             contentArea.dataset.chapterId = ch.id;
-
-            if (ch.pdfFileBase64) {
-                const inlineContainer = contentArea.querySelector('.inline-pdf-container');
-                if (inlineContainer && window.renderInlinePdf) {
-                    // Start rendering asynchronously so we don't block the UI thread
-                    window.renderInlinePdf(ch, inlineContainer).catch(console.error);
-                }
-            }
 
             // Adjust padding for subsequent pages if they have a title
             if (index > 0) {
