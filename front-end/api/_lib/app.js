@@ -12,7 +12,15 @@ const statsRoutes = require('./routes/stats');
 const syncRoutes = require('./routes/sync');
 const healthRoutes = require('./routes/health');
 const googleAuthRoutes = require('./routes/google-auth');
-const pipelineRoutes = require('./routes/pipeline');
+
+// Pipeline route — wrapped in try/catch because it depends on @google/generative-ai
+// If the package is unavailable, the rest of the API continues to work normally.
+let pipelineRoutes = null;
+try {
+    pipelineRoutes = require('./routes/pipeline');
+} catch (e) {
+    console.warn('[Pipeline] Route failed to load:', e.message);
+}
 
 const app = express();
 
@@ -80,7 +88,11 @@ app.use('/api/library', libraryRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/health', healthRoutes);
-app.use('/api/pipeline', pipelineRoutes);
+if (pipelineRoutes) {
+    app.use('/api/pipeline', pipelineRoutes);
+} else {
+    app.use('/api/pipeline', (req, res) => res.status(503).json({ error: 'Pipeline service unavailable' }));
+}
 
 // Root API info
 app.get('/api', (req, res) => {
