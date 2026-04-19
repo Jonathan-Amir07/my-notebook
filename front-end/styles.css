@@ -90,6 +90,11 @@ body {
     color: var(--ink-color);
 }
 
+.writing-tool-natural {
+    font-family: 'Patrick Hand', cursive;
+    color: var(--ink-color);
+}
+
 .tool-btn.active {
     background: var(--template-color) !important;
     color: white !important;
@@ -2098,6 +2103,44 @@ body.dark-mode .sequence-editor-block {
 }
 
 /* Prism overrides */
+/* Canvas Mode & Floating Blocks */
+.canvas-text-block {
+    position: absolute;
+    min-width: 50px;
+    min-height: 24px;
+    padding: 10px;
+    background: transparent;
+    cursor: text;
+    z-index: 100;
+    border: 1px dashed transparent;
+    transition: all 0.2s;
+    user-select: text;
+}
+
+.canvas-text-block:hover {
+    border-color: var(--accent-color);
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.canvas-text-block.lasso-selected {
+    border: 2px solid var(--accent-color);
+    background: rgba(231, 76, 60, 0.05);
+}
+
+.canvas-text-block.lasso-preview {
+    border: 2px dashed var(--accent-color);
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.canvas-text-block:focus-within {
+    border-color: var(--accent-color);
+    border-style: solid;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.beautify-toggle-btn.active {
+    box-shadow: 0 0 10px var(--med-accent);
+}
 .cs-code-editor code,
 .cs-code-editor pre {
     font-family: 'Fira Code', monospace !important;

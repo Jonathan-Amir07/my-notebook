@@ -1159,15 +1159,11 @@ class LassoSelector {
 
         // Attach listeners on workspace
         const workspace = document.getElementById('workspace') || document.body;
-        workspace.addEventListener('mousedown', this._onMouseDown, true);
-        document.addEventListener('mousemove', this._onMouseMove, true);
-        document.addEventListener('mouseup', this._onMouseUp, true);
+        workspace.addEventListener('pointerdown', this._onMouseDown, true);
+        document.addEventListener('pointermove', this._onMouseMove, true);
+        document.addEventListener('pointerup', this._onMouseUp, true);
+        document.addEventListener('pointercancel', this._onMouseUp, true);
         document.addEventListener('keydown', this._onKeyDown, true);
-
-        // Touch
-        workspace.addEventListener('touchstart', this._onMouseDown, { passive: false, capture: true });
-        document.addEventListener('touchmove', this._onMouseMove, { passive: false, capture: true });
-        document.addEventListener('touchend', this._onMouseUp, { passive: false, capture: true });
 
         const btn = document.getElementById('lassoBtn');
         if (btn) btn.classList.add('active');
@@ -1190,13 +1186,11 @@ class LassoSelector {
         document.body.classList.remove('lasso-mode');
 
         const workspace = document.getElementById('workspace') || document.body;
-        workspace.removeEventListener('mousedown', this._onMouseDown, true);
-        document.removeEventListener('mousemove', this._onMouseMove, true);
-        document.removeEventListener('mouseup', this._onMouseUp, true);
+        workspace.removeEventListener('pointerdown', this._onMouseDown, true);
+        document.removeEventListener('pointermove', this._onMouseMove, true);
+        document.removeEventListener('pointerup', this._onMouseUp, true);
+        document.removeEventListener('pointercancel', this._onMouseUp, true);
         document.removeEventListener('keydown', this._onKeyDown, true);
-        workspace.removeEventListener('touchstart', this._onMouseDown, true);
-        document.removeEventListener('touchmove', this._onMouseMove, true);
-        document.removeEventListener('touchend', this._onMouseUp, true);
 
         if (this.selectionRect) this.selectionRect.style.display = 'none';
         this._hideFreeformCanvas();
@@ -1231,12 +1225,14 @@ class LassoSelector {
         // We use childNodes to see text nodes as well as element nodes
         const nodes = Array.from(area.childNodes);
         const blockTags = ['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'UL', 'OL', 'TABLE', 'PRE', 'HR', 'SECTION', 'ARTICLE'];
+        const excludedClasses = ['canvas-text-block', 'recall-sticker'];
 
         nodes.forEach(node => {
             const isBlockElement = node.nodeType === 1 && blockTags.includes(node.tagName.toUpperCase());
+            const isFloatingBlock = node.nodeType === 1 && excludedClasses.some(cls => node.classList.contains(cls));
             const isLassoUI = node.nodeType === 1 && (node.classList.contains('rd-image-wrapper') || node.classList.contains('uploaded-container'));
 
-            if (isBlockElement || isLassoUI) {
+            if (isBlockElement || isLassoUI || isFloatingBlock) {
                 // If we encounter a block, wrap whatever inline stuff we collected before it
                 finalizeWrap();
             } else {
@@ -1293,6 +1289,11 @@ class LassoSelector {
                 // All direct children that are block-level elements
                 Array.from(area.children).forEach(child => {
                     const tag = child.tagName.toLowerCase();
+                    // Explicitly include canvas text blocks
+                    if (child.classList.contains('canvas-text-block')) {
+                        addElement(child);
+                        return;
+                    }
                     // Skip if it's purely a spacer/break
                     if (tag === 'br') return;
                     // Skip empty elements with no meaningful content
@@ -4878,14 +4879,16 @@ let dragInitialTop = 0;
 let isDraggingObject = false;
 
 function handleObjectDragStart(e) {
-    if (!e.target.classList.contains('recall-sticker')) return;
+    if (!e.target.classList.contains('recall-sticker') && !e.target.closest('.canvas-text-block')) return;
+
+    // If it's a child of canvas-text-block, drag the block
+    dragItem = e.target.classList.contains('canvas-text-block') ? e.target : e.target.closest('.canvas-text-block');
 
     e.preventDefault();
     e.stopPropagation();
 
-    dragItem = e.target;
-    const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-    const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+    const clientX = e.clientX;
+    const clientY = e.clientY;
 
     dragStartX = clientX;
     dragStartY = clientY;
@@ -4898,9 +4901,8 @@ function handleObjectDragStart(e) {
 
 function handleObjectDragMove(e) {
     if (!dragItem) return;
-    e.preventDefault();
-    const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-    const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+    const clientX = e.clientX;
+    const clientY = e.clientY;
     const dx = clientX - dragStartX;
     const dy = clientY - dragStartY;
 
@@ -4926,15 +4928,12 @@ function handleObjectDragEnd(e) {
     isDraggingObject = false;
 }
 
-// Apply drag listeners to the stream container
+// Apply drag listeners to the stream container (using Pointer Events for tablet support)
 const streamEl = document.getElementById('sequentialStream');
-streamEl.addEventListener('mousedown', handleObjectDragStart);
-window.addEventListener('mousemove', handleObjectDragMove);
-window.addEventListener('mouseup', handleObjectDragEnd);
-
-streamEl.addEventListener('touchstart', handleObjectDragStart, { passive: false });
-window.addEventListener('touchmove', handleObjectDragMove, { passive: false });
-window.addEventListener('touchend', handleObjectDragEnd);
+streamEl.addEventListener('pointerdown', handleObjectDragStart);
+window.addEventListener('pointermove', handleObjectDragMove);
+window.addEventListener('pointerup', handleObjectDragEnd);
+window.addEventListener('pointercancel', handleObjectDragEnd);
 
 window.updatePageMeta = () => {
     const chapter = chapters.find(c => c.id === currentId);
@@ -5289,22 +5288,10 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 
-canvas.addEventListener('mousedown', startDrawing);
-canvas.addEventListener('mousemove', draw);
-canvas.addEventListener('mouseup', stopDrawing);
-
-canvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 1) return;
-    if (isSketchMode) e.preventDefault();
-    startDrawing(e.touches[0]);
-}, { passive: false });
-
-canvas.addEventListener('touchmove', (e) => {
-    if (isSketchMode) e.preventDefault();
-    draw(e.touches[0]);
-}, { passive: false });
-
-canvas.addEventListener('touchend', stopDrawing);
+canvas.addEventListener('pointerdown', startDrawing);
+canvas.addEventListener('pointermove', draw);
+canvas.addEventListener('pointerup', stopDrawing);
+canvas.addEventListener('pointercancel', stopDrawing);
 
 let isPanning = false;
 let startPanX = 0; let startPanY = 0;
@@ -5365,27 +5352,24 @@ function getCanvasCoordinates(inputEvent) {
 function startDrawing(e) {
     if (activeSketchTool === 'hand') {
         isPanning = true;
-        const clientX = e.clientX || e.touches[0].clientX;
-        const clientY = e.clientY || e.touches[0].clientY;
+        const clientX = e.clientX;
+        const clientY = e.clientY;
         startPanX = clientX; startPanY = clientY;
         const ws = document.getElementById('workspace');
         scrollStartX = ws.scrollLeft; scrollStartY = ws.scrollTop;
         ws.classList.add('grabbing');
-        if (e.type === 'touchstart') e.preventDefault();
         return;
     }
 
     if (!isSketchMode || isReadMode) return;
-    if (e.type === 'touchstart') e.preventDefault();
 
     // Ensure intrinsic canvas resolution matches its stretched CSS size
-    // to prevent pixelation if the page grew since last window resize.
     resizeCanvas(true);
 
     saveStateToStack();
     drawing = true;
 
-    const coords = getCanvasCoordinates(e.clientX ? e : e.touches[0]);
+    const coords = getCanvasCoordinates(e);
     ctx.beginPath();
     ctx.moveTo(coords.x, coords.y);
 }
@@ -5393,9 +5377,8 @@ function startDrawing(e) {
 function draw(e) {
     if (activeSketchTool === 'hand') {
         if (!isPanning) return;
-        e.preventDefault();
-        const clientX = e.clientX || e.touches[0].clientX;
-        const clientY = e.clientY || e.touches[0].clientY;
+        const clientX = e.clientX;
+        const clientY = e.clientY;
         const walkX = (clientX - startPanX);
         const walkY = (clientY - startPanY);
         const ws = document.getElementById('workspace');
@@ -5405,9 +5388,11 @@ function draw(e) {
     }
 
     if (!drawing || !isSketchMode || isReadMode) return;
-    if (e.type === 'touchmove') e.preventDefault();
 
-    const coords = getCanvasCoordinates(e.clientX ? e : e.touches[0]);
+    const coords = getCanvasCoordinates(e);
+    
+    // Support pressure sensitivity from PointerEvents
+    const pressure = (e.pressure && e.pressure > 0) ? e.pressure : 1;
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -5416,22 +5401,29 @@ function draw(e) {
 
     if (activeSketchTool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = 15;
+        ctx.lineWidth = 20 * pressure;
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     } else if (activeSketchTool === 'highlighter') {
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)';
-        ctx.lineWidth = 10;
+        ctx.lineWidth = 15 * pressure;
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+    } else if (activeSketchTool === 'natural') {
+        // Natural ink: simple, responds directly to pressure
+        ctx.lineWidth = 2.5 * pressure;
+        ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#1a1a1a';
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     } else if (activeSketchTool === 'custom') {
         ctx.strokeStyle = customStrokeStyle;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 2 * pressure;
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
     } else {
-        ctx.lineWidth = 1;
+        // Standard pen tools
+        ctx.lineWidth = 1.5 * pressure;
         ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50';
         ctx.lineTo(coords.x, coords.y);
         ctx.stroke();
@@ -6485,6 +6477,25 @@ function loadChapter(id) {
             renderSidebar(); // Update sidebar highlight
             updateWordCount(); // Update word count for focused page
         };
+
+        // CANVAS-ONLY: Handle click to create text blocks
+        block.addEventListener('pointerdown', function(e) {
+            // Mutual exclusion with other modes
+            if (isSketchMode || (lassoSelector && lassoSelector.isLassoMode)) return;
+            
+            // Only create if we click exactly on the block or the editor background
+            if (e.target === block || e.target === editor) {
+                const rect = editor.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Don't create if clicking right at the end of content in a way 
+                // that should move the cursor (optional heuristic)
+                
+                createCanvasTextBlock(x, y, editor);
+                e.stopPropagation();
+            }
+        });
 
         block.appendChild(editor);
         stream.appendChild(block);
@@ -14644,3 +14655,54 @@ window.renderBacklinks = () => {
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', initBiDirectionalLinking);
+
+// --- CANVAS-ONLY: Floating Text Block Creation ---
+window.createCanvasTextBlock = (x, y, parent) => {
+    const block = document.createElement('div');
+    block.className = 'canvas-text-block';
+    block.style.left = x + 'px';
+    block.style.top = y + 'px';
+    block.contentEditable = 'true';
+    block.innerHTML = 'Type here...';
+    
+    // Add to parent
+    parent.appendChild(block);
+    
+    // Auto-focus and select all text
+    setTimeout(() => {
+        block.focus();
+        document.execCommand('selectAll', false, null);
+    }, 50);
+    
+    // Save state
+    if (parent.oninput) parent.oninput();
+    return block;
+};
+
+// Initialize Beautify Toggle UI
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('beautifyToggle');
+    if (btn) {
+        btn.onclick = () => {
+            if (!shapeRecognizer) {
+                // Try initializing if missing
+                if (typeof toggleShapeRecognition === 'function') toggleShapeRecognition();
+                return;
+            }
+            shapeRecognizer.isEnabled = !shapeRecognizer.isEnabled;
+            btn.classList.toggle('active', shapeRecognizer.isEnabled);
+            btn.style.background = shapeRecognizer.isEnabled ? 'var(--med-accent)' : '#95a5a6';
+            if (typeof showToast === 'function') {
+                showToast(shapeRecognizer.isEnabled ? '✨ Beautification ON' : '📜 Natural Mode ON');
+            }
+        };
+        
+        // Match initial button state to recognizer
+        setTimeout(() => {
+            if (shapeRecognizer) {
+                btn.classList.toggle('active', shapeRecognizer.isEnabled);
+                btn.style.background = shapeRecognizer.isEnabled ? 'var(--med-accent)' : '#95a5a6';
+            }
+        }, 1000);
+    }
+});
