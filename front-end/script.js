@@ -5497,9 +5497,12 @@ paper.addEventListener('pointerdown', function(e) {
         const contentArea = paper.querySelector('.content-area');
         if (!contentArea) return;
 
+        // Calculate coordinates relative to the content-area,
+        // accounting for scroll offset of any scrollable parent
         const rect = contentArea.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const scrollParent = contentArea.closest('#workspace') || contentArea.closest('.paper') || contentArea;
+        const x = e.clientX - rect.left + contentArea.scrollLeft;
+        const y = e.clientY - rect.top + contentArea.scrollTop;
 
         // Check if there's already a text block near this tap
         let nearbyBlock = null;
@@ -13734,6 +13737,7 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () { var el = document.querySelector('#trayToggle'); if (el) el.addEventListener('click', function () { toggleTray() }); })();
     (function () { var el = document.querySelector('#_auto_68'); if (el) el.addEventListener('click', function () { toggleTopTools() }); })();
     (function () { var el = document.querySelector('#_auto_69'); if (el) el.addEventListener('click', function () { selectWritingTool('pen') }); })();
+    (function () { var el = document.querySelector('#naturalPenBtn'); if (el) el.addEventListener('click', function () { selectWritingTool('natural') }); })();
     (function () { var el = document.querySelector('#_auto_70'); if (el) el.addEventListener('click', function () { selectWritingTool('pencil') }); })();
     (function () { var el = document.querySelector('#_auto_71'); if (el) el.addEventListener('click', function () { selectWritingTool('highlighter') }); })();
     (function () { var el = document.querySelector('#_auto_72'); if (el) el.addEventListener('click', function () { selectWritingTool('marker') }); })();
