@@ -3134,6 +3134,13 @@ body.sketch-mode #sketchCanvas {
     touch-action: none;
 }
 
+/* AUTO-PEN: When a stylus is detected, canvas captures pen input even without sketch-mode */
+body.pen-active #sketchCanvas {
+    pointer-events: auto;
+    cursor: crosshair;
+    touch-action: none;
+}
+
 /* Orange glow around the page when sketch mode is active */
 body.sketch-mode .paper {
     box-shadow:

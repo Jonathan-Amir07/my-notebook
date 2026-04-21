@@ -5293,6 +5293,42 @@ canvas.addEventListener('pointermove', draw);
 canvas.addEventListener('pointerup', stopDrawing);
 canvas.addEventListener('pointercancel', stopDrawing);
 
+// AUTO-PEN INTERCEPTOR: Catch stylus input on the paper BEFORE it reaches the text editor.
+// This is the key to freeform handwriting: pen strokes go to the canvas, not the contenteditable.
+// Mouse/touch input is NOT intercepted, so keyboard users can still click and type normally.
+paper.addEventListener('pointerdown', function(e) {
+    if (e.pointerType !== 'pen') return; // Only intercept stylus
+    if (isReadMode) return;
+    if (isSketchMode) return; // Already handled by canvas in sketch mode
+
+    // Activate pen-active mode so the canvas CSS captures further pen events
+    document.body.classList.add('pen-active');
+
+    // Resize canvas to match paper
+    resizeCanvas(true);
+
+    // Prevent the text editor from receiving this pen input
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Manually start drawing on the canvas
+    startDrawing(e);
+}, { capture: true });
+
+// Also intercept pointermove and pointerup on paper for pen input
+paper.addEventListener('pointermove', function(e) {
+    if (e.pointerType !== 'pen') return;
+    if (!drawing) return;
+    e.preventDefault();
+    draw(e);
+}, { capture: true });
+
+paper.addEventListener('pointerup', function(e) {
+    if (e.pointerType !== 'pen') return;
+    if (!drawing) return;
+    stopDrawing(e);
+}, { capture: true });
+
 let isPanning = false;
 let startPanX = 0; let startPanY = 0;
 let scrollStartX = 0; let scrollStartY = 0;
@@ -5361,10 +5397,20 @@ function startDrawing(e) {
         return;
     }
 
-    if (!isSketchMode || isReadMode) return;
+    // AUTO-PEN: If a stylus/pen is detected, always allow drawing on canvas
+    // This is the core of freeform: pen strokes go to the canvas, not the text editor
+    const isPenInput = e.pointerType === 'pen';
+    
+    if (!isPenInput && !isSketchMode) return;
+    if (isReadMode) return;
 
     // Ensure intrinsic canvas resolution matches its stretched CSS size
     resizeCanvas(true);
+
+    // If pen input auto-activated us, mark it so CSS enables canvas pointer-events
+    if (isPenInput && !isSketchMode) {
+        document.body.classList.add('pen-active');
+    }
 
     saveStateToStack();
     drawing = true;
@@ -5387,7 +5433,9 @@ function draw(e) {
         return;
     }
 
-    if (!drawing || !isSketchMode || isReadMode) return;
+    if (!drawing || isReadMode) return;
+    // AUTO-PEN: allow drawing if pen is active OR sketch mode is on
+    if (!drawing) return;
 
     const coords = getCanvasCoordinates(e);
     
@@ -5442,6 +5490,8 @@ function stopDrawing() {
     if (drawing) {
         drawing = false;
         ctx.globalCompositeOperation = 'source-over';
+        // Remove pen-active if it was auto-set (keeps canvas from blocking mouse clicks)
+        document.body.classList.remove('pen-active');
         saveSketchToCloud();
     }
 }
@@ -5516,6 +5566,12 @@ window.selectWritingTool = (tool, save = true) => {
         selectSketchTool('highlighter');
         return;
     }
+    
+    // If 'natural' tool is selected, also set the sketch tool for canvas auto-pen
+    if (tool === 'natural') {
+        activeSketchTool = 'natural';
+    }
+    
     // Apply class to ALL editors in the stream
     document.querySelectorAll('.content-area').forEach(e => {
         e.className = `content-area writing-tool-${tool}`;
