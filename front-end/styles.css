@@ -3601,6 +3601,87 @@ body:not(.sketch-mode) .paper,
     box-shadow: none !important;
 }
 
+/* --- PREMIUM FLOATING CANVAS TEXT BLOCKS --- */
+.canvas-text-block {
+    position: absolute;
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    min-width: 100px;
+    min-height: 1.5em;
+    background: transparent;
+    cursor: text;
+    z-index: 100;
+    transition: all 0.2s ease;
+    user-select: text;
+    -webkit-user-select: text;
+    outline: none;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.canvas-text-block:hover {
+    background: rgba(44, 62, 80, 0.03);
+}
+
+.canvas-text-block:focus {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(4px);
+    border-color: rgba(52, 152, 219, 0.3);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Tool-specific Beautification Styles */
+.writing-tool-pen {
+    font-family: 'Patrick Hand', cursive;
+    font-size: 1.4rem;
+    color: #2c3e50;
+}
+
+.writing-tool-pencil {
+    font-family: 'Indie Flower', cursive;
+    font-size: 1.3rem;
+    color: #5d6d7e;
+    opacity: 0.9;
+}
+
+.writing-tool-elegant {
+    font-family: 'Caveat', cursive;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.writing-tool-marker {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 1.5rem;
+    color: #2c3e50;
+}
+
+.writing-tool-chalk {
+    font-family: 'Kalam', cursive;
+    font-size: 1.4rem;
+    color: #2c3e50;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.1);
+}
+
+body.dark-mode .canvas-text-block:focus {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(52, 152, 219, 0.5);
+}
+
+body.dark-mode .writing-tool-pen,
+body.dark-mode .writing-tool-chalk,
+body.dark-mode .writing-tool-marker,
+body.dark-mode .writing-tool-elegant {
+    color: #ecf0f1;
+}
+
+/* De-activate canvas drawing when typing in blocks */
+body.typing-in-block canvas#sketchCanvas {
+    pointer-events: none !important;
+}
+
 /* Ensure the paper container has unified styling */
 .paper {
     background-color: var(--paper-bg);

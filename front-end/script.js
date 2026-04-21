@@ -5286,6 +5286,11 @@ function resizeCanvas() {
         if (sketchData) drawSavedSketch(sketchData);
     }
 }
+// VECTOR STROKE ENGINE STATE
+let currentNoteStrokes = []; // All strokes for the current note
+let currentStroke = null;    // The stroke currently being drawn
+let pointsBuffer = [];       // Temporary buffer for smoothing calculation
+
 window.addEventListener('resize', resizeCanvas);
 
 canvas.addEventListener('pointerdown', startDrawing);
@@ -5314,11 +5319,9 @@ paper.addEventListener('pointerdown', function(e) {
         e.stopPropagation();
         startDrawing(e);
     } else {
-        // BEAUTIFICATION TOOLS: Create a floating text block at pen coordinates
-        // so iPad Scribble can convert handwriting into styled text there.
-        e.preventDefault();
-        e.stopPropagation();
-
+        // BEAUTIFICATION TOOLS: Focus or create a floating text block
+        // We do NOT preventDefault here because iPad Scribble needs to see the tap to focus and start recognition.
+        
         const contentArea = paper.querySelector('.content-area');
         if (!contentArea) return;
 
@@ -5339,7 +5342,6 @@ paper.addEventListener('pointerdown', function(e) {
         if (nearbyBlock) {
             nearbyBlock.focus();
         } else {
-            // Get the current tool name for styling
             const currentTool = document.querySelector('.tool-opt.active');
             const toolName = (currentTool && currentTool.dataset.tool) || 'pen';
 
@@ -5348,15 +5350,25 @@ paper.addEventListener('pointerdown', function(e) {
             block.style.left = x + 'px';
             block.style.top = y + 'px';
             block.contentEditable = 'true';
-            block.style.minWidth = '200px';
-            block.style.minHeight = '30px';
+
+            // Add lifecycle listeners for premium experience
+            block.addEventListener('focus', () => {
+                document.body.classList.add('typing-in-block');
+            });
+            block.addEventListener('blur', () => {
+                document.body.classList.remove('typing-in-block');
+                // Remove empty blocks to keep canvas clean
+                if (!block.textContent.trim()) block.remove();
+                saveChapterToDB();
+            });
+            block.addEventListener('input', () => {
+                saveChapterToDB();
+            });
 
             contentArea.appendChild(block);
-
-            // Focus after a short delay so the DOM settles and Scribble can target it
-            setTimeout(() => {
-                block.focus();
-            }, 10);
+            
+            // Focus with a slight delay
+            setTimeout(() => block.focus(), 10);
         }
     }
 }, { capture: true });
@@ -5456,6 +5468,16 @@ function startDrawing(e) {
     drawing = true;
 
     const coords = getCanvasCoordinates(e);
+    
+    // Initialize new stroke for vector engine
+    currentStroke = {
+        tool: activeSketchTool,
+        color: ctx.strokeStyle,
+        width: ctx.lineWidth,
+        points: [{ x: coords.x, y: coords.y, p: e.pressure || 0.5 }]
+    };
+    pointsBuffer = [{ x: coords.x, y: coords.y, p: e.pressure || 0.5 }];
+
     ctx.beginPath();
     ctx.moveTo(coords.x, coords.y);
 }
@@ -5476,47 +5498,52 @@ function draw(e) {
     if (!drawing || isReadMode) return;
 
     const coords = getCanvasCoordinates(e);
-    
-    // Support pressure sensitivity from PointerEvents
-    const pressure = (e.pressure && e.pressure > 0) ? e.pressure : 1;
+    const pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.5;
+
+    // Add to current stroke data
+    if (currentStroke) {
+        currentStroke.points.push({ x: coords.x, y: coords.y, p: pressure });
+    }
+    pointsBuffer.push({ x: coords.x, y: coords.y, p: pressure });
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
 
-    if (activeSketchTool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = 20 * pressure;
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
-    } else if (activeSketchTool === 'highlighter') {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)';
-        ctx.lineWidth = 15 * pressure;
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
-    } else if (activeSketchTool === 'natural') {
-        // Natural ink: simple, responds directly to pressure
-        ctx.lineWidth = 2.5 * pressure;
-        ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#1a1a1a';
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
-    } else if (activeSketchTool === 'custom') {
-        ctx.strokeStyle = customStrokeStyle;
-        ctx.lineWidth = 2 * pressure;
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
-    } else {
-        // Standard pen tools
-        ctx.lineWidth = 1.5 * pressure;
-        ctx.strokeStyle = document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50';
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
-    }
+    // APPROACH 1: Real-time smoothing using midpoints for a "premium" feel
+    if (pointsBuffer.length > 2) {
+        const lastTwoPoints = pointsBuffer.slice(-3);
+        const xc = (lastTwoPoints[1].x + lastTwoPoints[2].x) / 2;
+        const yc = (lastTwoPoints[1].y + lastTwoPoints[2].y) / 2;
 
-    ctx.beginPath();
-    ctx.moveTo(coords.x, coords.y);
+        ctx.beginPath();
+        ctx.moveTo(lastTwoPoints[0].x, lastTwoPoints[0].y);
+        
+        // Use quadratic curve for smoothness
+        ctx.quadraticCurveTo(lastTwoPoints[1].x, lastTwoPoints[1].y, xc, yc);
+
+        // Tool-specific styling
+        if (activeSketchTool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.lineWidth = 20 * pressure;
+        } else if (activeSketchTool === 'highlighter') {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)';
+            ctx.lineWidth = 15 * pressure;
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = activeSketchTool === 'natural' 
+                ? (document.body.classList.contains('dark-mode') ? '#ffffff' : '#1a1a1a')
+                : (document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50');
+            ctx.lineWidth = (activeSketchTool === 'natural' ? 2.5 : 1.5) * pressure;
+        }
+
+        ctx.stroke();
+        
+        // Update moveTo for next segment
+        pointsBuffer[0] = { x: xc, y: yc, p: pressure };
+        pointsBuffer.splice(1, 1);
+    }
 }
 
 function stopDrawing() {
@@ -5528,6 +5555,14 @@ function stopDrawing() {
     if (drawing) {
         drawing = false;
         ctx.globalCompositeOperation = 'source-over';
+        
+        // Save to vector engine
+        if (currentStroke && currentStroke.points.length > 1) {
+            currentNoteStrokes.push(currentStroke);
+        }
+        currentStroke = null;
+        pointsBuffer = [];
+
         // Remove pen-active if it was auto-set (keeps canvas from blocking mouse clicks)
         document.body.classList.remove('pen-active');
         saveSketchToCloud();
