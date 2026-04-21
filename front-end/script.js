@@ -13333,7 +13333,6 @@ async function initApp() {
 
 // ========== PHASE 1: ADVANCED FEATURES ==========
 let lassoSelector = null;
-let shapeRecognizer = null;
 
 function initializeAdvancedFeatures() {
     const failures = [];
@@ -13346,17 +13345,6 @@ function initializeAdvancedFeatures() {
     } catch (err) {
         console.error('❌ Lasso Selection failed:', err);
         failures.push('Lasso Selection');
-    }
-
-    // Initialize Shape Recognition
-    try {
-        shapeRecognizer = new ShapeRecognizer();
-        shapeRecognizer.initialize();
-        shapeRecognizer.setSensitivity('moderate');
-        console.log('✅ Shape Recognition initialized');
-    } catch (err) {
-        console.error('❌ Shape Recognition failed:', err);
-        failures.push('Shape Recognition');
     }
 
     // Initialize Page Details Gesture
@@ -13395,70 +13383,6 @@ function toggleLassoSelection() {
     showToast(isActive ? 'Lasso Selection Active — Draw to select elements' : 'Lasso Selection Disabled');
 }
 
-function toggleShapeRecognition() {
-    if (!shapeRecognizer) {
-        showToast('Shape recognition not available');
-        return;
-    }
-
-    shapeRecognizer.isEnabled = !shapeRecognizer.isEnabled;
-    const btn = document.getElementById('shapeRecBtn');
-
-    if (shapeRecognizer.isEnabled) {
-        btn.style.background = '#9b59b6';
-        btn.style.color = 'white';
-        showToast('Shape Recognition ON - Draw shapes to auto-correct');
-
-        // Connect shape recognition to drawing system
-        connectShapeRecognition();
-    } else {
-        btn.style.background = '';
-        btn.style.color = '';
-        showToast('Shape Recognition OFF');
-    }
-}
-
-function connectShapeRecognition() {
-    // This function will integrate shape recognition with the existing drawing system
-    // When a stroke ends, analyze it for shapes
-
-    // Hook into the existing sketch canvas system
-    shapeRecognizer.onShapeDetected = (shapeResult) => {
-        // When a shape is accepted, draw it on the canvas
-        drawPerfectShape(shapeResult);
-        showToast(`${shapeResult.type} detected and corrected!`);
-    };
-}
-
-function drawPerfectShape(shapeResult) {
-    // Get the active canvas context
-    const canvas = document.querySelector('canvas.active, canvas');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    const bounds = shapeResult.params.bounds || shapeResult.params;
-
-    ctx.strokeStyle = '#2c3e50';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    if (shapeResult.type === 'circle') {
-        const { center, radius } = shapeResult.params;
-        ctx.beginPath();
-        ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI);
-        ctx.stroke();
-    } else if (shapeResult.type === 'rectangle' || shapeResult.type === 'square') {
-        const { bounds } = shapeResult.params;
-        ctx.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
-    } else if (shapeResult.type === 'line') {
-        const { start, end } = shapeResult.params;
-        ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x, end.y);
-        ctx.stroke();
-    }
-}
 
 // ========== END PHASE 1 ADVANCED FEATURES ==========
 
@@ -14776,30 +14700,3 @@ window.createCanvasTextBlock = (x, y, parent) => {
     return block;
 };
 
-// Initialize Beautify Toggle UI
-document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('beautifyToggle');
-    if (btn) {
-        btn.onclick = () => {
-            if (!shapeRecognizer) {
-                // Try initializing if missing
-                if (typeof toggleShapeRecognition === 'function') toggleShapeRecognition();
-                return;
-            }
-            shapeRecognizer.isEnabled = !shapeRecognizer.isEnabled;
-            btn.classList.toggle('active', shapeRecognizer.isEnabled);
-            btn.style.background = shapeRecognizer.isEnabled ? 'var(--med-accent)' : '#95a5a6';
-            if (typeof showToast === 'function') {
-                showToast(shapeRecognizer.isEnabled ? '✨ Beautification ON' : '📜 Natural Mode ON');
-            }
-        };
-        
-        // Match initial button state to recognizer
-        setTimeout(() => {
-            if (shapeRecognizer) {
-                btn.classList.toggle('active', shapeRecognizer.isEnabled);
-                btn.style.background = shapeRecognizer.isEnabled ? 'var(--med-accent)' : '#95a5a6';
-            }
-        }, 1000);
-    }
-});
