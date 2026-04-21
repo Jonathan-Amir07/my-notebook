@@ -5286,10 +5286,182 @@ function resizeCanvas() {
         if (sketchData) drawSavedSketch(sketchData);
     }
 }
-// VECTOR STROKE ENGINE STATE
-let currentNoteStrokes = []; // All strokes for the current note
-let currentStroke = null;    // The stroke currently being drawn
-let pointsBuffer = [];       // Temporary buffer for smoothing calculation
+// ════════════════════════════════════════════════════════════════
+// PREMIUM INK ENGINE — GoodNotes/Notability-style vector strokes
+// ════════════════════════════════════════════════════════════════
+const InkEngine = {
+    strokes: [],        // All vector strokes for current note
+    current: null,      // Stroke being drawn right now
+    buf: [],            // Smoothing buffer
+    lastVel: 0,         // Velocity for adaptive smoothing
+
+    // Tool rendering profiles — each tool feels different
+    profiles: {
+        natural:     { base: 2.2, pMin: 0.4, pMax: 1.6, smooth: 0, alpha: 1,    taper: false, color: null },
+        pen:         { base: 1.8, pMin: 0.5, pMax: 1.4, smooth: 1, alpha: 1,    taper: true,  color: null },
+        pencil:      { base: 1.2, pMin: 0.3, pMax: 1.1, smooth: 0.5, alpha: 0.75, taper: false, color: '#5d6d7e' },
+        highlighter: { base: 14,  pMin: 0.8, pMax: 1.2, smooth: 0.3, alpha: 0.25, taper: false, color: '#ffeb3b' },
+        marker:      { base: 3.5, pMin: 0.6, pMax: 1.5, smooth: 0.8, alpha: 0.85, taper: true,  color: null },
+        elegant:     { base: 1.6, pMin: 0.2, pMax: 2.0, smooth: 1, alpha: 1,    taper: true,  color: null },
+        brush:       { base: 3.0, pMin: 0.3, pMax: 2.2, smooth: 0.7, alpha: 0.9, taper: true,  color: null },
+        chalk:       { base: 2.8, pMin: 0.5, pMax: 1.3, smooth: 0.4, alpha: 0.8, taper: false, color: null },
+        eraser:      { base: 20,  pMin: 0.8, pMax: 1.5, smooth: 0, alpha: 1,    taper: false, color: null },
+        custom:      { base: 2.0, pMin: 0.5, pMax: 1.4, smooth: 0.5, alpha: 1,  taper: false, color: null }
+    },
+
+    getProfile(tool) {
+        return this.profiles[tool] || this.profiles.pen;
+    },
+
+    // Map raw pressure (0-1) to stroke width using the tool profile
+    pressureWidth(pressure, profile) {
+        const p = Math.max(0.01, Math.min(1, pressure));
+        const factor = profile.pMin + (profile.pMax - profile.pMin) * p;
+        return profile.base * factor;
+    },
+
+    // Get ink color based on tool and theme
+    inkColor(tool, profile) {
+        if (tool === 'eraser') return '#000';
+        if (tool === 'custom' && customStrokeStyle) return customStrokeStyle;
+        if (tool === 'highlighter' && customStrokeStyle) return customStrokeStyle;
+        if (profile.color) return profile.color;
+        return document.body.classList.contains('dark-mode') ? '#e8e8e8' : '#1a1a2e';
+    },
+
+    // Begin a new stroke
+    begin(coords, pressure, tool) {
+        const prof = this.getProfile(tool);
+        this.current = {
+            id: 's_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+            tool: tool,
+            color: this.inkColor(tool, prof),
+            points: [{ x: coords.x, y: coords.y, p: pressure }],
+            ts: Date.now()
+        };
+        this.buf = [{ x: coords.x, y: coords.y, p: pressure }];
+        this.lastVel = 0;
+    },
+
+    // Add a point and render the latest segment
+    move(coords, pressure, tool, ctx) {
+        if (!this.current) return;
+        const pt = { x: coords.x, y: coords.y, p: pressure };
+        this.current.points.push(pt);
+        this.buf.push(pt);
+
+        const prof = this.getProfile(tool);
+        const w = this.pressureWidth(pressure, prof);
+
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        if (tool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.globalAlpha = 1;
+        } else if (tool === 'highlighter') {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = prof.alpha;
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = prof.alpha;
+        }
+
+        ctx.strokeStyle = this.current.color;
+        ctx.lineWidth = w;
+
+        // Smoothed rendering with quadratic midpoint interpolation
+        if (this.buf.length >= 3) {
+            const a = this.buf[this.buf.length - 3];
+            const b = this.buf[this.buf.length - 2];
+            const c = this.buf[this.buf.length - 1];
+            const mx = (b.x + c.x) / 2;
+            const my = (b.y + c.y) / 2;
+
+            ctx.beginPath();
+            ctx.moveTo((a.x + b.x) / 2, (a.y + b.y) / 2);
+            ctx.quadraticCurveTo(b.x, b.y, mx, my);
+            ctx.stroke();
+        } else if (this.buf.length === 2) {
+            // First segment — just a straight line
+            ctx.beginPath();
+            ctx.moveTo(this.buf[0].x, this.buf[0].y);
+            ctx.lineTo(this.buf[1].x, this.buf[1].y);
+            ctx.stroke();
+        }
+    },
+
+    // End the stroke and archive it
+    end() {
+        if (this.current && this.current.points.length > 1) {
+            this.strokes.push(this.current);
+        }
+        this.current = null;
+        this.buf = [];
+    },
+
+    // Full re-render of all strokes from vector data (used after undo, resize, etc.)
+    rerender(ctx, canvasW, canvasH) {
+        ctx.clearRect(0, 0, canvasW, canvasH);
+        for (const stroke of this.strokes) {
+            this._renderStroke(stroke, ctx);
+        }
+    },
+
+    _renderStroke(stroke, ctx) {
+        if (stroke.points.length < 2) return;
+        const prof = this.getProfile(stroke.tool);
+
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = stroke.color;
+
+        if (stroke.tool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.globalAlpha = 1;
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = prof.alpha;
+        }
+
+        const pts = stroke.points;
+        for (let i = 1; i < pts.length; i++) {
+            const prev = pts[i - 1];
+            const cur = pts[i];
+            ctx.lineWidth = this.pressureWidth(cur.p, prof);
+
+            if (i >= 2) {
+                const pp = pts[i - 2];
+                const mx1 = (pp.x + prev.x) / 2;
+                const my1 = (pp.y + prev.y) / 2;
+                const mx2 = (prev.x + cur.x) / 2;
+                const my2 = (prev.y + cur.y) / 2;
+                ctx.beginPath();
+                ctx.moveTo(mx1, my1);
+                ctx.quadraticCurveTo(prev.x, prev.y, mx2, my2);
+                ctx.stroke();
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(prev.x, prev.y);
+                ctx.lineTo(cur.x, cur.y);
+                ctx.stroke();
+            }
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+    },
+
+    // Serialize strokes for saving
+    toJSON() { return JSON.stringify(this.strokes); },
+
+    // Load strokes from saved data
+    fromJSON(json) {
+        try { this.strokes = JSON.parse(json) || []; }
+        catch(e) { this.strokes = []; }
+    },
+
+    clear() { this.strokes = []; this.current = null; this.buf = []; }
+};
 
 window.addEventListener('resize', resizeCanvas);
 
@@ -5468,15 +5640,10 @@ function startDrawing(e) {
     drawing = true;
 
     const coords = getCanvasCoordinates(e);
-    
-    // Initialize new stroke for vector engine
-    currentStroke = {
-        tool: activeSketchTool,
-        color: ctx.strokeStyle,
-        width: ctx.lineWidth,
-        points: [{ x: coords.x, y: coords.y, p: e.pressure || 0.5 }]
-    };
-    pointsBuffer = [{ x: coords.x, y: coords.y, p: e.pressure || 0.5 }];
+    const pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.5;
+
+    // Initialize stroke in InkEngine
+    InkEngine.begin(coords, pressure, activeSketchTool);
 
     ctx.beginPath();
     ctx.moveTo(coords.x, coords.y);
@@ -5500,50 +5667,8 @@ function draw(e) {
     const coords = getCanvasCoordinates(e);
     const pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.5;
 
-    // Add to current stroke data
-    if (currentStroke) {
-        currentStroke.points.push({ x: coords.x, y: coords.y, p: pressure });
-    }
-    pointsBuffer.push({ x: coords.x, y: coords.y, p: pressure });
-
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.globalAlpha = 1;
-
-    // APPROACH 1: Real-time smoothing using midpoints for a "premium" feel
-    if (pointsBuffer.length > 2) {
-        const lastTwoPoints = pointsBuffer.slice(-3);
-        const xc = (lastTwoPoints[1].x + lastTwoPoints[2].x) / 2;
-        const yc = (lastTwoPoints[1].y + lastTwoPoints[2].y) / 2;
-
-        ctx.beginPath();
-        ctx.moveTo(lastTwoPoints[0].x, lastTwoPoints[0].y);
-        
-        // Use quadratic curve for smoothness
-        ctx.quadraticCurveTo(lastTwoPoints[1].x, lastTwoPoints[1].y, xc, yc);
-
-        // Tool-specific styling
-        if (activeSketchTool === 'eraser') {
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.lineWidth = 20 * pressure;
-        } else if (activeSketchTool === 'highlighter') {
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.strokeStyle = customStrokeStyle || 'rgba(255, 235, 59, 0.25)';
-            ctx.lineWidth = 15 * pressure;
-        } else {
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.strokeStyle = activeSketchTool === 'natural' 
-                ? (document.body.classList.contains('dark-mode') ? '#ffffff' : '#1a1a1a')
-                : (document.body.classList.contains('dark-mode') ? '#ffffff' : '#2c3e50');
-            ctx.lineWidth = (activeSketchTool === 'natural' ? 2.5 : 1.5) * pressure;
-        }
-
-        ctx.stroke();
-        
-        // Update moveTo for next segment
-        pointsBuffer[0] = { x: xc, y: yc, p: pressure };
-        pointsBuffer.splice(1, 1);
-    }
+    // Delegate all rendering to InkEngine
+    InkEngine.move(coords, pressure, activeSketchTool, ctx);
 }
 
 function stopDrawing() {
@@ -5555,17 +5680,15 @@ function stopDrawing() {
     if (drawing) {
         drawing = false;
         ctx.globalCompositeOperation = 'source-over';
-        
-        // Save to vector engine
-        if (currentStroke && currentStroke.points.length > 1) {
-            currentNoteStrokes.push(currentStroke);
-        }
-        currentStroke = null;
-        pointsBuffer = [];
+        ctx.globalAlpha = 1;
 
-        // Remove pen-active if it was auto-set (keeps canvas from blocking mouse clicks)
+        // Finalize stroke in InkEngine
+        InkEngine.end();
+
+        // Remove pen-active if it was auto-set
         document.body.classList.remove('pen-active');
         saveSketchToCloud();
+
     }
 }
 
@@ -5619,7 +5742,9 @@ window.clearSketch = () => {
     if (!confirm("Are you sure you want to clear your drawing?")) return;
     saveStateToStack();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    InkEngine.clear();
     saveSketchToCloud();
+
     showToast("Sketch cleared");
 };
 
@@ -6778,6 +6903,7 @@ function saveSketchToCloud() {
     const chapter = chapters.find(c => c.id === currentId);
     if (chapter) {
         chapter.sketch = canvas.toDataURL();
+        chapter.vectorStrokes = InkEngine.toJSON();
         sketchData = chapter.sketch;
         saveChapterToDB(chapter);
     }
@@ -11845,15 +11971,24 @@ function executeLoadChapterLogic(chapter, id, highlightQuery = '') {
         false  // don't re-save, we are just restoring
     );
 
-    // Restore sketch data if exists
-    if (chapter.sketchData) {
+    // Restore sketch data and vector strokes
+    InkEngine.clear();
+    if (chapter.vectorStrokes) {
+        InkEngine.fromJSON(chapter.vectorStrokes);
+        setTimeout(() => {
+            resizeCanvas(true);
+            const dpr = window.devicePixelRatio || 1;
+            InkEngine.rerender(ctx, canvas.width / dpr, canvas.height / dpr);
+        }, 100);
+    } else if (chapter.sketchData || chapter.sketch) {
+        const sketchSrc = chapter.sketch || chapter.sketchData;
         setTimeout(() => {
             const canvas = document.getElementById('sketchCanvas');
             const ctx = canvas?.getContext('2d');
-            if (ctx && chapter.sketchData) {
+            if (ctx && sketchSrc) {
                 const img = new Image();
                 img.onload = () => ctx.drawImage(img, 0, 0);
-                img.src = chapter.sketchData;
+                img.src = sketchSrc;
             }
         }, 100);
     }
