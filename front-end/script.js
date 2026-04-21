@@ -5293,32 +5293,78 @@ canvas.addEventListener('pointermove', draw);
 canvas.addEventListener('pointerup', stopDrawing);
 canvas.addEventListener('pointercancel', stopDrawing);
 
-// AUTO-PEN INTERCEPTOR: Catch stylus input on the paper BEFORE it reaches the text editor.
-// This is the key to freeform handwriting: pen strokes go to the canvas, not the contenteditable.
-// Mouse/touch input is NOT intercepted, so keyboard users can still click and type normally.
+// ============================================================
+// PEN INPUT ROUTER: Routes stylus input based on active tool
+// - Natural Pen: raw canvas strokes (no beautification)
+// - All other tools: floating text blocks at pen coords (iPad Scribble beautifies)
+// - Mouse/keyboard: normal text editor (sequential lines)
+// ============================================================
 paper.addEventListener('pointerdown', function(e) {
-    if (e.pointerType !== 'pen') return; // Only intercept stylus
+    if (e.pointerType !== 'pen') return;
     if (isReadMode) return;
-    if (isSketchMode) return; // Already handled by canvas in sketch mode
+    if (isSketchMode) return; // Sketch mode handles its own canvas
 
-    // Activate pen-active mode so the canvas CSS captures further pen events
-    document.body.classList.add('pen-active');
+    const isNatural = (activeSketchTool === 'natural');
 
-    // Resize canvas to match paper
-    resizeCanvas(true);
+    if (isNatural) {
+        // NATURAL PEN: Draw raw strokes directly on canvas
+        document.body.classList.add('pen-active');
+        resizeCanvas(true);
+        e.preventDefault();
+        e.stopPropagation();
+        startDrawing(e);
+    } else {
+        // BEAUTIFICATION TOOLS: Create a floating text block at pen coordinates
+        // so iPad Scribble can convert handwriting into styled text there.
+        e.preventDefault();
+        e.stopPropagation();
 
-    // Prevent the text editor from receiving this pen input
-    e.preventDefault();
-    e.stopPropagation();
+        const contentArea = paper.querySelector('.content-area');
+        if (!contentArea) return;
 
-    // Manually start drawing on the canvas
-    startDrawing(e);
+        const rect = contentArea.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Check if there's already a text block near this tap
+        let nearbyBlock = null;
+        contentArea.querySelectorAll('.canvas-text-block').forEach(block => {
+            const bRect = block.getBoundingClientRect();
+            if (e.clientX >= bRect.left && e.clientX <= bRect.right &&
+                e.clientY >= bRect.top && e.clientY <= bRect.bottom) {
+                nearbyBlock = block;
+            }
+        });
+
+        if (nearbyBlock) {
+            nearbyBlock.focus();
+        } else {
+            // Get the current tool name for styling
+            const currentTool = document.querySelector('.tool-opt.active');
+            const toolName = (currentTool && currentTool.dataset.tool) || 'pen';
+
+            const block = document.createElement('div');
+            block.className = `canvas-text-block writing-tool-${toolName}`;
+            block.style.left = x + 'px';
+            block.style.top = y + 'px';
+            block.contentEditable = 'true';
+            block.style.minWidth = '200px';
+            block.style.minHeight = '30px';
+
+            contentArea.appendChild(block);
+
+            // Focus after a short delay so the DOM settles and Scribble can target it
+            setTimeout(() => {
+                block.focus();
+            }, 10);
+        }
+    }
 }, { capture: true });
 
-// Also intercept pointermove and pointerup on paper for pen input
+// Pen move/up interceptors (only active during Natural pen drawing)
 paper.addEventListener('pointermove', function(e) {
     if (e.pointerType !== 'pen') return;
-    if (!drawing) return;
+    if (!drawing) return; // Only for natural pen canvas strokes
     e.preventDefault();
     draw(e);
 }, { capture: true });
@@ -5328,6 +5374,7 @@ paper.addEventListener('pointerup', function(e) {
     if (!drawing) return;
     stopDrawing(e);
 }, { capture: true });
+
 
 let isPanning = false;
 let startPanX = 0; let startPanY = 0;
@@ -5397,20 +5444,13 @@ function startDrawing(e) {
         return;
     }
 
-    // AUTO-PEN: If a stylus/pen is detected, always allow drawing on canvas
-    // This is the core of freeform: pen strokes go to the canvas, not the text editor
-    const isPenInput = e.pointerType === 'pen';
-    
-    if (!isPenInput && !isSketchMode) return;
+    // Only draw on canvas if sketch mode is on, or if called by the pen interceptor
+    // (the pen interceptor already checked for natural pen tool)
+    if (!isSketchMode && !document.body.classList.contains('pen-active')) return;
     if (isReadMode) return;
 
     // Ensure intrinsic canvas resolution matches its stretched CSS size
     resizeCanvas(true);
-
-    // If pen input auto-activated us, mark it so CSS enables canvas pointer-events
-    if (isPenInput && !isSketchMode) {
-        document.body.classList.add('pen-active');
-    }
 
     saveStateToStack();
     drawing = true;
@@ -5434,8 +5474,6 @@ function draw(e) {
     }
 
     if (!drawing || isReadMode) return;
-    // AUTO-PEN: allow drawing if pen is active OR sketch mode is on
-    if (!drawing) return;
 
     const coords = getCanvasCoordinates(e);
     
@@ -5567,9 +5605,12 @@ window.selectWritingTool = (tool, save = true) => {
         return;
     }
     
-    // If 'natural' tool is selected, also set the sketch tool for canvas auto-pen
+    // Natural pen → raw canvas strokes; other tools → beautification via text blocks
     if (tool === 'natural') {
         activeSketchTool = 'natural';
+    } else if (activeSketchTool === 'natural') {
+        // Switching away from natural → reset sketch tool to default
+        activeSketchTool = 'brush';
     }
     
     // Apply class to ALL editors in the stream
