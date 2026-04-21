@@ -1899,8 +1899,11 @@ class LassoSelector {
 
     _startGroupDrag(ev, clickedElement) {
         this.isDraggingGroup = true;
-        this._dragStartX = ev.clientX;
-        this._dragStartY = ev.clientY;
+        this._dragStartX = ev.clientX || (ev.touches ? ev.touches[0].clientX : 0);
+        this._dragStartY = ev.clientY || (ev.touches ? ev.touches[0].clientY : 0);
+        this._currentDx = 0;
+        this._currentDy = 0;
+        this._dragRAF = null;
 
         // Convert every selected element to absolute positioning so it can
         // be freely dragged around the paper.
@@ -1940,12 +1943,15 @@ class LassoSelector {
             };
         });
 
-        document.addEventListener('mousemove', this._onGroupDragMove, true);
-        document.addEventListener('mouseup', this._onGroupDragEnd, true);
-        document.addEventListener('touchmove', this._onGroupDragMove, { passive: false, capture: true });
-        document.addEventListener('touchend', this._onGroupDragEnd, { passive: false, capture: true });
+        document.addEventListener('pointermove', this._onGroupDragMove, { passive: false, capture: true });
+        document.addEventListener('pointerup', this._onGroupDragEnd, true);
+        document.addEventListener('pointercancel', this._onGroupDragEnd, true);
 
-        this.selectedElements.forEach(el => el.classList.add('lasso-dragging'));
+        this.selectedElements.forEach(el => {
+            el.classList.add('lasso-dragging');
+            // Ensure no lingering transforms
+            el.style.transform = '';
+        });
         this._hideActionBar();
     }
 
@@ -1953,25 +1959,40 @@ class LassoSelector {
         if (!this.isDraggingGroup) return;
         e.preventDefault();
         const ev = e.touches ? e.touches[0] : e;
-        const dx = ev.clientX - this._dragStartX;
-        const dy = ev.clientY - this._dragStartY;
+        this._currentDx = ev.clientX - this._dragStartX;
+        this._currentDy = ev.clientY - this._dragStartY;
 
-        this._dragOffsets.forEach(({ el, startLeft, startTop }) => {
-            el.style.left = (startLeft + dx) + 'px';
-            el.style.top = (startTop + dy) + 'px';
-        });
+        if (!this._dragRAF) {
+            this._dragRAF = requestAnimationFrame(() => {
+                this._dragOffsets.forEach(({ el }) => {
+                    el.style.transform = `translate(${this._currentDx}px, ${this._currentDy}px)`;
+                });
+                this._dragRAF = null;
+            });
+        }
     }
 
     _handleGroupDragEnd(e) {
         if (!this.isDraggingGroup) return;
         this.isDraggingGroup = false;
 
-        document.removeEventListener('mousemove', this._onGroupDragMove, true);
-        document.removeEventListener('mouseup', this._onGroupDragEnd, true);
-        document.removeEventListener('touchmove', this._onGroupDragMove, true);
-        document.removeEventListener('touchend', this._onGroupDragEnd, true);
+        document.removeEventListener('pointermove', this._onGroupDragMove, { capture: true });
+        document.removeEventListener('pointerup', this._onGroupDragEnd, true);
+        document.removeEventListener('pointercancel', this._onGroupDragEnd, true);
 
-        this.selectedElements.forEach(el => el.classList.remove('lasso-dragging'));
+        if (this._dragRAF) {
+            cancelAnimationFrame(this._dragRAF);
+            this._dragRAF = null;
+        }
+
+        // Apply final translation to left/top and clear transform so it drops right there
+        this._dragOffsets.forEach(({ el, startLeft, startTop }) => {
+            el.style.transform = '';
+            el.style.left = (startLeft + this._currentDx) + 'px';
+            el.style.top = (startTop + this._currentDy) + 'px';
+            el.classList.remove('lasso-dragging');
+        });
+
         this._showActionBar();
         this._triggerSave();
     }
