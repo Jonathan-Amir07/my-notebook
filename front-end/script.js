@@ -1391,11 +1391,14 @@ class LassoSelector {
         this.isDrawing = false;
 
         const ev = e.changedTouches ? e.changedTouches[0] : e;
+        
+        const isAdditive = e.shiftKey && !e.altKey;
+        const isSubtractive = e.altKey;
 
         if (this.selectionMode === 'box') {
-            this._endBox(ev, e.shiftKey);
+            this._endBox(ev, isAdditive, isSubtractive);
         } else {
-            this._endFreeform(e.shiftKey);
+            this._endFreeform(isAdditive, isSubtractive);
         }
     }
 
@@ -1469,7 +1472,7 @@ class LassoSelector {
         this._previewByRect(left, top, width, height);
     }
 
-    _endBox(ev, additive) {
+    _endBox(ev, additive, subtractive) {
         this.selectionRect.style.display = 'none';
 
         const endX = ev.pageX;
@@ -1480,7 +1483,7 @@ class LassoSelector {
         const height = Math.abs(endY - this.startY);
 
         if (width > 5 || height > 5) {
-            this._selectByRect(left, top, width, height, additive);
+            this._selectByRect(left, top, width, height, additive, subtractive);
         } else {
             if (!this._findSelectedAncestor(document.elementFromPoint(ev.clientX, ev.clientY))) {
                 this.clearSelection();
@@ -1513,15 +1516,40 @@ class LassoSelector {
         this._freeformPath = [{ x: ev.pageX, y: ev.pageY }];
         this._showFreeformCanvas();
 
+        this._dashOffset = 0;
+        this._animateLassoPath();
+    }
+
+    _animateLassoPath() {
+        if (!this.isDrawing || this.selectionMode !== 'free') return;
+        
+        this._dashOffset -= 0.5; // Animate dashes
         const ctx = this.freeformCtx;
+        
         ctx.clearRect(0, 0, this.freeformCanvas.width, this.freeformCanvas.height);
-        ctx.beginPath();
-        ctx.moveTo(ev.pageX, ev.pageY);
-        ctx.strokeStyle = 'rgba(52, 152, 219, 0.8)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 4]);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        
+        if (this._freeformPath.length > 0) {
+            ctx.beginPath();
+            this._freeformPath.forEach((pt, i) => {
+                if (i === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            });
+            
+            ctx.strokeStyle = 'rgba(52, 152, 219, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.lineDashOffset = this._dashOffset;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+            
+            ctx.save();
+            ctx.fillStyle = 'rgba(52, 152, 219, 0.06)';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        this._animationFrameId = requestAnimationFrame(() => this._animateLassoPath());
     }
 
     _moveFreeform(ev) {
@@ -1529,28 +1557,16 @@ class LassoSelector {
         const y = ev.pageY;
         this._freeformPath.push({ x, y });
 
-        const ctx = this.freeformCtx;
-        ctx.lineTo(x, y);
-        ctx.stroke();
-
-        // Draw fill preview
-        ctx.save();
-        ctx.beginPath();
-        this._freeformPath.forEach((pt, i) => {
-            if (i === 0) ctx.moveTo(pt.x, pt.y);
-            else ctx.lineTo(pt.x, pt.y);
-        });
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(52, 152, 219, 0.06)';
-        ctx.fill();
-        ctx.restore();
-
         // Live preview
         this._previewByPolygon(this._freeformPath);
     }
 
-    _endFreeform(additive) {
+    _endFreeform(additive, subtractive) {
         this._hideFreeformCanvas();
+        if (this._animationFrameId) {
+            cancelAnimationFrame(this._animationFrameId);
+            this._animationFrameId = null;
+        }
 
         if (this._freeformPath.length < 5) {
             // Too few points — treat as a click
@@ -1558,7 +1574,7 @@ class LassoSelector {
             return;
         }
 
-        this._selectByPolygon(this._freeformPath, additive);
+        this._selectByPolygon(this._freeformPath, additive, subtractive);
         this._freeformPath = [];
     }
 
@@ -1574,7 +1590,7 @@ class LassoSelector {
         });
     }
 
-    _selectByRect(left, top, width, height, additive) {
+    _selectByRect(left, top, width, height, additive, subtractive) {
         const selRect = { left, top, right: left + width, bottom: top + height };
         const selectables = this.getSelectableElements();
         selectables.forEach(el => el.classList.remove('lasso-preview'));
@@ -1583,6 +1599,8 @@ class LassoSelector {
 
         if (additive) {
             hits.forEach(el => { if (!this.selectedElements.includes(el)) this.selectedElements.push(el); });
+        } else if (subtractive) {
+            this.selectedElements = this.selectedElements.filter(el => !hits.includes(el));
         } else {
             this.selectedElements = hits;
         }
@@ -1605,7 +1623,7 @@ class LassoSelector {
         });
     }
 
-    _selectByPolygon(polygon, additive) {
+    _selectByPolygon(polygon, additive, subtractive) {
         const selectables = this.getSelectableElements();
         selectables.forEach(el => el.classList.remove('lasso-preview'));
 
@@ -1630,6 +1648,8 @@ class LassoSelector {
 
         if (additive) {
             hits.forEach(el => { if (!this.selectedElements.includes(el)) this.selectedElements.push(el); });
+        } else if (subtractive) {
+            this.selectedElements = this.selectedElements.filter(el => !hits.includes(el));
         } else {
             this.selectedElements = hits;
         }
