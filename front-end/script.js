@@ -5494,7 +5494,28 @@ paper.addEventListener('pointerdown', function(e) {
         // BEAUTIFICATION TOOLS: Focus or create a floating text block
         // We do NOT preventDefault here because iPad Scribble needs to see the tap to focus and start recognition.
         
-        const contentArea = paper.querySelector('.content-area');
+        let contentArea = e.target.closest('.content-area');
+        if (!contentArea) {
+            const block = e.target.closest('.sequence-editor-block');
+            if (block) contentArea = block.querySelector('.content-area');
+        }
+        if (!contentArea) {
+            // Fallback: find the content area closest to the tap
+            let closestDist = Infinity;
+            paper.querySelectorAll('.content-area').forEach(ca => {
+                const r = ca.getBoundingClientRect();
+                if (e.clientY >= r.top && e.clientY <= r.bottom) {
+                    contentArea = ca;
+                } else if (!contentArea) { // Only calculate distance if not already within bounds
+                    const dist = Math.min(Math.abs(e.clientY - r.top), Math.abs(e.clientY - r.bottom));
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        contentArea = ca;
+                    }
+                }
+            });
+        }
+        if (!contentArea) contentArea = paper.querySelector('.content-area');
         if (!contentArea) return;
 
         // Calculate coordinates relative to the content-area,
