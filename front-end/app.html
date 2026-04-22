@@ -699,40 +699,44 @@
     <!-- MAIN CONTAINER FOR SPLIT LAYOUT -->
     <div class="main-container" id="mainContainer">
         <main class="workspace" id="workspace">
-            <!-- UI OVERLAYS (STAY FIXED) -->
-            <div class="status-bar">
-                <span class="save-status" id="saveStatus">All changes saved</span>
-                <span class="word-count" id="wordCount">0 Words</span>
-            </div>
-
-            <div class="show-tools-btn" id="_auto_68">✎</div>
-            <div class="writing-tools" id="topTools">
-                <div class="tool-opt active" data-tool="pen" id="_auto_69" title="Standard Pen">🖊️</div>
-                <div class="tool-opt" data-tool="natural" id="naturalPenBtn" title="Natural Pen (No Beautification)">✨</div>
-                <div class="tool-opt" data-tool="pencil" id="_auto_70">✏️</div>
-                <div class="tool-opt highlighter" data-tool="highlighter" id="_auto_71">🖌️</div>
-                <div class="tool-opt" data-tool="marker" id="_auto_72">🖍️</div>
-                <div class="tool-opt" data-tool="elegant" id="_auto_73">✒️</div>
-                <div class="tool-opt" data-tool="brush" id="_auto_74">🎨</div>
-                <div class="tool-opt" data-tool="chalk" id="_auto_75">📝</div>
-                <div class="tool-divider" style="margin: 0 10px;"></div>
-                <div class="tool-divider sketch-only"></div>
-                <div class="tool-opt sketch-only" id="_auto_77" title="Undo">↩️</div>
-                <div class="tool-opt sketch-only" id="_auto_78" title="Redo">↪️</div>
-            </div>
-
-            <input accept="image/*" id="imageInput" style="display: none;" type="file" />
-
-            <div id="canvasViewport">
-                <div id="canvasLayer">
-                    <div class="paper" id="paper">
-                        <input class="paper-title" id="pageTitle" placeholder="Page title…" type="text" />
-                        <div id="pdfBackground"></div>
-                        <div id="mathLayer"></div>
-                        <canvas id="sketchCanvas"></canvas>
-                        <div id="sequentialStream"></div>
-
-                <!-- SPATIAL VIEWPORT & LAYER -->
+            <div class="paper" id="paper">
+                <!-- PDF BACKGROUND LAYER -->
+                <div id="pdfBackground"></div>
+                <!-- MATH LAYER CONTAINER -->
+                <div id="mathLayer">
+                </div>
+                <canvas id="sketchCanvas"></canvas>
+                <div class="status-bar">
+                    <span class="save-status" id="saveStatus">All changes saved</span>
+                    <span class="word-count" id="wordCount">0 Words</span>
+                </div>
+                <div class="show-tools-btn" id="_auto_68">✎</div>
+                <div class="writing-tools" id="topTools">
+                    <div class="tool-opt active" data-tool="pen" id="_auto_69" title="Standard Pen">🖊️</div>
+                    <div class="tool-opt" data-tool="natural" id="naturalPenBtn" title="Natural Pen (No Beautification)">✨</div>
+                    <div class="tool-opt" data-tool="pencil" id="_auto_70">✏️</div>
+                    <div class="tool-opt highlighter" data-tool="highlighter" id="_auto_71">🖌️</div>
+                    <div class="tool-opt" data-tool="marker" id="_auto_72">🖍️</div>
+                    <div class="tool-opt" data-tool="elegant" id="_auto_73">✒️</div>
+                    <div class="tool-opt" data-tool="brush" id="_auto_74">🎨</div>
+                    <div class="tool-opt" data-tool="chalk" id="_auto_75">📝</div>
+                    <div class="tool-divider" style="margin: 0 10px;"></div>
+                    <div class="tool-divider sketch-only"></div>
+                    <div class="tool-opt sketch-only" id="_auto_77" title="Undo">↩️</div>
+                    <div class="tool-opt sketch-only" id="_auto_78" title="Redo">↪️</div>
+                </div>
+                <input accept="image/*" id="imageInput" style="display: none;" type="file" />
+                <input class="paper-title" id="pageTitle" placeholder="Page title…" type="text" />
+                <!-- NEW: Sequential Stream Container -->
+                <div id="sequentialStream">
+                    <!-- Skeletons (removed by JS) -->
+                    <div class="skeleton-content-area loader-skeleton">
+                        <div class="skeleton-box skeleton-h1"></div>
+                        <div class="skeleton-box skeleton-p"></div>
+                        <div class="skeleton-box skeleton-p"></div>
+                        <div class="skeleton-box skeleton-p medium"></div>
+                        <div class="skeleton-box skeleton-p"></div>
+                        <div class="skeleton-box skeleton-p short"></div>
                     </div>
                 </div>
             </div>

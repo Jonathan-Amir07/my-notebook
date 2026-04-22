@@ -5675,12 +5675,9 @@ function getCanvasCoordinates(inputEvent) {
     }
 
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
     return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY
+        x: clientX - rect.left,
+        y: clientY - rect.top
     };
 }
 
@@ -11854,9 +11851,6 @@ window.deleteChapter = async (id) => {
 
 // Load a specific chapter (UPDATED FOR MULTI-PAGE STREAM WITH FLIP ANIMATION AND SEARCH HIGHLIGHTING)
 window.loadChapter = (id, highlightQuery = '') => {
-    // Reset Canvas Viewport for new note
-    if (window.canvasManager) window.canvasManager.reset();
-
     const chapter = chapters.find(c => c.id === id);
     if (!chapter) return;
 
@@ -13705,131 +13699,7 @@ initializeAdvancedFeatures = function () {
 
 // ========== END PHASE 3 GESTURE FEATURES ==========
 
-// ========== INFINITE CANVAS INFRASTRUCTURE ==========
-class CanvasManager {
-    constructor() {
-        this.viewport = document.getElementById('canvasViewport');
-        this.layer = document.getElementById('canvasLayer');
-        this.offsetX = 0;
-        this.offsetY = 0;
-        this.zoom = 1;
-        this.isPanning = false;
-        this.lastX = 0;
-        this.lastY = 0;
-    }
 
-    initialize() {
-        if (!this.viewport || !this.layer) return;
-
-        // Middle mouse button or Alt + Left click to pan
-        this.viewport.addEventListener('pointerdown', (e) => {
-            if (e.button === 1 || (e.button === 0 && e.altKey)) {
-                this.startPanning(e);
-            }
-        });
-
-        window.addEventListener('pointermove', (e) => {
-            if (this.isPanning) this.pan(e);
-        });
-
-        window.addEventListener('pointerup', () => {
-            this.stopPanning();
-        });
-
-        // Click to create text block anywhere on the infinite plane
-        this.viewport.addEventListener('click', (e) => {
-            // Only trigger if clicking directly on the viewport/layer background
-            // and we are NOT in sketch mode or lasso mode
-            if (typeof isSketchMode !== 'undefined' && isSketchMode) return;
-            if (window.lassoSelector && window.lassoSelector.isLassoMode) return;
-            if (this.isPanning) return;
-
-            if (e.target === this.viewport || e.target === this.layer || e.target.id === 'sequentialStream') {
-                const coords = this.getCanvasCoords(e.clientX, e.clientY);
-                window.createCanvasTextBlock(coords.x, coords.y, this.layer);
-            }
-        });
-
-        // Touch panning (two fingers)
-        this.viewport.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 2) {
-                this.isPanning = true;
-                this.lastX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                this.lastY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-            }
-        }, { passive: false });
-
-        this.viewport.addEventListener('touchmove', (e) => {
-            if (this.isPanning && e.touches.length === 2) {
-                e.preventDefault();
-                const x = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                const y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                this.offsetX += x - this.lastX;
-                this.offsetY += y - this.lastY;
-                this.lastX = x;
-                this.lastY = y;
-                this.updateTransform();
-            }
-        }, { passive: false });
-
-        console.log('✅ Canvas Manager initialized');
-    }
-
-    startPanning(e) {
-        this.isPanning = true;
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        this.viewport.style.cursor = 'grabbing';
-        e.preventDefault();
-    }
-
-    pan(e) {
-        const dx = e.clientX - this.lastX;
-        const dy = e.clientY - this.lastY;
-        this.offsetX += dx;
-        this.offsetY += dy;
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        this.updateTransform();
-    }
-
-    stopPanning() {
-        this.isPanning = false;
-        if (this.viewport) this.viewport.style.cursor = 'crosshair';
-    }
-
-    reset() {
-        this.offsetX = 0;
-        this.offsetY = 0;
-        this.zoom = 1;
-        this.updateTransform();
-    }
-
-    updateTransform() {
-        if (this.layer) {
-            this.layer.style.transform = `translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.zoom})`;
-        }
-    }
-
-    getCanvasCoords(clientX, clientY) {
-        return {
-            x: (clientX - this.offsetX) / this.zoom,
-            y: (clientY - this.offsetY) / this.zoom
-        };
-    }
-}
-
-const canvasManager = new CanvasManager();
-window.canvasManager = canvasManager;
-
-// Wrap the main initApp
-(function() {
-    const originalInit = window.initApp;
-    window.initApp = async function() {
-        if (originalInit) await originalInit();
-        canvasManager.initialize();
-    };
-})();
 
 initApp();
 setTimeout(resizeCanvas, 500);
