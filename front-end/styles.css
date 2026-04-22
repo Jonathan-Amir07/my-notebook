@@ -7030,7 +7030,7 @@ body.dark-mode .skeleton-box {
 /* Paper needs position:relative for the pseudo-element */
 #paper {
     position: relative;
-    overflow: hidden; /* Viewport for the infinite canvas */
+    overflow: hidden;
 }
 
 #canvasViewport {
