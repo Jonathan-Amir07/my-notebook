@@ -5334,8 +5334,9 @@ function resizeCanvas(force) {
 
     if (!needsResize) return; // Nothing to do — avoids async race condition
 
-    // Capture existing strokes synchronously BEFORE wiping
-    const snapshot = sketchData || (canvas.width > 0 ? canvas.toDataURL() : null);
+    // Fallback to snapshot only if we have no vector strokes
+    const hasVectors = InkEngine && InkEngine.strokes && InkEngine.strokes.length > 0;
+    const snapshot = (!hasVectors && sketchData) ? sketchData : null;
 
     canvas.width = targetW;
     canvas.height = targetH;
@@ -5344,11 +5345,14 @@ function resizeCanvas(force) {
     if (activeCanvas) {
         activeCanvas.width = targetW;
         activeCanvas.height = targetH;
-        activeCtx.scale(dpr, dpr);
+        if (activeCtx) activeCtx.scale(dpr, dpr);
     }
 
-    if (snapshot) {
-        // Restore previous strokes synchronously using a pre-loaded image
+    if (hasVectors) {
+        // Redraw cleanly from mathematical vector data (No blurring/stretching)
+        InkEngine.rerender(ctx, targetW / dpr, targetH / dpr);
+    } else if (snapshot) {
+        // Legacy fallback: restore from image string
         const img = new Image();
         img.onload = () => {
             ctx.clearRect(0, 0, targetW / dpr, targetH / dpr);
@@ -5852,6 +5856,7 @@ window.clearSketch = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (activeCtx) activeCtx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
     if (InkEngine && InkEngine.clear) InkEngine.clear(); // Ensure it doesn't crash if InkEngine doesn't have clear()
+    sketchData = null;
     saveSketchToCloud();
 
     showToast("Sketch cleared");
@@ -6914,11 +6919,20 @@ function loadChapter(id) {
     // no drawing is happening yet). Then restore saved sketch if any.
     resizeCanvas(true);
 
-    if (chapter.sketch) {
+    if (chapter.vectorStrokes) {
+        // Primary Vector Rendering Engine
+        InkEngine.fromJSON(chapter.vectorStrokes);
+        // We divide by devicePixelRatio if the scale is applied
+        const dpr = window.devicePixelRatio || 1;
+        InkEngine.rerender(ctx, canvas.width / dpr, canvas.height / dpr);
+        sketchData = null; // We rely on vector logic now
+    } else if (chapter.sketch) {
+        // Legacy Support
         sketchData = chapter.sketch;
         drawSavedSketch(sketchData);
     } else {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        InkEngine.clear();
         sketchData = null;
     }
 
