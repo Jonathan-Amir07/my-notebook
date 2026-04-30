@@ -5415,12 +5415,17 @@ const ShapeRecognizer = {
         let maxDistFromLine = 0;
         const lineLen = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
         
+        // If the stroke is too curly or self-intersecting, reject immediately.
+        // Also reject if the line length is too short compared to diagonal.
+        if (lineLen < diag * 0.8) return null;
+
         for (const p of points) {
             const dist = Math.abs((end.y - start.y) * p.x - (end.x - start.x) * p.y + end.x * start.y - end.y * start.x) / (lineLen || 1);
             if (dist > maxDistFromLine) maxDistFromLine = dist;
         }
         
-        if (maxDistFromLine < diag * 0.05) {
+        // STRICTION: Tolerance lowered from 0.05 to 0.02 to avoid false positives like 'J'
+        if (maxDistFromLine < diag * 0.02) {
             return { type: 'line', points: [start, end] };
         }
 
@@ -5723,11 +5728,17 @@ paper.addEventListener('pointerdown', function(e) {
         e.stopPropagation();
         startDrawing(e);
     } else {
-        // BEAUTIFICATION MODE: move the cursor to the tap position so
-        // Scribble inserts text where the user is writing, not at the
-        // last cursor position (which caused the "line snapping" bug).
-        const target = document.elementFromPoint(e.clientX, e.clientY);
-        const editor = target && (target.closest('.content-area') || target.classList.contains('content-area') ? target.closest('.content-area') || target : null);
+        // BEAUTIFICATION MODE: Move cursor to tap position.
+        // If tapping in empty space far from text, spawn an absolute transparent div
+        // so text stays exactly where drawn.
+        let target = document.elementFromPoint(e.clientX, e.clientY);
+        
+        // If we tapped the paper directly, find the active content area
+        let editor = target && target.closest('.content-area');
+        if (!editor && target && target.classList.contains('paper')) {
+            editor = document.querySelector('.sequence-editor-block.active-focus .content-area') || document.querySelector('.content-area');
+        }
+
         if (editor && editor.isContentEditable) {
             let range = null;
             if (document.caretRangeFromPoint) {
@@ -5740,11 +5751,63 @@ paper.addEventListener('pointerdown', function(e) {
                     range.collapse(true);
                 }
             }
+
+            // Check if tap was far from the nearest text bounds (e.g. at the bottom of the page)
+            let spawnFloating = false;
+            if (range) {
+                const rects = range.getClientRects();
+                if (rects.length > 0) {
+                    const r = rects[0];
+                    if (Math.abs(r.bottom - e.clientY) > 40 || Math.abs(r.right - e.clientX) > 40) {
+                        spawnFloating = true;
+                    }
+                } else {
+                    spawnFloating = true;
+                }
+            } else {
+                spawnFloating = true;
+            }
+
+            // Also check if we just tapped directly on an existing floating block
+            if (target && target.classList.contains('freeform-text-block')) {
+                spawnFloating = false; 
+            }
+
+            if (spawnFloating) {
+                const freeBlock = document.createElement('div');
+                freeBlock.className = 'freeform-text-block';
+                // Inline font applied automatically via CSS by execCommand below
+                
+                const editorRect = editor.getBoundingClientRect();
+                freeBlock.style.left = (e.clientX - editorRect.left) + 'px';
+                freeBlock.style.top = (e.clientY - editorRect.top) + 'px';
+                
+                editor.appendChild(freeBlock);
+                
+                range = document.createRange();
+                range.selectNodeContents(freeBlock);
+                range.collapse(true);
+            }
+
             if (range) {
                 const sel = window.getSelection();
                 sel.removeAllRanges();
                 sel.addRange(range);
             }
+            
+            // Set the appropriate inline font so text matches the tool immediately
+            const fonts = {
+                'pen': 'Patrick Hand',
+                'pencil': 'Indie Flower',
+                'elegant': 'Caveat',
+                'marker': 'Permanent Marker',
+                'chalk': 'Kalam',
+                'brush': 'Shadows Into Light'
+            };
+            if (fonts[activeSketchTool]) {
+                document.execCommand('fontName', false, fonts[activeSketchTool]);
+            }
+
             editor.focus();
             // Do NOT preventDefault — let Scribble see this event and
             // insert the recognised text at the cursor we just set.
@@ -6026,15 +6089,23 @@ window.selectWritingTool = (tool, save = true) => {
     activeSketchTool = tool;
     window._currentWritingTool = tool;
 
-    // Apply font class to ALL editors so existing and new text
-    // in this note uses the selected tool's style.
-    // This gives consistent, reliable beautification rendering.
-    document.querySelectorAll('.content-area').forEach(e => {
-        // Strip old writing-tool-* classes, keep everything else
-        const classes = Array.from(e.classList).filter(c => !c.startsWith('writing-tool-'));
-        classes.push(`writing-tool-${tool}`);
-        e.className = classes.join(' ');
-    });
+    // We DO NOT apply the font class to all existing .content-area blocks anymore.
+    // The user specifically requested that changing tools should NOT change the font
+    // of text they have already written.
+    // The selected tool's class will be applied to the current selection or new blocks.
+    
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+        let node = sel.anchorNode;
+        if (node.nodeType === 3) node = node.parentNode;
+        const activeArea = node ? node.closest('.content-area') : null;
+        if (activeArea) {
+            // Apply only to the currently active area where the user is typing
+            const classes = Array.from(activeArea.classList).filter(c => !c.startsWith('writing-tool-'));
+            classes.push(`writing-tool-${tool}`);
+            activeArea.className = classes.join(' ');
+        }
+    }
 
     document.querySelectorAll('.tool-opt').forEach(o => o.classList.toggle('active', o.dataset.tool === tool));
     if (save) {

@@ -3615,14 +3615,16 @@ body:not(.sketch-mode) .paper,
    any generic body/content-area font declarations.
 ──────────────────────────────────────────────────────────────────── */
 .content-area.writing-tool-pen,
-.content-area.writing-tool-pen * {
+.content-area.writing-tool-pen *,
+font[face="Patrick Hand"], font[face="Patrick Hand"] * {
     font-family: 'Patrick Hand', cursive !important;
     font-size: 1.4rem !important;
     color: #2c3e50;
 }
 
 .content-area.writing-tool-pencil,
-.content-area.writing-tool-pencil * {
+.content-area.writing-tool-pencil *,
+font[face="Indie Flower"], font[face="Indie Flower"] * {
     font-family: 'Indie Flower', cursive !important;
     font-size: 1.3rem !important;
     color: #5d6d7e;
@@ -3630,7 +3632,8 @@ body:not(.sketch-mode) .paper,
 }
 
 .content-area.writing-tool-elegant,
-.content-area.writing-tool-elegant * {
+.content-area.writing-tool-elegant *,
+font[face="Caveat"], font[face="Caveat"] * {
     font-family: 'Caveat', cursive !important;
     font-size: 1.8rem !important;
     font-weight: 600;
@@ -3638,14 +3641,16 @@ body:not(.sketch-mode) .paper,
 }
 
 .content-area.writing-tool-marker,
-.content-area.writing-tool-marker * {
+.content-area.writing-tool-marker *,
+font[face="Permanent Marker"], font[face="Permanent Marker"] * {
     font-family: 'Permanent Marker', cursive !important;
     font-size: 1.5rem !important;
     color: #2c3e50;
 }
 
 .content-area.writing-tool-chalk,
-.content-area.writing-tool-chalk * {
+.content-area.writing-tool-chalk *,
+font[face="Kalam"], font[face="Kalam"] * {
     font-family: 'Kalam', cursive !important;
     font-size: 1.4rem !important;
     color: #2c3e50;
@@ -3653,7 +3658,8 @@ body:not(.sketch-mode) .paper,
 }
 
 .content-area.writing-tool-brush,
-.content-area.writing-tool-brush * {
+.content-area.writing-tool-brush *,
+font[face="Shadows Into Light"], font[face="Shadows Into Light"] * {
     font-family: 'Shadows Into Light', cursive !important;
     font-size: 1.4rem !important;
     color: var(--ink-color);
@@ -3663,6 +3669,23 @@ body:not(.sketch-mode) .paper,
 .content-area.writing-tool-natural {
     font-family: 'Patrick Hand', cursive;
     color: var(--ink-color);
+}
+
+/* Freeform Text Blocks */
+.freeform-text-block {
+    position: absolute;
+    min-width: 10px;
+    min-height: 1.5em;
+    outline: none;
+    border: none;
+    background: transparent;
+    z-index: 10;
+    white-space: pre-wrap;
+    word-break: break-word;
+    cursor: text;
+}
+.freeform-text-block:empty::before {
+    content: "\feff"; /* Keeps the block open for typing */
 }
 
 body.dark-mode .canvas-text-block:focus {
