@@ -5533,27 +5533,12 @@ document.addEventListener('pointercancel', function(e) {
 });
 
 // ============================================================
-// PEN INPUT ROUTER: Routes ALL stylus drawing tools to the canvas
+// PEN INPUT ROUTER: Routes ALL stylus (Apple Pencil) input to the canvas
 // 
-// COORDINATE SYSTEM:
-//   All strokes are stored with absolute canvas coordinates (x, y)
-//   computed by getCanvasCoordinates(). The canvas is overlaid on
-//   the .paper element, so (0,0) = top-left of the paper.
-//
-// POSITION PRESERVATION:
-//   InkEngine.begin/move/end store raw {x, y, p} points.
-//   Smoothing (quadratic midpoint interpolation in InkEngine.move)
-//   only affects stroke SHAPE by curving between adjacent points —
-//   it never translates, snaps, or repositions the stroke centroid.
-//   The rendered output appears at the exact spatial location where
-//   the user originally drew it.
-//
 // ROUTING RULES:
-//   - ALL pen/writing tools → raw canvas strokes via InkEngine
+//   - Apple Pencil (pointerType='pen') → always draws on canvas
+//   - Touch/mouse → always focuses text for typing (handled in block listeners)
 //   - Strokes render exactly where the user places them (no snapping)
-//   - This works for both stylus (pointerType='pen') and mouse input
-//   - Text block creation is handled separately (double-tap or
-//     clicking when no drawing tool is active)
 // ============================================================
 paper.addEventListener('pointerdown', function(e) {
     if (e.pointerType !== 'pen') return;
@@ -5777,6 +5762,7 @@ window.selectSketchTool = (tool) => {
     if (tool !== 'highlighter') customStrokeStyle = null;
     activeSketchTool = tool === activeSketchTool ? 'brush' : tool;
 
+    // Update eraser button visual state
     document.getElementById('eraserBtn').classList.toggle('active', activeSketchTool === 'eraser');
     const highlighterBtn = document.querySelector('.tool-opt.highlighter');
     if (highlighterBtn) highlighterBtn.classList.toggle('active', activeSketchTool === 'highlighter');
@@ -5790,16 +5776,17 @@ window.selectWritingTool = (tool, save = true) => {
         return;
     }
     
-    // ALL writing tools now draw raw canvas strokes via InkEngine.
-    // Set activeSketchTool so InkEngine uses the correct rendering profile.
-    // Each tool has its own visual profile (pen, pencil, marker, etc.)
-    // but ALL produce strokes anchored to absolute canvas coordinates.
+    // AUTO-DISABLE ERASER: switching to any writing tool deactivates the eraser
+    const eraserBtn = document.getElementById('eraserBtn');
+    if (eraserBtn) eraserBtn.classList.remove('active');
+    
+    // Set activeSketchTool so InkEngine uses the correct rendering profile
+    // for Apple Pencil drawing with this tool.
     activeSketchTool = tool;
     
-    // Apply class to ALL editors in the stream
-    document.querySelectorAll('.content-area').forEach(e => {
-        e.className = `content-area writing-tool-${tool}`;
-    });
+    // Track the current tool for NEW text styling only.
+    // We do NOT retroactively change existing content's font.
+    window._currentWritingTool = tool;
 
     document.querySelectorAll('.tool-opt').forEach(o => o.classList.toggle('active', o.dataset.tool === tool));
     if (save) {
@@ -6748,6 +6735,42 @@ function loadChapter(id) {
             debounceSave(item);
         };
 
+        // Apply current writing tool style to NEW text only.
+        // When the user starts typing, wrap their input in a span
+        // with the active tool's class so old text stays unchanged.
+        editor.addEventListener('keydown', function(e) {
+            // Only act on printable character keys (not arrows, backspace, etc.)
+            if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+            
+            const tool = window._currentWritingTool || 'pen';
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return;
+            
+            const range = sel.getRangeAt(0);
+            
+            // Check if we're already inside a span with this tool's class
+            const parentSpan = range.startContainer.parentElement;
+            if (parentSpan && parentSpan.classList && parentSpan.classList.contains(`writing-tool-${tool}`)) {
+                return; // Already styled correctly, let it type naturally
+            }
+            
+            // Create a styled span for the new text
+            const span = document.createElement('span');
+            span.className = `writing-tool-${tool}`;
+            
+            // If there's a selection, delete it first
+            if (!range.collapsed) {
+                range.deleteContents();
+            }
+            
+            // Insert the span and place cursor inside it
+            range.insertNode(span);
+            range.setStart(span, 0);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        });
+
         // Focus handling to highlight active page visually
         editor.onfocus = () => {
             document.querySelectorAll('.sequence-editor-block').forEach(b => b.classList.remove('active-focus'));
@@ -6758,47 +6781,41 @@ function loadChapter(id) {
             updateWordCount(); // Update word count for focused page
         };
 
-        // MOUSE/TOUCH DRAWING: Route mouse clicks to canvas when a drawing
-        // tool is active, instead of creating text blocks. This ensures
-        // strokes appear exactly where the user clicks — no repositioning.
-        //
-        // Text block creation is reserved for double-tap only.
+        // TOUCH/MOUSE TAP: Place cursor directly where the user taps.
+        // No floating text boxes — just tap anywhere and start typing.
+        // Apple Pencil is handled separately (always draws on canvas).
         block.addEventListener('pointerdown', function(e) {
-            // Mutual exclusion with other modes
-            if (isSketchMode || (lassoSelector && lassoSelector.isLassoMode)) return;
-            
-            // Only act if clicking on the block/editor background (not on existing content)
-            if (e.target === block || e.target === editor) {
-                // When a writing/drawing tool is active and this is a mouse/touch,
-                // draw on the canvas instead of creating a text block.
-                // This makes mouse drawing work the same as pen drawing:
-                // strokes rendered at exact canvas coordinates, no snapping.
-                const activeTool = document.querySelector('.tool-opt.active');
-                const toolName = activeTool && activeTool.dataset.tool;
-                const isDrawingTool = toolName && toolName !== 'text';
-                
-                if (isDrawingTool && e.pointerType !== 'pen') {
-                    // Route to canvas drawing for freeform strokes
-                    document.body.classList.add('pen-active');
-                    resizeCanvas(true);
-                    e.preventDefault();
-                    e.stopPropagation();
-                    startDrawing(e);
-                    return;
-                }
-            }
-        });
-        
-        // DOUBLE-TAP: Create a floating text block (opt-in text input)
-        block.addEventListener('dblclick', function(e) {
+            // Skip if in sketch mode or lasso mode
             if (isSketchMode || (lassoSelector && lassoSelector.isLassoMode)) return;
             if (isReadMode) return;
+            
+            // Apple Pencil (pen) is handled by the paper-level pen interceptor
+            if (e.pointerType === 'pen') return;
+            
+            // For touch/mouse: place cursor at tap position in the editor
             if (e.target === block || e.target === editor) {
-                const rect = editor.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                createCanvasTextBlock(x, y, editor);
-                e.stopPropagation();
+                // Use caretRangeFromPoint (or caretPositionFromPoint) to place
+                // the cursor exactly where the user tapped — no snapping.
+                let range = null;
+                if (document.caretRangeFromPoint) {
+                    range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                } else if (document.caretPositionFromPoint) {
+                    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+                    if (pos) {
+                        range = document.createRange();
+                        range.setStart(pos.offsetNode, pos.offset);
+                        range.collapse(true);
+                    }
+                }
+                
+                if (range) {
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+                
+                // Focus the editor so the keyboard appears
+                editor.focus();
             }
         });
 
@@ -6971,8 +6988,13 @@ window.toggleSketchMode = () => {
     const editors = document.querySelectorAll('.content-area');
     editors.forEach(e => e.contentEditable = !isSketchMode);
 
-    if (!isSketchMode) activeSketchTool = 'brush';
-    showToast(isSketchMode ? "Sketching Enabled" : "Writing Enabled");
+    if (!isSketchMode) {
+        activeSketchTool = window._currentWritingTool || 'pen';
+        // Auto-disable eraser when exiting sketch mode
+        const eraserBtn = document.getElementById('eraserBtn');
+        if (eraserBtn) eraserBtn.classList.remove('active');
+    }
+    showToast(isSketchMode ? "Finger Sketching Enabled" : "Writing Enabled");
 };
 
 window.toggleVoiceTranscription = () => {
@@ -14896,26 +14918,10 @@ window.renderBacklinks = () => {
 // Initialize on load
 document.addEventListener('DOMContentLoaded', initBiDirectionalLinking);
 
-// --- CANVAS-ONLY: Floating Text Block Creation ---
-window.createCanvasTextBlock = (x, y, parent) => {
-    const block = document.createElement('div');
-    block.className = 'canvas-text-block';
-    block.style.left = x + 'px';
-    block.style.top = y + 'px';
-    block.contentEditable = 'true';
-    block.innerHTML = 'Type here...';
-    
-    // Add to parent
-    parent.appendChild(block);
-    
-    // Auto-focus and select all text
-    setTimeout(() => {
-        block.focus();
-        document.execCommand('selectAll', false, null);
-    }, 50);
-    
-    // Save state
-    if (parent.oninput) parent.oninput();
-    return block;
+// --- Floating Text Block creation removed ---
+// Users now tap directly on the page to place their cursor.
+// No more floating boxes; text goes right where you tap.
+window.createCanvasTextBlock = () => {
+    // No-op: floating text blocks have been removed.
+    // Kept as empty function to avoid errors from any remaining references.
 };
-

@@ -3127,18 +3127,18 @@ body.focus-mode .btn-menu-mobile {
     pointer-events: none;
 }
 
-/* FIX: Added touch-action: none to prevent iPad scrolling while drawing */
+/* FIX: Allow pinch-to-zoom while drawing on iPad */
 body.sketch-mode #sketchCanvas {
     pointer-events: auto;
     cursor: crosshair;
-    touch-action: none;
+    touch-action: pinch-zoom;
 }
 
 /* AUTO-PEN: When a stylus is detected, canvas captures pen input even without sketch-mode */
 body.pen-active #sketchCanvas {
     pointer-events: auto;
     cursor: crosshair;
-    touch-action: none;
+    touch-action: pinch-zoom;
 }
 
 /* Orange glow around the page when sketch mode is active */
@@ -3585,12 +3585,14 @@ body.dark-mode .continuation-label {
 .content-area {
     min-height: 800px;
     outline: none;
-    line-height: 1.8;
+    line-height: 1.5;
     font-size: 1.3rem;
     color: var(--ink-color);
     position: relative;
     z-index: 2;
     background: transparent;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 /* UNIFIED PAPER LAYOUT - Remove borders and unify textures */
