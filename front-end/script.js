@@ -3412,6 +3412,29 @@ let drawing = false;
 
 // Palm Rejection state
 let lastPenTime = 0;
+let touchCount = 0;
+let lastTouchStartTime = 0;
+
+// GESTURE SYSTEM (Phase 6)
+document.addEventListener('touchstart', (e) => {
+    touchCount = e.touches.length;
+    lastTouchStartTime = Date.now();
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+    const duration = Date.now() - lastTouchStartTime;
+    // If it was a quick tap (not a scroll/drag)
+    if (duration < 250) {
+        if (touchCount === 2) {
+            if (typeof undoSketch === 'function') undoSketch();
+            showToast("Undo (Gesture)");
+        } else if (touchCount === 3) {
+            if (typeof redoSketch === 'function') redoSketch();
+            showToast("Redo (Gesture)");
+        }
+    }
+    touchCount = 0;
+}, { passive: true });
 
 const markdownTriggers = { '#': 'h1', '##': 'h2', '###': 'h3', '-': 'unordered-list', '*': 'unordered-list', '1.': 'ordered-list', '>': 'blockquote', '[]': 'checkbox', '---': 'hr' };
 
@@ -5362,6 +5385,95 @@ function resizeCanvas(force) {
     }
 }
 // ════════════════════════════════════════════════════════════════
+// SHAPE RECOGNIZER — Converts rough sketches into perfect primitives
+// ════════════════════════════════════════════════════════════════
+const ShapeRecognizer = {
+    recognize(points) {
+        if (points.length < 10) return null;
+
+        // Calculate basic metrics
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let sumX = 0, sumY = 0;
+        
+        for (const p of points) {
+            if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+            sumX += p.x; sumY += p.y;
+        }
+        
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const centerX = sumX / points.length;
+        const centerY = sumY / points.length;
+        const diag = Math.sqrt(width * width + height * height);
+
+        if (diag < 20) return null; // Too small to be a shape
+
+        // 1. Check for a Straight Line
+        const start = points[0];
+        const end = points[points.length - 1];
+        let maxDistFromLine = 0;
+        const lineLen = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+        
+        for (const p of points) {
+            const dist = Math.abs((end.y - start.y) * p.x - (end.x - start.x) * p.y + end.x * start.y - end.y * start.x) / (lineLen || 1);
+            if (dist > maxDistFromLine) maxDistFromLine = dist;
+        }
+        
+        if (maxDistFromLine < diag * 0.05) {
+            return { type: 'line', points: [start, end] };
+        }
+
+        // 2. Check for a Circle
+        let totalDistFromCenter = 0;
+        for (const p of points) {
+            totalDistFromCenter += Math.sqrt(Math.pow(p.x - centerX, 2) + Math.pow(p.y - centerY, 2));
+        }
+        const meanRadius = totalDistFromCenter / points.length;
+        let radiusVariance = 0;
+        for (const p of points) {
+            radiusVariance += Math.abs(Math.sqrt(Math.pow(p.x - centerX, 2) + Math.pow(p.y - centerY, 2)) - meanRadius);
+        }
+        
+        if (radiusVariance / points.length < meanRadius * 0.15) {
+            // Generate a smooth circle
+            const circlePts = [];
+            for (let a = 0; a <= Math.PI * 2; a += 0.2) {
+                circlePts.push({ x: centerX + Math.cos(a) * meanRadius, y: centerY + Math.sin(a) * meanRadius, p: 0.5 });
+            }
+            return { type: 'circle', points: circlePts };
+        }
+
+        // 3. Check for a Rectangle
+        const area = width * height;
+        const hullArea = area; // Simplified
+        const isClosed = Math.sqrt(Math.pow(start.x - end.x, 2) + Math.pow(start.y - end.y, 2)) < diag * 0.2;
+        
+        if (isClosed) {
+            // Check if points are mostly on the bounding box edges
+            let edgeDistSum = 0;
+            for (const p of points) {
+                const d = Math.min(
+                    Math.abs(p.x - minX), Math.abs(p.x - maxX),
+                    Math.abs(p.y - minY), Math.abs(p.y - maxY)
+                );
+                edgeDistSum += d;
+            }
+            
+            if (edgeDistSum / points.length < diag * 0.08) {
+                return { type: 'rectangle', points: [
+                    {x: minX, y: minY, p: 0.5}, {x: maxX, y: minY, p: 0.5},
+                    {x: maxX, y: maxY, p: 0.5}, {x: minX, y: maxY, p: 0.5},
+                    {x: minX, y: minY, p: 0.5}
+                ]};
+            }
+        }
+
+        return null;
+    }
+};
+
+// ════════════════════════════════════════════════════════════════
 // PREMIUM INK ENGINE — GoodNotes/Notability-style vector strokes
 // ════════════════════════════════════════════════════════════════
 const InkEngine = {
@@ -5468,11 +5580,20 @@ const InkEngine = {
 
     // End the stroke and archive it
     end() {
+        let recognized = null;
         if (this.current && this.current.points.length > 1) {
+            // SHAPE RECOGNITION (Phase 5)
+            recognized = ShapeRecognizer.recognize(this.current.points);
+            if (recognized) {
+                this.current.points = recognized.points;
+                this.current.isShape = true;
+            }
+            
             this.strokes.push(this.current);
         }
         this.current = null;
         this.buf = [];
+        return recognized;
     },
 
     // Full re-render of all strokes from vector data (used after undo, resize, etc.)
@@ -5775,21 +5896,36 @@ function stopDrawing() {
         ctx.globalAlpha = 1;
 
         // Finalize stroke in InkEngine
-        InkEngine.end();
+        const recognizedShape = InkEngine.end();
 
         // Flush active layer onto main layer
         if (activeCtx && activeCanvas) {
             const prevOp = ctx.globalCompositeOperation;
-            if (activeSketchTool === 'eraser') {
-                ctx.globalCompositeOperation = 'destination-out';
+            
+            if (recognizedShape) {
+                // If a shape was recognized, we don't want the raw pixels.
+                // Clear the raw stroke and redraw the "perfected" shape from InkEngine.
+                activeCtx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
+                const dpr = window.devicePixelRatio || 1;
+                InkEngine.rerender(ctx, canvas.width / dpr, canvas.height / dpr);
             } else {
-                ctx.globalCompositeOperation = 'source-over';
+                // No shape recognized - just commit the raw pixels
+                if (activeSketchTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                ctx.drawImage(activeCanvas, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+                activeCtx.clearRect(0, 0, activeCanvas.width / (window.devicePixelRatio || 1), activeCanvas.height / (window.devicePixelRatio || 1));
             }
-            // Draw the active stroke to the main canvas
-            ctx.drawImage(activeCanvas, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
             ctx.globalCompositeOperation = prevOp;
-            // Clear the active overlay
-            activeCtx.clearRect(0, 0, activeCanvas.width / (window.devicePixelRatio || 1), activeCanvas.height / (window.devicePixelRatio || 1));
+        }
+
+        // AUTO-SAVE VECTORS (Phase 6 Optimization)
+        // Ensure InkEngine state is synced to chapter immediately
+        const chapter = chapters.find(c => c.id === currentId);
+        if (chapter) {
+            chapter.vectorStrokes = InkEngine.toJSON();
         }
 
         // Capture the rendered canvas immediately BEFORE anything else
