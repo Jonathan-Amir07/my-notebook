@@ -5319,17 +5319,31 @@ function resizeCanvas(force) {
     const paper = document.getElementById('paper');
     const dpr = window.devicePixelRatio || 1;
 
-    const needsResize = force ||
-        Math.abs(canvas.width - paper.offsetWidth * dpr) > 2 || 
-        Math.abs(canvas.height - paper.offsetHeight * dpr) > 2;
+    const targetW = paper.offsetWidth * dpr;
+    const targetH = paper.offsetHeight * dpr;
 
-    if (needsResize) {
-        // IMPORTANT: Capture existing pixel data BEFORE resizing wipes it
-        const snapshot = (sketchData || (canvas.width > 0 ? canvas.toDataURL() : null));
-        canvas.width = paper.offsetWidth * dpr;
-        canvas.height = paper.offsetHeight * dpr;
-        ctx.scale(dpr, dpr);
-        if (snapshot) drawSavedSketch(snapshot);
+    // Only resize if dimensions actually changed (or forced on initial load)
+    const needsResize = force ||
+        Math.abs(canvas.width - targetW) > 2 || 
+        Math.abs(canvas.height - targetH) > 2;
+
+    if (!needsResize) return; // Nothing to do — avoids async race condition
+
+    // Capture existing strokes synchronously BEFORE wiping
+    const snapshot = sketchData || (canvas.width > 0 ? canvas.toDataURL() : null);
+
+    canvas.width = targetW;
+    canvas.height = targetH;
+    ctx.scale(dpr, dpr);
+
+    if (snapshot) {
+        // Restore previous strokes synchronously using a pre-loaded image
+        const img = new Image();
+        img.onload = () => {
+            ctx.clearRect(0, 0, targetW / dpr, targetH / dpr);
+            ctx.drawImage(img, 0, 0, targetW / dpr, targetH / dpr);
+        };
+        img.src = snapshot;
     }
 }
 // ════════════════════════════════════════════════════════════════
@@ -5541,30 +5555,54 @@ document.addEventListener('pointercancel', function(e) {
 // PEN INPUT ROUTER
 //
 // TWO-MODE SYSTEM:
-//   1. "natural" tool  → Apple Pencil draws raw ink strokes on canvas
-//   2. All other tools → Apple Pencil triggers iPad Scribble / text input
-//      (no canvas drawing; handwriting is converted to styled text)
+//   1. "natural" tool  → Apple Pencil draws raw ink strokes on canvas.
+//      preventDefault() is called to block Scribble / text input.
 //
-// This separation is intentional:
-//   - Beautification tools (pen, pencil, marker, etc.) rely on iPad
-//     Scribble to recognise handwriting and convert it to styled text.
-//   - The natural/handwriting tool bypasses Scribble entirely and
-//     renders raw ink exactly where the stylus touches.
+//   2. All other tools → Beautification mode.
+//      The pen is NOT captured for canvas. Instead we move the text
+//      cursor to exactly where the pencil touches BEFORE Scribble
+//      activates. This stops text from snapping to the old cursor
+//      position at the top/previous line.
 // ============================================================
 paper.addEventListener('pointerdown', function(e) {
     if (e.pointerType !== 'pen') return;
     if (isReadMode) return;
     if (isSketchMode) return; // Sketch mode has its own handler
 
-    // ONLY the 'natural' tool routes Apple Pencil input to the canvas.
-    // All beautification tools let Scribble handle the input as text.
-    if (activeSketchTool !== 'natural') return;
-
-    document.body.classList.add('pen-active');
-    resizeCanvas(false); // Non-destructive resize — preserves existing strokes
-    e.preventDefault();
-    e.stopPropagation();
-    startDrawing(e);
+    if (activeSketchTool === 'natural') {
+        // FREEFORM MODE: capture pen input for raw canvas strokes
+        document.body.classList.add('pen-active');
+        e.preventDefault();
+        e.stopPropagation();
+        startDrawing(e);
+    } else {
+        // BEAUTIFICATION MODE: move the cursor to the tap position so
+        // Scribble inserts text where the user is writing, not at the
+        // last cursor position (which caused the "line snapping" bug).
+        const target = document.elementFromPoint(e.clientX, e.clientY);
+        const editor = target && (target.closest('.content-area') || target.classList.contains('content-area') ? target.closest('.content-area') || target : null);
+        if (editor && editor.isContentEditable) {
+            let range = null;
+            if (document.caretRangeFromPoint) {
+                range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            } else if (document.caretPositionFromPoint) {
+                const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+                if (pos) {
+                    range = document.createRange();
+                    range.setStart(pos.offsetNode, pos.offset);
+                    range.collapse(true);
+                }
+            }
+            if (range) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+            editor.focus();
+            // Do NOT preventDefault — let Scribble see this event and
+            // insert the recognised text at the cursor we just set.
+        }
+    }
 }, { capture: true });
 
 // Pen move/up interceptors — active during ANY pen canvas drawing
@@ -5651,12 +5689,12 @@ function startDrawing(e) {
     }
 
     // Only draw on canvas if sketch mode is on, or if called by the pen interceptor
-    // (the pen interceptor already checked for natural pen tool)
     if (!isSketchMode && !document.body.classList.contains('pen-active')) return;
     if (isReadMode) return;
 
-    // Ensure intrinsic canvas resolution matches its stretched CSS size
-    resizeCanvas(true);
+    // DO NOT call resizeCanvas here — it wipes the canvas asynchronously
+    // and races with the new stroke being drawn.
+    // resizeCanvas is called once at chapter load and on window resize only.
 
     saveStateToStack();
     drawing = true;
@@ -6827,6 +6865,10 @@ function loadChapter(id) {
         document.getElementById('paper').classList.remove('annotate-mode');
         // Paper texture is now controlled by user via cyclePaperStyle button
     }
+
+    // Resize canvas to match current paper dimensions (safe to do here since
+    // no drawing is happening yet). Then restore saved sketch if any.
+    resizeCanvas(true);
 
     if (chapter.sketch) {
         sketchData = chapter.sketch;

@@ -59,41 +59,9 @@ body {
     transition: background-color 0.3s ease;
 }
 
-/* --- STYLES --- */
-.writing-tool-pencil {
-    font-family: 'Caveat', cursive;
-    color: var(--pencil-color);
-}
+/* Writing tool fonts are defined further down with proper specificity
+   applied to .content-area so Scribble-converted text inherits them */
 
-.writing-tool-pen {
-    font-family: 'Patrick Hand', cursive;
-    color: var(--pen-color);
-}
-
-.writing-tool-marker {
-    font-family: 'Permanent Marker', cursive;
-    color: var(--marker-color);
-}
-
-.writing-tool-brush {
-    font-family: 'Shadows Into Light', cursive;
-    color: var(--ink-color);
-}
-
-.writing-tool-chalk {
-    font-family: 'Architects Daughter', cursive;
-    color: #4a4a4a;
-}
-
-.writing-tool-elegant {
-    font-family: 'Kalam', cursive;
-    color: var(--ink-color);
-}
-
-.writing-tool-natural {
-    font-family: 'Patrick Hand', cursive;
-    color: var(--ink-color);
-}
 
 .tool-btn.active {
     background: var(--template-color) !important;
@@ -3633,38 +3601,61 @@ body:not(.sketch-mode) .paper,
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
-/* Tool-specific Beautification Styles */
-.writing-tool-pen {
-    font-family: 'Patrick Hand', cursive;
-    font-size: 1.4rem;
+/* ── Writing Tool Beautification Fonts ──────────────────────────────
+   Applied to the .content-area element itself so ALL text inside
+   (including Scribble-converted text and keyboard input) inherits
+   the selected tool's font. The more specific selector wins over
+   any generic body/content-area font declarations.
+──────────────────────────────────────────────────────────────────── */
+.content-area.writing-tool-pen,
+.content-area.writing-tool-pen * {
+    font-family: 'Patrick Hand', cursive !important;
+    font-size: 1.4rem !important;
     color: #2c3e50;
 }
 
-.writing-tool-pencil {
-    font-family: 'Indie Flower', cursive;
-    font-size: 1.3rem;
+.content-area.writing-tool-pencil,
+.content-area.writing-tool-pencil * {
+    font-family: 'Indie Flower', cursive !important;
+    font-size: 1.3rem !important;
     color: #5d6d7e;
     opacity: 0.9;
 }
 
-.writing-tool-elegant {
-    font-family: 'Caveat', cursive;
-    font-size: 1.8rem;
+.content-area.writing-tool-elegant,
+.content-area.writing-tool-elegant * {
+    font-family: 'Caveat', cursive !important;
+    font-size: 1.8rem !important;
     font-weight: 600;
     color: #1a1a1a;
 }
 
-.writing-tool-marker {
-    font-family: 'Permanent Marker', cursive;
-    font-size: 1.5rem;
+.content-area.writing-tool-marker,
+.content-area.writing-tool-marker * {
+    font-family: 'Permanent Marker', cursive !important;
+    font-size: 1.5rem !important;
     color: #2c3e50;
 }
 
-.writing-tool-chalk {
-    font-family: 'Kalam', cursive;
-    font-size: 1.4rem;
+.content-area.writing-tool-chalk,
+.content-area.writing-tool-chalk * {
+    font-family: 'Kalam', cursive !important;
+    font-size: 1.4rem !important;
     color: #2c3e50;
     text-shadow: 1px 1px 1px rgba(0,0,0,0.1);
+}
+
+.content-area.writing-tool-brush,
+.content-area.writing-tool-brush * {
+    font-family: 'Shadows Into Light', cursive !important;
+    font-size: 1.4rem !important;
+    color: var(--ink-color);
+}
+
+/* Natural tool: no font override — raw canvas strokes only, no text styling */
+.content-area.writing-tool-natural {
+    font-family: 'Patrick Hand', cursive;
+    color: var(--ink-color);
 }
 
 body.dark-mode .canvas-text-block:focus {
