@@ -5666,6 +5666,22 @@ const InkEngine = {
 
 window.addEventListener('resize', resizeCanvas);
 
+// FIX for "Huge Offset" bug:
+// When the user types or scribbles, the .paper container grows in height.
+// If the canvas HTML dimensions aren't updated, the browser STRETCHES the canvas
+// vertically to match the new CSS height, causing massive Y-coordinate offsets.
+// We use a ResizeObserver to sync the canvas HTML dimensions perfectly with .paper.
+let _paperResizeTimeout;
+const paperObserver = new ResizeObserver(() => {
+    if (drawing) return; // Don't interrupt an active stroke
+    clearTimeout(_paperResizeTimeout);
+    _paperResizeTimeout = setTimeout(() => {
+        if (!drawing) resizeCanvas(false);
+    }, 150);
+});
+const paperEl = document.getElementById('paper');
+if (paperEl) paperObserver.observe(paperEl);
+
 canvas.addEventListener('pointerdown', startDrawing);
 canvas.addEventListener('pointermove', draw);
 canvas.addEventListener('pointerup', stopDrawing);
