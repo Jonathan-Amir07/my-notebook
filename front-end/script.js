@@ -3406,7 +3406,12 @@ let editingMathElement = null; // Stores reference to math element being edited
 
 const canvas = document.getElementById('sketchCanvas');
 const ctx = canvas.getContext('2d');
+const activeCanvas = document.getElementById('activeSketchCanvas');
+const activeCtx = activeCanvas ? activeCanvas.getContext('2d') : null;
 let drawing = false;
+
+// Palm Rejection state
+let lastPenTime = 0;
 
 const markdownTriggers = { '#': 'h1', '##': 'h2', '###': 'h3', '-': 'unordered-list', '*': 'unordered-list', '1.': 'ordered-list', '>': 'blockquote', '[]': 'checkbox', '---': 'hr' };
 
@@ -5335,6 +5340,12 @@ function resizeCanvas(force) {
     canvas.width = targetW;
     canvas.height = targetH;
     ctx.scale(dpr, dpr);
+    
+    if (activeCanvas) {
+        activeCanvas.width = targetW;
+        activeCanvas.height = targetH;
+        activeCtx.scale(dpr, dpr);
+    }
 
     if (snapshot) {
         // Restore previous strokes synchronously using a pre-loaded image
@@ -5552,7 +5563,7 @@ document.addEventListener('pointercancel', function(e) {
 });
 
 // ============================================================
-// PEN INPUT ROUTER
+// PEN INPUT ROUTER & PALM REJECTION
 //
 // TWO-MODE SYSTEM:
 //   1. "natural" tool  → Apple Pencil draws raw ink strokes on canvas.
@@ -5565,7 +5576,18 @@ document.addEventListener('pointercancel', function(e) {
 //      position at the top/previous line.
 // ============================================================
 paper.addEventListener('pointerdown', function(e) {
-    if (e.pointerType !== 'pen') return;
+    if (e.pointerType === 'pen') {
+        lastPenTime = Date.now();
+    } else if (e.pointerType === 'touch') {
+        // Strict Palm Rejection: Ignore touch if a pen was used in the last 500ms
+        if (Date.now() - lastPenTime < 500) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+    }
+
+    if (e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
     if (isReadMode) return;
     if (isSketchMode) return; // Sketch mode has its own handler
 
@@ -5700,13 +5722,19 @@ function startDrawing(e) {
     drawing = true;
 
     const coords = getCanvasCoordinates(e);
-    const pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.5;
+    const pressure = (e.pointerType === 'pen' && e.pressure && e.pressure > 0) ? e.pressure : 0.5;
 
     // Initialize stroke in InkEngine
     InkEngine.begin(coords, pressure, activeSketchTool);
 
-    ctx.beginPath();
-    ctx.moveTo(coords.x, coords.y);
+    // Active stroke starts on the high-performance overlay layer
+    if (activeCtx) {
+        activeCtx.beginPath();
+        activeCtx.moveTo(coords.x, coords.y);
+    } else {
+        ctx.beginPath();
+        ctx.moveTo(coords.x, coords.y);
+    }
 }
 
 function draw(e) {
@@ -5725,10 +5753,10 @@ function draw(e) {
     if (!drawing || isReadMode) return;
 
     const coords = getCanvasCoordinates(e);
-    const pressure = (e.pressure && e.pressure > 0) ? e.pressure : 0.5;
+    const pressure = (e.pointerType === 'pen' && e.pressure && e.pressure > 0) ? e.pressure : 0.5;
 
-    // Delegate all rendering to InkEngine
-    InkEngine.move(coords, pressure, activeSketchTool, ctx);
+    // Delegate rendering to InkEngine, targeting active layer
+    InkEngine.move(coords, pressure, activeSketchTool, activeCtx || ctx);
 }
 
 function stopDrawing() {
@@ -5744,6 +5772,21 @@ function stopDrawing() {
 
         // Finalize stroke in InkEngine
         InkEngine.end();
+
+        // Flush active layer onto main layer
+        if (activeCtx && activeCanvas) {
+            const prevOp = ctx.globalCompositeOperation;
+            if (activeSketchTool === 'eraser') {
+                ctx.globalCompositeOperation = 'destination-out';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+            }
+            // Draw the active stroke to the main canvas
+            ctx.drawImage(activeCanvas, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+            ctx.globalCompositeOperation = prevOp;
+            // Clear the active overlay
+            activeCtx.clearRect(0, 0, activeCanvas.width / (window.devicePixelRatio || 1), activeCanvas.height / (window.devicePixelRatio || 1));
+        }
 
         // Capture the rendered canvas immediately BEFORE anything else
         // (resizeCanvas or other calls could wipe it otherwise)
@@ -5807,7 +5850,8 @@ window.clearSketch = () => {
     if (!confirm("Are you sure you want to clear your drawing?")) return;
     saveStateToStack();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    InkEngine.clear();
+    if (activeCtx) activeCtx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
+    if (InkEngine && InkEngine.clear) InkEngine.clear(); // Ensure it doesn't crash if InkEngine doesn't have clear()
     saveSketchToCloud();
 
     showToast("Sketch cleared");

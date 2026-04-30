@@ -3085,25 +3085,32 @@ body.focus-mode .btn-menu-mobile {
 }
 
 /* Paper */
-#sketchCanvas {
+#sketchCanvas, #activeSketchCanvas {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 5;
     pointer-events: none;
+}
+#sketchCanvas {
+    z-index: 5;
+}
+#activeSketchCanvas {
+    z-index: 6;
 }
 
 /* FIX: Allow pinch-to-zoom while drawing on iPad */
-body.sketch-mode #sketchCanvas {
+body.sketch-mode #sketchCanvas,
+body.sketch-mode #activeSketchCanvas {
     pointer-events: auto;
     cursor: crosshair;
     touch-action: pinch-zoom;
 }
 
 /* AUTO-PEN: When a stylus is detected, canvas captures pen input even without sketch-mode */
-body.pen-active #sketchCanvas {
+body.pen-active #sketchCanvas,
+body.pen-active #activeSketchCanvas {
     pointer-events: auto;
     cursor: crosshair;
     touch-action: pinch-zoom;

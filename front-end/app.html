@@ -705,7 +705,11 @@
                 <!-- MATH LAYER CONTAINER -->
                 <div id="mathLayer">
                 </div>
+                <!-- DUAL CANVAS ARCHITECTURE -->
+                <!-- Main canvas stores persistent strokes -->
                 <canvas id="sketchCanvas"></canvas>
+                <!-- Active canvas is a high-performance overlay for the current stroke being drawn -->
+                <canvas id="activeSketchCanvas"></canvas>
                 <div class="status-bar">
                     <span class="save-status" id="saveStatus">All changes saved</span>
                     <span class="word-count" id="wordCount">0 Words</span>
