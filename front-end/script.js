@@ -5511,109 +5511,69 @@ canvas.addEventListener('pointermove', draw);
 canvas.addEventListener('pointerup', stopDrawing);
 canvas.addEventListener('pointercancel', stopDrawing);
 
+// Document-level move/up listeners for mouse-initiated drawing.
+// When startDrawing is triggered from a block's pointerdown (for mouse input),
+// the pointer may move over elements stacked above the canvas.
+// These listeners ensure continuous stroke tracking regardless of pointer position.
+document.addEventListener('pointermove', function(e) {
+    if (!drawing) return;
+    // Only handle mouse/touch here (pen is handled by the paper capture listeners)
+    if (e.pointerType === 'pen') return;
+    draw(e);
+});
+document.addEventListener('pointerup', function(e) {
+    if (!drawing) return;
+    if (e.pointerType === 'pen') return;
+    stopDrawing(e);
+});
+document.addEventListener('pointercancel', function(e) {
+    if (!drawing) return;
+    if (e.pointerType === 'pen') return;
+    stopDrawing(e);
+});
+
 // ============================================================
-// PEN INPUT ROUTER: Routes stylus input based on active tool
-// - Natural Pen: raw canvas strokes (no beautification)
-// - All other tools: floating text blocks at pen coords (iPad Scribble beautifies)
-// - Mouse/keyboard: normal text editor (sequential lines)
+// PEN INPUT ROUTER: Routes ALL stylus drawing tools to the canvas
+// 
+// COORDINATE SYSTEM:
+//   All strokes are stored with absolute canvas coordinates (x, y)
+//   computed by getCanvasCoordinates(). The canvas is overlaid on
+//   the .paper element, so (0,0) = top-left of the paper.
+//
+// POSITION PRESERVATION:
+//   InkEngine.begin/move/end store raw {x, y, p} points.
+//   Smoothing (quadratic midpoint interpolation in InkEngine.move)
+//   only affects stroke SHAPE by curving between adjacent points —
+//   it never translates, snaps, or repositions the stroke centroid.
+//   The rendered output appears at the exact spatial location where
+//   the user originally drew it.
+//
+// ROUTING RULES:
+//   - ALL pen/writing tools → raw canvas strokes via InkEngine
+//   - Strokes render exactly where the user places them (no snapping)
+//   - This works for both stylus (pointerType='pen') and mouse input
+//   - Text block creation is handled separately (double-tap or
+//     clicking when no drawing tool is active)
 // ============================================================
 paper.addEventListener('pointerdown', function(e) {
     if (e.pointerType !== 'pen') return;
     if (isReadMode) return;
     if (isSketchMode) return; // Sketch mode handles its own canvas
 
-    const isNatural = (activeSketchTool === 'natural');
-
-    if (isNatural) {
-        // NATURAL PEN: Draw raw strokes directly on canvas
-        document.body.classList.add('pen-active');
-        resizeCanvas(true);
-        e.preventDefault();
-        e.stopPropagation();
-        startDrawing(e);
-    } else {
-        // BEAUTIFICATION TOOLS: Focus or create a floating text block
-        // We do NOT preventDefault here because iPad Scribble needs to see the tap to focus and start recognition.
-        
-        let contentArea = e.target.closest('.content-area');
-        if (!contentArea) {
-            const block = e.target.closest('.sequence-editor-block');
-            if (block) contentArea = block.querySelector('.content-area');
-        }
-        if (!contentArea) {
-            // Fallback: find the content area closest to the tap
-            let closestDist = Infinity;
-            paper.querySelectorAll('.content-area').forEach(ca => {
-                const r = ca.getBoundingClientRect();
-                if (e.clientY >= r.top && e.clientY <= r.bottom) {
-                    contentArea = ca;
-                } else if (!contentArea) { // Only calculate distance if not already within bounds
-                    const dist = Math.min(Math.abs(e.clientY - r.top), Math.abs(e.clientY - r.bottom));
-                    if (dist < closestDist) {
-                        closestDist = dist;
-                        contentArea = ca;
-                    }
-                }
-            });
-        }
-        if (!contentArea) contentArea = paper.querySelector('.content-area');
-        if (!contentArea) return;
-
-        // Calculate coordinates relative to the content-area,
-        // accounting for scroll offset of any scrollable parent
-        const rect = contentArea.getBoundingClientRect();
-        const scrollParent = contentArea.closest('#workspace') || contentArea.closest('.paper') || contentArea;
-        const x = e.clientX - rect.left + contentArea.scrollLeft;
-        const y = e.clientY - rect.top + contentArea.scrollTop;
-
-        // Check if there's already a text block near this tap
-        let nearbyBlock = null;
-        contentArea.querySelectorAll('.canvas-text-block').forEach(block => {
-            const bRect = block.getBoundingClientRect();
-            if (e.clientX >= bRect.left && e.clientX <= bRect.right &&
-                e.clientY >= bRect.top && e.clientY <= bRect.bottom) {
-                nearbyBlock = block;
-            }
-        });
-
-        if (nearbyBlock) {
-            nearbyBlock.focus();
-        } else {
-            const currentTool = document.querySelector('.tool-opt.active');
-            const toolName = (currentTool && currentTool.dataset.tool) || 'pen';
-
-            const block = document.createElement('div');
-            block.className = `canvas-text-block writing-tool-${toolName}`;
-            block.style.left = x + 'px';
-            block.style.top = y + 'px';
-            block.contentEditable = 'true';
-
-            // Add lifecycle listeners for premium experience
-            block.addEventListener('focus', () => {
-                document.body.classList.add('typing-in-block');
-            });
-            block.addEventListener('blur', () => {
-                document.body.classList.remove('typing-in-block');
-                // Remove empty blocks to keep canvas clean
-                if (!block.textContent.trim()) block.remove();
-                saveChapterToDB();
-            });
-            block.addEventListener('input', () => {
-                saveChapterToDB();
-            });
-
-            contentArea.appendChild(block);
-            
-            // Focus with a slight delay
-            setTimeout(() => block.focus(), 10);
-        }
-    }
+    // ALL PEN TOOLS: Draw raw strokes directly on canvas.
+    // This ensures ink appears exactly where the user draws —
+    // no line snapping, no baseline correction, no repositioning.
+    document.body.classList.add('pen-active');
+    resizeCanvas(true);
+    e.preventDefault();
+    e.stopPropagation();
+    startDrawing(e);
 }, { capture: true });
 
-// Pen move/up interceptors (only active during Natural pen drawing)
+// Pen move/up interceptors — active during ANY pen canvas drawing
 paper.addEventListener('pointermove', function(e) {
     if (e.pointerType !== 'pen') return;
-    if (!drawing) return; // Only for natural pen canvas strokes
+    if (!drawing) return;
     e.preventDefault();
     draw(e);
 }, { capture: true });
@@ -5830,13 +5790,11 @@ window.selectWritingTool = (tool, save = true) => {
         return;
     }
     
-    // Natural pen → raw canvas strokes; other tools → beautification via text blocks
-    if (tool === 'natural') {
-        activeSketchTool = 'natural';
-    } else if (activeSketchTool === 'natural') {
-        // Switching away from natural → reset sketch tool to default
-        activeSketchTool = 'brush';
-    }
+    // ALL writing tools now draw raw canvas strokes via InkEngine.
+    // Set activeSketchTool so InkEngine uses the correct rendering profile.
+    // Each tool has its own visual profile (pen, pencil, marker, etc.)
+    // but ALL produce strokes anchored to absolute canvas coordinates.
+    activeSketchTool = tool;
     
     // Apply class to ALL editors in the stream
     document.querySelectorAll('.content-area').forEach(e => {
@@ -6800,20 +6758,45 @@ function loadChapter(id) {
             updateWordCount(); // Update word count for focused page
         };
 
-        // CANVAS-ONLY: Handle click to create text blocks
+        // MOUSE/TOUCH DRAWING: Route mouse clicks to canvas when a drawing
+        // tool is active, instead of creating text blocks. This ensures
+        // strokes appear exactly where the user clicks — no repositioning.
+        //
+        // Text block creation is reserved for double-tap only.
         block.addEventListener('pointerdown', function(e) {
             // Mutual exclusion with other modes
             if (isSketchMode || (lassoSelector && lassoSelector.isLassoMode)) return;
             
-            // Only create if we click exactly on the block or the editor background
+            // Only act if clicking on the block/editor background (not on existing content)
+            if (e.target === block || e.target === editor) {
+                // When a writing/drawing tool is active and this is a mouse/touch,
+                // draw on the canvas instead of creating a text block.
+                // This makes mouse drawing work the same as pen drawing:
+                // strokes rendered at exact canvas coordinates, no snapping.
+                const activeTool = document.querySelector('.tool-opt.active');
+                const toolName = activeTool && activeTool.dataset.tool;
+                const isDrawingTool = toolName && toolName !== 'text';
+                
+                if (isDrawingTool && e.pointerType !== 'pen') {
+                    // Route to canvas drawing for freeform strokes
+                    document.body.classList.add('pen-active');
+                    resizeCanvas(true);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startDrawing(e);
+                    return;
+                }
+            }
+        });
+        
+        // DOUBLE-TAP: Create a floating text block (opt-in text input)
+        block.addEventListener('dblclick', function(e) {
+            if (isSketchMode || (lassoSelector && lassoSelector.isLassoMode)) return;
+            if (isReadMode) return;
             if (e.target === block || e.target === editor) {
                 const rect = editor.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
-                
-                // Don't create if clicking right at the end of content in a way 
-                // that should move the cursor (optional heuristic)
-                
                 createCanvasTextBlock(x, y, editor);
                 e.stopPropagation();
             }

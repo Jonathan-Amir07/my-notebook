@@ -7032,6 +7032,28 @@ body.dark-mode .skeleton-box {
     position: relative;
 }
 
+/* Ensure existing elements in spatial mode are absolute or correctly layered */
+.canvas-text-block {
+    position: absolute;
+    min-width: 100px;
+    padding: 10px;
+    background: transparent;
+    border-radius: 4px;
+    cursor: text;
+    z-index: 5;
+    transition: background 0.2s;
+}
+
+.canvas-text-block:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.canvas-text-block:focus {
+    background: rgba(0, 0, 0, 0.04);
+    outline: 1px dashed var(--template-color);
+}
+
+
 /* Pass ink/pen color vars into content area */
 #paper.paper-theme-blueprint .content-area,
 #paper.paper-theme-dark .content-area {
