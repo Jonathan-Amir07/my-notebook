@@ -5315,16 +5315,21 @@ window.setCustomColor = (val) => {
     if (!isSketchMode) toggleSketchMode();
 };
 
-function resizeCanvas() {
+function resizeCanvas(force) {
     const paper = document.getElementById('paper');
     const dpr = window.devicePixelRatio || 1;
 
-    if (Math.abs(canvas.width - paper.offsetWidth * dpr) > 2 || 
-        Math.abs(canvas.height - paper.offsetHeight * dpr) > 2) {
+    const needsResize = force ||
+        Math.abs(canvas.width - paper.offsetWidth * dpr) > 2 || 
+        Math.abs(canvas.height - paper.offsetHeight * dpr) > 2;
+
+    if (needsResize) {
+        // IMPORTANT: Capture existing pixel data BEFORE resizing wipes it
+        const snapshot = (sketchData || (canvas.width > 0 ? canvas.toDataURL() : null));
         canvas.width = paper.offsetWidth * dpr;
         canvas.height = paper.offsetHeight * dpr;
         ctx.scale(dpr, dpr);
-        if (sketchData) drawSavedSketch(sketchData);
+        if (snapshot) drawSavedSketch(snapshot);
     }
 }
 // ════════════════════════════════════════════════════════════════
@@ -5533,23 +5538,30 @@ document.addEventListener('pointercancel', function(e) {
 });
 
 // ============================================================
-// PEN INPUT ROUTER: Routes ALL stylus (Apple Pencil) input to the canvas
-// 
-// ROUTING RULES:
-//   - Apple Pencil (pointerType='pen') → always draws on canvas
-//   - Touch/mouse → always focuses text for typing (handled in block listeners)
-//   - Strokes render exactly where the user places them (no snapping)
+// PEN INPUT ROUTER
+//
+// TWO-MODE SYSTEM:
+//   1. "natural" tool  → Apple Pencil draws raw ink strokes on canvas
+//   2. All other tools → Apple Pencil triggers iPad Scribble / text input
+//      (no canvas drawing; handwriting is converted to styled text)
+//
+// This separation is intentional:
+//   - Beautification tools (pen, pencil, marker, etc.) rely on iPad
+//     Scribble to recognise handwriting and convert it to styled text.
+//   - The natural/handwriting tool bypasses Scribble entirely and
+//     renders raw ink exactly where the stylus touches.
 // ============================================================
 paper.addEventListener('pointerdown', function(e) {
     if (e.pointerType !== 'pen') return;
     if (isReadMode) return;
-    if (isSketchMode) return; // Sketch mode handles its own canvas
+    if (isSketchMode) return; // Sketch mode has its own handler
 
-    // ALL PEN TOOLS: Draw raw strokes directly on canvas.
-    // This ensures ink appears exactly where the user draws —
-    // no line snapping, no baseline correction, no repositioning.
+    // ONLY the 'natural' tool routes Apple Pencil input to the canvas.
+    // All beautification tools let Scribble handle the input as text.
+    if (activeSketchTool !== 'natural') return;
+
     document.body.classList.add('pen-active');
-    resizeCanvas(true);
+    resizeCanvas(false); // Non-destructive resize — preserves existing strokes
     e.preventDefault();
     e.stopPropagation();
     startDrawing(e);
@@ -5695,10 +5707,15 @@ function stopDrawing() {
         // Finalize stroke in InkEngine
         InkEngine.end();
 
-        // Remove pen-active if it was auto-set
-        document.body.classList.remove('pen-active');
-        saveSketchToCloud();
+        // Capture the rendered canvas immediately BEFORE anything else
+        // (resizeCanvas or other calls could wipe it otherwise)
+        sketchData = canvas.toDataURL();
 
+        // Remove pen-active class
+        document.body.classList.remove('pen-active');
+
+        // Save to cloud with the already-captured snapshot
+        saveSketchToCloud();
     }
 }
 
@@ -5780,13 +5797,21 @@ window.selectWritingTool = (tool, save = true) => {
     const eraserBtn = document.getElementById('eraserBtn');
     if (eraserBtn) eraserBtn.classList.remove('active');
     
-    // Set activeSketchTool so InkEngine uses the correct rendering profile
-    // for Apple Pencil drawing with this tool.
+    // Set activeSketchTool so InkEngine knows which profile to use.
+    // Only 'natural' routes Apple Pencil to the canvas; all other tools
+    // let iPad Scribble convert handwriting to styled text.
     activeSketchTool = tool;
-    
-    // Track the current tool for NEW text styling only.
-    // We do NOT retroactively change existing content's font.
     window._currentWritingTool = tool;
+
+    // Apply font class to ALL editors so existing and new text
+    // in this note uses the selected tool's style.
+    // This gives consistent, reliable beautification rendering.
+    document.querySelectorAll('.content-area').forEach(e => {
+        // Strip old writing-tool-* classes, keep everything else
+        const classes = Array.from(e.classList).filter(c => !c.startsWith('writing-tool-'));
+        classes.push(`writing-tool-${tool}`);
+        e.className = classes.join(' ');
+    });
 
     document.querySelectorAll('.tool-opt').forEach(o => o.classList.toggle('active', o.dataset.tool === tool));
     if (save) {
@@ -6735,41 +6760,7 @@ function loadChapter(id) {
             debounceSave(item);
         };
 
-        // Apply current writing tool style to NEW text only.
-        // When the user starts typing, wrap their input in a span
-        // with the active tool's class so old text stays unchanged.
-        editor.addEventListener('keydown', function(e) {
-            // Only act on printable character keys (not arrows, backspace, etc.)
-            if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
-            
-            const tool = window._currentWritingTool || 'pen';
-            const sel = window.getSelection();
-            if (!sel.rangeCount) return;
-            
-            const range = sel.getRangeAt(0);
-            
-            // Check if we're already inside a span with this tool's class
-            const parentSpan = range.startContainer.parentElement;
-            if (parentSpan && parentSpan.classList && parentSpan.classList.contains(`writing-tool-${tool}`)) {
-                return; // Already styled correctly, let it type naturally
-            }
-            
-            // Create a styled span for the new text
-            const span = document.createElement('span');
-            span.className = `writing-tool-${tool}`;
-            
-            // If there's a selection, delete it first
-            if (!range.collapsed) {
-                range.deleteContents();
-            }
-            
-            // Insert the span and place cursor inside it
-            range.insertNode(span);
-            range.setStart(span, 0);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-        });
+
 
         // Focus handling to highlight active page visually
         editor.onfocus = () => {
