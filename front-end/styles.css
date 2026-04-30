@@ -3558,6 +3558,7 @@ body.dark-mode .continuation-label {
 }
 
 .content-area {
+    position: relative;
     min-height: 800px;
     outline: none;
     line-height: 1.5;
@@ -3614,7 +3615,7 @@ body:not(.sketch-mode) .paper,
    the selected tool's font. The more specific selector wins over
    any generic body/content-area font declarations.
 ──────────────────────────────────────────────────────────────────── */
-.content-area.writing-tool-pen {
+.writing-tool-pen {
     font-family: 'Patrick Hand', cursive;
     font-size: 1.4rem;
     color: #2c3e50;
@@ -3625,7 +3626,7 @@ font[face="Patrick Hand"], font[face="Patrick Hand"] * {
     color: #2c3e50 !important;
 }
 
-.content-area.writing-tool-pencil {
+.writing-tool-pencil {
     font-family: 'Indie Flower', cursive;
     font-size: 1.3rem;
     color: #5d6d7e;
@@ -3637,7 +3638,7 @@ font[face="Indie Flower"], font[face="Indie Flower"] * {
     color: #5d6d7e !important;
 }
 
-.content-area.writing-tool-elegant {
+.writing-tool-elegant {
     font-family: 'Caveat', cursive;
     font-size: 1.8rem;
     font-weight: 600;
@@ -3650,7 +3651,7 @@ font[face="Caveat"], font[face="Caveat"] * {
     color: #1a1a1a !important;
 }
 
-.content-area.writing-tool-marker {
+.writing-tool-marker {
     font-family: 'Permanent Marker', cursive;
     font-size: 1.5rem;
     color: #2c3e50;
@@ -3661,7 +3662,7 @@ font[face="Permanent Marker"], font[face="Permanent Marker"] * {
     color: #2c3e50 !important;
 }
 
-.content-area.writing-tool-chalk {
+.writing-tool-chalk {
     font-family: 'Kalam', cursive;
     font-size: 1.4rem;
     color: #2c3e50;
@@ -3674,7 +3675,7 @@ font[face="Kalam"], font[face="Kalam"] * {
     text-shadow: 1px 1px 1px rgba(0,0,0,0.1) !important;
 }
 
-.content-area.writing-tool-brush {
+.writing-tool-brush {
     font-family: 'Shadows Into Light', cursive;
     font-size: 1.4rem;
     color: var(--ink-color);
@@ -3686,7 +3687,7 @@ font[face="Shadows Into Light"], font[face="Shadows Into Light"] * {
 }
 
 /* Natural tool: no font override — raw canvas strokes only, no text styling */
-.content-area.writing-tool-natural {
+.writing-tool-natural {
     font-family: 'Patrick Hand', cursive;
     color: var(--ink-color);
 }

@@ -5791,8 +5791,7 @@ paper.addEventListener('pointerdown', function(e) {
 
             if (spawnFloating) {
                 const freeBlock = document.createElement('div');
-                freeBlock.className = 'freeform-text-block';
-                // Inline font applied automatically via CSS by execCommand below
+                freeBlock.className = `freeform-text-block writing-tool-${activeSketchTool}`;
                 
                 const editorRect = editor.getBoundingClientRect();
                 freeBlock.style.left = (e.clientX - editorRect.left) + 'px';
