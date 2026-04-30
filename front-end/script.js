@@ -6110,17 +6110,16 @@ window.selectWritingTool = (tool, save = true) => {
     // of text they have already written.
     // The selected tool's class will be applied to the current selection or new blocks.
     
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-        let node = sel.anchorNode;
-        if (node.nodeType === 3) node = node.parentNode;
-        const activeArea = node ? node.closest('.content-area') : null;
-        if (activeArea) {
-            // Apply only to the currently active area where the user is typing
-            const classes = Array.from(activeArea.classList).filter(c => !c.startsWith('writing-tool-'));
-            classes.push(`writing-tool-${tool}`);
-            activeArea.className = classes.join(' ');
-        }
+    const fonts = {
+        'pen': 'Patrick Hand',
+        'pencil': 'Indie Flower',
+        'elegant': 'Caveat',
+        'marker': 'Permanent Marker',
+        'chalk': 'Kalam',
+        'brush': 'Shadows Into Light'
+    };
+    if (fonts[tool]) {
+        document.execCommand('fontName', false, fonts[tool]);
     }
 
     document.querySelectorAll('.tool-opt').forEach(o => o.classList.toggle('active', o.dataset.tool === tool));

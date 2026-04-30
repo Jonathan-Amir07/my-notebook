@@ -3614,55 +3614,75 @@ body:not(.sketch-mode) .paper,
    the selected tool's font. The more specific selector wins over
    any generic body/content-area font declarations.
 ──────────────────────────────────────────────────────────────────── */
-.content-area.writing-tool-pen,
-.content-area.writing-tool-pen *,
+.content-area.writing-tool-pen {
+    font-family: 'Patrick Hand', cursive;
+    font-size: 1.4rem;
+    color: #2c3e50;
+}
 font[face="Patrick Hand"], font[face="Patrick Hand"] * {
     font-family: 'Patrick Hand', cursive !important;
     font-size: 1.4rem !important;
-    color: #2c3e50;
+    color: #2c3e50 !important;
 }
 
-.content-area.writing-tool-pencil,
-.content-area.writing-tool-pencil *,
-font[face="Indie Flower"], font[face="Indie Flower"] * {
-    font-family: 'Indie Flower', cursive !important;
-    font-size: 1.3rem !important;
+.content-area.writing-tool-pencil {
+    font-family: 'Indie Flower', cursive;
+    font-size: 1.3rem;
     color: #5d6d7e;
     opacity: 0.9;
 }
+font[face="Indie Flower"], font[face="Indie Flower"] * {
+    font-family: 'Indie Flower', cursive !important;
+    font-size: 1.3rem !important;
+    color: #5d6d7e !important;
+}
 
-.content-area.writing-tool-elegant,
-.content-area.writing-tool-elegant *,
-font[face="Caveat"], font[face="Caveat"] * {
-    font-family: 'Caveat', cursive !important;
-    font-size: 1.8rem !important;
+.content-area.writing-tool-elegant {
+    font-family: 'Caveat', cursive;
+    font-size: 1.8rem;
     font-weight: 600;
     color: #1a1a1a;
 }
+font[face="Caveat"], font[face="Caveat"] * {
+    font-family: 'Caveat', cursive !important;
+    font-size: 1.8rem !important;
+    font-weight: 600 !important;
+    color: #1a1a1a !important;
+}
 
-.content-area.writing-tool-marker,
-.content-area.writing-tool-marker *,
+.content-area.writing-tool-marker {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 1.5rem;
+    color: #2c3e50;
+}
 font[face="Permanent Marker"], font[face="Permanent Marker"] * {
     font-family: 'Permanent Marker', cursive !important;
     font-size: 1.5rem !important;
-    color: #2c3e50;
+    color: #2c3e50 !important;
 }
 
-.content-area.writing-tool-chalk,
-.content-area.writing-tool-chalk *,
-font[face="Kalam"], font[face="Kalam"] * {
-    font-family: 'Kalam', cursive !important;
-    font-size: 1.4rem !important;
+.content-area.writing-tool-chalk {
+    font-family: 'Kalam', cursive;
+    font-size: 1.4rem;
     color: #2c3e50;
     text-shadow: 1px 1px 1px rgba(0,0,0,0.1);
 }
+font[face="Kalam"], font[face="Kalam"] * {
+    font-family: 'Kalam', cursive !important;
+    font-size: 1.4rem !important;
+    color: #2c3e50 !important;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.1) !important;
+}
 
-.content-area.writing-tool-brush,
-.content-area.writing-tool-brush *,
+.content-area.writing-tool-brush {
+    font-family: 'Shadows Into Light', cursive;
+    font-size: 1.4rem;
+    color: var(--ink-color);
+}
 font[face="Shadows Into Light"], font[face="Shadows Into Light"] * {
     font-family: 'Shadows Into Light', cursive !important;
     font-size: 1.4rem !important;
-    color: var(--ink-color);
+    color: var(--ink-color) !important;
 }
 
 /* Natural tool: no font override — raw canvas strokes only, no text styling */
