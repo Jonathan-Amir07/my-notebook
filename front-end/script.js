@@ -1042,6 +1042,7 @@ class LassoSelector {
         this.isDrawing = false;
         this.isDraggingGroup = false;
         this.selectedElements = [];
+        this.selectedStrokes  = [];     // Canvas ink strokes selected by lasso
         this.selectionRect = null;      // Box mode overlay div
         this.freeformCanvas = null;     // Freeform mode overlay canvas
         this.freeformCtx = null;
@@ -1089,6 +1090,9 @@ class LassoSelector {
 
         // Action bar
         this._createActionBar();
+
+        // Activate extended stroke-selection methods
+        this._patchMethods();
 
         console.log('LassoSelector: initialized');
     }
@@ -2017,6 +2021,535 @@ class LassoSelector {
         this._triggerSave();
     }
 
+
+    // ================================================================
+    //  CANVAS STROKE SELECTION SUPPORT
+
+    //  Works with InkEngine.strokes — each stroke has { points, tool, color }
+    //  where points is an array of { x, y, p } in canvas-local coordinates.
+    // ================================================================
+
+    /**
+     * Get all InkEngine strokes. Returns an array of stroke objects.
+     */
+    _getStrokes() {
+        if (typeof InkEngine === 'undefined' || !InkEngine.strokes) return [];
+        return InkEngine.strokes;
+    }
+
+    /**
+     * Get the bounding rect of a stroke (in page coordinates, accounting
+     * for the canvas element's position in the page).
+     */
+    _getStrokePageRect(stroke) {
+        const canvas = document.getElementById('sketchCanvas');
+        if (!canvas) return null;
+        const canvasRect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const pt of stroke.points) {
+            // pt.x / pt.y are in CSS pixels (InkEngine stores them at CSS resolution)
+            if (pt.x < minX) minX = pt.x;
+            if (pt.y < minY) minY = pt.y;
+            if (pt.x > maxX) maxX = pt.x;
+            if (pt.y > maxY) maxY = pt.y;
+        }
+        if (minX === Infinity) return null;
+        // Convert canvas-local → page coords
+        return {
+            left:   canvasRect.left  + window.scrollX + minX,
+            top:    canvasRect.top   + window.scrollY + minY,
+            right:  canvasRect.left  + window.scrollX + maxX,
+            bottom: canvasRect.top   + window.scrollY + maxY
+        };
+    }
+
+    /**
+     * Find all strokes whose bounding-rect overlaps a selection rect.
+     */
+    _strokesByRect(left, top, width, height) {
+        const selRect = { left, top, right: left + width, bottom: top + height };
+        return this._getStrokes().filter(s => {
+            const r = this._getStrokePageRect(s);
+            return r && this._rectsOverlap(selRect, r);
+        });
+    }
+
+    /**
+     * Find all strokes whose bounding-rect center is inside a polygon.
+     */
+    _strokesByPolygon(polygon) {
+        return this._getStrokes().filter(s => {
+            const r = this._getStrokePageRect(s);
+            if (!r) return false;
+            const center = { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
+            return this._pointInPolygon(center, polygon);
+        });
+    }
+
+    /**
+     * Mark strokes as selected — adds a 'lasso-preview' highlight class trick
+     * by tagging them on the stroke object itself (we re-render later).
+     */
+    _applyStrokePreview(strokes) {
+        this._getStrokes().forEach(s => s._lassoPreview = false);
+        strokes.forEach(s => s._lassoPreview = true);
+        this._rerenderCanvas();
+    }
+
+    /** Re-render the canvas with selection highlights */
+    _rerenderCanvas() {
+        const canvas = document.getElementById('sketchCanvas');
+        const activeCanvas = document.getElementById('activeSketchCanvas');
+        if (!canvas || typeof InkEngine === 'undefined') return;
+        const dpr = window.devicePixelRatio || 1;
+        const ctx = canvas.getContext('2d');
+        InkEngine.rerender(ctx, canvas.width / dpr, canvas.height / dpr);
+
+        // Draw teal highlight overlay for selected strokes
+        if (this.selectedStrokes && this.selectedStrokes.length > 0) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(52,152,219,0.55)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([]);
+            for (const stroke of this.selectedStrokes) {
+                if (stroke.points.length < 2) continue;
+                ctx.beginPath();
+                ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    }
+
+    // ================================================================
+    //  BOUNDING BOX OVERLAY (for selection + resize handle)
+    // ================================================================
+
+    _showSelectionBox() {
+        // Create overlay div if needed
+        if (!this._selectionBox) {
+            this._selectionBox = document.createElement('div');
+            this._selectionBox.id = 'lasso-group-selection-box';
+            this._selectionBox.style.cssText = `
+                position: fixed;
+                border: 2px dashed #3498db;
+                border-radius: 3px;
+                pointer-events: none;
+                z-index: 9999;
+                box-sizing: border-box;
+                display: none;
+            `;
+            document.body.appendChild(this._selectionBox);
+        }
+        if (!this._resizeHandle) {
+            this._resizeHandle = document.createElement('div');
+            this._resizeHandle.id = 'lasso-group-resize-handle';
+            this._resizeHandle.style.cssText = `
+                position: fixed;
+                width: 14px;
+                height: 14px;
+                background: #3498db;
+                border: 2px solid white;
+                border-radius: 50%;
+                cursor: nwse-resize;
+                z-index: 10000;
+                display: none;
+                touch-action: none;
+            `;
+            document.body.appendChild(this._resizeHandle);
+
+            // Wire resize handle drag
+            this._resizeHandle.addEventListener('pointerdown', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                this._startGroupResize(ev);
+            }, { capture: true });
+        }
+
+        this._updateSelectionBox();
+    }
+
+    _updateSelectionBox() {
+        const bounds = this._getCombinedBounds();
+        if (!bounds || !this._selectionBox) return;
+
+        const pad = 6;
+        this._selectionBox.style.left   = (bounds.left   - pad) + 'px';
+        this._selectionBox.style.top    = (bounds.top    - pad) + 'px';
+        this._selectionBox.style.width  = (bounds.right  - bounds.left + pad * 2) + 'px';
+        this._selectionBox.style.height = (bounds.bottom - bounds.top  + pad * 2) + 'px';
+        this._selectionBox.style.display = 'block';
+
+        if (this._resizeHandle) {
+            this._resizeHandle.style.left    = (bounds.right  + pad - 7) + 'px';
+            this._resizeHandle.style.top     = (bounds.bottom + pad - 7) + 'px';
+            this._resizeHandle.style.display = 'block';
+        }
+    }
+
+    _hideSelectionBox() {
+        if (this._selectionBox) this._selectionBox.style.display = 'none';
+        if (this._resizeHandle)  this._resizeHandle.style.display  = 'none';
+    }
+
+    /**
+     * Combined bounding rect of all selected DOM elements AND selected strokes
+     * (in viewport coordinates, for the overlay).
+     */
+    _getCombinedBounds() {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        // DOM elements
+        this.selectedElements.forEach(el => {
+            const r = el.getBoundingClientRect();
+            if (r.left < minX) minX = r.left;
+            if (r.top  < minY) minY = r.top;
+            if (r.right  > maxX) maxX = r.right;
+            if (r.bottom > maxY) maxY = r.bottom;
+        });
+
+        // Canvas strokes
+        if (this.selectedStrokes) {
+            this.selectedStrokes.forEach(s => {
+                const r = this._getStrokePageRect(s);
+                if (!r) return;
+                // Convert page → viewport
+                const left   = r.left   - window.scrollX;
+                const top    = r.top    - window.scrollY;
+                const right  = r.right  - window.scrollX;
+                const bottom = r.bottom - window.scrollY;
+                if (left   < minX) minX = left;
+                if (top    < minY) minY = top;
+                if (right  > maxX) maxX = right;
+                if (bottom > maxY) maxY = bottom;
+            });
+        }
+
+        if (minX === Infinity) return null;
+        return { left: minX, top: minY, right: maxX, bottom: maxY };
+    }
+
+    // ================================================================
+    //  GROUP RESIZE — scales selected DOM elements + stroke points
+    // ================================================================
+
+    _startGroupResize(ev) {
+        this._isResizing = true;
+        this._resizeStartX = ev.clientX;
+        this._resizeStartY = ev.clientY;
+
+        const bounds = this._getCombinedBounds();
+        this._resizeOriginX = bounds ? bounds.left : 0;
+        this._resizeOriginY = bounds ? bounds.top  : 0;
+        this._resizeStartW  = bounds ? (bounds.right  - bounds.left) : 1;
+        this._resizeStartH  = bounds ? (bounds.bottom - bounds.top)  : 1;
+
+        // Snapshot starting positions/sizes of DOM elements
+        this._resizeElSnapshots = this.selectedElements.map(el => {
+            const r = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
+            return {
+                el,
+                left:   parseFloat(el.style.left  || r.left  - (el.offsetParent ? el.offsetParent.getBoundingClientRect().left : 0)),
+                top:    parseFloat(el.style.top   || r.top   - (el.offsetParent ? el.offsetParent.getBoundingClientRect().top  : 0)),
+                width:  r.width,
+                height: r.height,
+                fontSize: parseFloat(cs.fontSize) || 16
+            };
+        });
+
+        // Snapshot stroke points
+        this._resizeStrokeSnapshots = (this.selectedStrokes || []).map(stroke => ({
+            stroke,
+            points: stroke.points.map(p => ({ ...p }))
+        }));
+
+        this._onResizeMove = this._handleResizeMove.bind(this);
+        this._onResizeEnd  = this._handleResizeEnd.bind(this);
+        document.addEventListener('pointermove', this._onResizeMove, { capture: true });
+        document.addEventListener('pointerup',   this._onResizeEnd,  { capture: true });
+        document.addEventListener('pointercancel', this._onResizeEnd, { capture: true });
+    }
+
+    _handleResizeMove(ev) {
+        if (!this._isResizing) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        const dx = ev.clientX - this._resizeStartX;
+        const dy = ev.clientY - this._resizeStartY;
+        const scaleX = Math.max(0.1, (this._resizeStartW + dx) / this._resizeStartW);
+        const scaleY = Math.max(0.1, (this._resizeStartH + dy) / this._resizeStartH);
+        const scale  = (scaleX + scaleY) / 2; // uniform scale
+
+        // Scale DOM elements
+        this._resizeElSnapshots.forEach(({ el, left, top, width, height, fontSize }) => {
+            const ox = this._resizeOriginX;
+            const oy = this._resizeOriginY;
+            const parent = el.offsetParent;
+            const pRect  = parent ? parent.getBoundingClientRect() : { left: 0, top: 0 };
+
+            el.style.position = 'absolute';
+            el.style.left     = (ox - pRect.left + (left - (ox - pRect.left)) * scale) + 'px';
+            el.style.top      = (oy - pRect.top  + (top  - (oy - pRect.top )) * scale) + 'px';
+            el.style.width    = (width  * scale) + 'px';
+            el.style.height   = (height * scale) + 'px';
+            el.style.fontSize = (fontSize * scale) + 'px';
+        });
+
+        // Scale stroke points
+        const canvas = document.getElementById('sketchCanvas');
+        const canvasRect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0 };
+        // originX/Y in canvas-local coords
+        const originXCanvas = this._resizeOriginX + window.scrollX - canvasRect.left;
+        const originYCanvas = this._resizeOriginY + window.scrollY - canvasRect.top;
+
+        this._resizeStrokeSnapshots.forEach(({ stroke, points }) => {
+            stroke.points = points.map(p => ({
+                ...p,
+                x: originXCanvas + (p.x - originXCanvas) * scale,
+                y: originYCanvas + (p.y - originYCanvas) * scale
+            }));
+        });
+
+        this._rerenderCanvas();
+        this._updateSelectionBox();
+    }
+
+    _handleResizeEnd(ev) {
+        if (!this._isResizing) return;
+        this._isResizing = false;
+        document.removeEventListener('pointermove', this._onResizeMove, { capture: true });
+        document.removeEventListener('pointerup',   this._onResizeEnd,  { capture: true });
+        document.removeEventListener('pointercancel', this._onResizeEnd, { capture: true });
+
+        // Sync InkEngine vector data to the chapter
+        const chapter = chapters.find(c => c.id === currentId);
+        if (chapter) {
+            chapter.vectorStrokes = InkEngine.toJSON();
+        }
+        this._triggerSave();
+    }
+
+    // ================================================================
+    //  OVERRIDE: _selectByRect — also collect strokes
+    // ================================================================
+
+    _selectByRectFull(left, top, width, height, additive, subtractive) {
+        const selRect = { left, top, right: left + width, bottom: top + height };
+        const selectables = this.getSelectableElements();
+        selectables.forEach(el => el.classList.remove('lasso-preview'));
+
+        const domHits = selectables.filter(el => this._rectsOverlap(selRect, this._getPageRect(el)));
+        const strokeHits = this._strokesByRect(left, top, width, height);
+
+        if (additive) {
+            domHits.forEach(el => { if (!this.selectedElements.includes(el)) this.selectedElements.push(el); });
+            strokeHits.forEach(s => { if (!(this.selectedStrokes || []).includes(s)) { this.selectedStrokes = this.selectedStrokes || []; this.selectedStrokes.push(s); } });
+        } else if (subtractive) {
+            this.selectedElements  = this.selectedElements.filter(el => !domHits.includes(el));
+            this.selectedStrokes   = (this.selectedStrokes || []).filter(s => !strokeHits.includes(s));
+        } else {
+            this.selectedElements  = domHits;
+            this.selectedStrokes   = strokeHits;
+        }
+
+        this._applySelectionStyles();
+        this._rerenderCanvas();
+        const hasAny = this.selectedElements.length > 0 || (this.selectedStrokes && this.selectedStrokes.length > 0);
+        hasAny ? this._showActionBar() : this._hideActionBar();
+        hasAny ? this._showSelectionBox() : this._hideSelectionBox();
+    }
+
+    // ================================================================
+    //  OVERRIDE: _selectByPolygon — also collect strokes
+    // ================================================================
+
+    _selectByPolygonFull(polygon, additive, subtractive) {
+        const selectables = this.getSelectableElements();
+        selectables.forEach(el => el.classList.remove('lasso-preview'));
+
+        const domHits = selectables.filter(el => {
+            const elRect = this._getPageRect(el);
+            const center = { x: (elRect.left + elRect.right) / 2, y: (elRect.top + elRect.bottom) / 2 };
+            if (this._pointInPolygon(center, polygon)) return true;
+            const corners = [
+                { x: elRect.left, y: elRect.top },
+                { x: elRect.right, y: elRect.top },
+                { x: elRect.left, y: elRect.bottom },
+                { x: elRect.right, y: elRect.bottom }
+            ];
+            return corners.some(c => this._pointInPolygon(c, polygon));
+        });
+        const strokeHits = this._strokesByPolygon(polygon);
+
+        if (additive) {
+            domHits.forEach(el => { if (!this.selectedElements.includes(el)) this.selectedElements.push(el); });
+            strokeHits.forEach(s => { if (!(this.selectedStrokes || []).includes(s)) { this.selectedStrokes = this.selectedStrokes || []; this.selectedStrokes.push(s); } });
+        } else if (subtractive) {
+            this.selectedElements = this.selectedElements.filter(el => !domHits.includes(el));
+            this.selectedStrokes  = (this.selectedStrokes || []).filter(s => !strokeHits.includes(s));
+        } else {
+            this.selectedElements = domHits;
+            this.selectedStrokes  = strokeHits;
+        }
+
+        this._applySelectionStyles();
+        this._rerenderCanvas();
+        const hasAny = this.selectedElements.length > 0 || (this.selectedStrokes && this.selectedStrokes.length > 0);
+        hasAny ? this._showActionBar() : this._hideActionBar();
+        hasAny ? this._showSelectionBox() : this._hideSelectionBox();
+    }
+
+    // ================================================================
+    //  OVERRIDE: clearSelection — also clear strokes
+    // ================================================================
+
+    clearSelectionFull() {
+        document.querySelectorAll('.lasso-selected, .lasso-preview').forEach(el => {
+            el.classList.remove('lasso-selected', 'lasso-preview');
+        });
+        this.selectedElements = [];
+        this.selectedStrokes  = [];
+        this._getStrokes().forEach(s => s._lassoPreview = false);
+        this._rerenderCanvas();
+        this._hideActionBar();
+        this._hideSelectionBox();
+    }
+
+    // ================================================================
+    //  OVERRIDE: group drag — also translate stroke coords
+    // ================================================================
+
+    _handleGroupDragMoveFull(e) {
+        if (!this.isDraggingGroup) return;
+        e.preventDefault();
+        const ev = e.touches ? e.touches[0] : e;
+        this._currentDx = ev.clientX - this._dragStartX;
+        this._currentDy = ev.clientY - this._dragStartY;
+
+        if (!this._dragRAF) {
+            this._dragRAF = requestAnimationFrame(() => {
+                // Move DOM elements
+                this._dragOffsets.forEach(({ el }) => {
+                    el.style.transform = `translate(${this._currentDx}px, ${this._currentDy}px)`;
+                });
+
+                // Move stroke points live
+                if (this._strokeDragSnapshots) {
+                    const canvas = document.getElementById('sketchCanvas');
+                    const dpr = window.devicePixelRatio || 1;
+                    this._strokeDragSnapshots.forEach(({ stroke, points }) => {
+                        stroke.points = points.map(p => ({
+                            ...p,
+                            x: p.x + this._currentDx,
+                            y: p.y + this._currentDy
+                        }));
+                    });
+                    this._rerenderCanvas();
+                    this._updateSelectionBox();
+                }
+                this._dragRAF = null;
+            });
+        }
+    }
+
+    // ================================================================
+    //  OVERRIDE: deleteSelected — also remove strokes
+    // ================================================================
+
+    deleteSelectedFull() {
+        if (this.selectedElements.length === 0 && !(this.selectedStrokes && this.selectedStrokes.length > 0)) return;
+        const domCount    = this.selectedElements.length;
+        const strokeCount = (this.selectedStrokes || []).length;
+
+        // Remove DOM elements
+        this.selectedElements.forEach(el => { if (el.parentNode) el.parentNode.removeChild(el); });
+
+        // Remove strokes from InkEngine
+        if (this.selectedStrokes && this.selectedStrokes.length > 0) {
+            InkEngine.strokes = InkEngine.strokes.filter(s => !this.selectedStrokes.includes(s));
+            const chapter = chapters.find(c => c.id === currentId);
+            if (chapter) chapter.vectorStrokes = InkEngine.toJSON();
+        }
+
+        this.selectedElements = [];
+        this.selectedStrokes  = [];
+        this._applySelectionStyles();
+        this._rerenderCanvas();
+        this._hideActionBar();
+        this._hideSelectionBox();
+
+        const total = domCount + strokeCount;
+        this._triggerSave();
+        if (typeof showToast === 'function') showToast(`Deleted ${total} element${total > 1 ? 's' : ''}`);
+    }
+
+    // ================================================================
+    //  OVERRIDE: duplicateSelected — also clone strokes
+    // ================================================================
+
+    duplicateSelectedFull() {
+        if (this.selectedElements.length === 0 && !(this.selectedStrokes && this.selectedStrokes.length > 0)) return;
+        const newElements = [];
+        const newStrokes  = [];
+
+        // Duplicate DOM elements
+        this.selectedElements.forEach(el => {
+            const clone = el.cloneNode(true);
+            clone.classList.remove('lasso-selected');
+            if (getComputedStyle(el).position === 'absolute') {
+                clone.style.left = (parseInt(el.style.left || '0') + 20) + 'px';
+                clone.style.top  = (parseInt(el.style.top  || '0') + 20) + 'px';
+            }
+            el.nextSibling ? el.parentNode.insertBefore(clone, el.nextSibling) : el.parentNode.appendChild(clone);
+            if (clone.classList.contains('rd-image-wrapper') && typeof window.createResizableDraggableImage === 'function') {
+                const img = clone.querySelector('img');
+                if (img) {
+                    const fresh = window.createResizableDraggableImage(img.src);
+                    fresh.style.left = clone.style.left; fresh.style.top = clone.style.top;
+                    fresh.style.width = clone.style.width; fresh.style.height = clone.style.height;
+                    clone.parentNode.replaceChild(fresh, clone);
+                    newElements.push(fresh); return;
+                }
+            }
+            newElements.push(clone);
+        });
+
+        // Duplicate strokes (offset by 20px)
+        if (this.selectedStrokes && this.selectedStrokes.length > 0) {
+            this.selectedStrokes.forEach(stroke => {
+                const clone = {
+                    ...stroke,
+                    id: 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                    points: stroke.points.map(p => ({ ...p, x: p.x + 20, y: p.y + 20 }))
+                };
+                InkEngine.strokes.push(clone);
+                newStrokes.push(clone);
+            });
+            const chapter = chapters.find(c => c.id === currentId);
+            if (chapter) chapter.vectorStrokes = InkEngine.toJSON();
+            this._rerenderCanvas();
+        }
+
+        this.clearSelectionFull();
+        this.selectedElements = newElements;
+        this.selectedStrokes  = newStrokes;
+        this._applySelectionStyles();
+        this._rerenderCanvas();
+        this._showActionBar();
+        this._showSelectionBox();
+
+        const total = newElements.length + newStrokes.length;
+        this._triggerSave();
+        if (typeof showToast === 'function') showToast(`Duplicated ${total} element${total > 1 ? 's' : ''}`);
+    }
+
     // ================================================================
     //  UTILITIES
     // ================================================================
@@ -2026,7 +2559,71 @@ class LassoSelector {
         if (contentArea && contentArea.oninput) contentArea.oninput();
         if (typeof markUnsaved === 'function') markUnsaved();
     }
+
+    // Apply the "Full" overrides so the base class methods delegate to
+    // the extended versions automatically.
+    _patchMethods() {
+        this._endBox_orig          = this._endBox.bind(this);
+        this._endFreeform_orig     = this._endFreeform.bind(this);
+
+        // Patch _endBox to call _selectByRectFull instead of _selectByRect
+        this._endBox = (ev, additive, subtractive) => {
+            this.selectionRect.style.display = 'none';
+            const endX = ev.pageX, endY = ev.pageY;
+            const left = Math.min(this.startX, endX), top = Math.min(this.startY, endY);
+            const width = Math.abs(endX - this.startX), height = Math.abs(endY - this.startY);
+            if (width > 5 || height > 5) {
+                this._selectByRectFull(left, top, width, height, additive, subtractive);
+            } else {
+                if (!this._findSelectedAncestor(document.elementFromPoint(ev.clientX, ev.clientY))) {
+                    this.clearSelectionFull();
+                }
+            }
+        };
+
+        // Patch _endFreeform to call _selectByPolygonFull
+        this._endFreeform = (additive, subtractive) => {
+            this._hideFreeformCanvas();
+            if (this._animationFrameId) { cancelAnimationFrame(this._animationFrameId); this._animationFrameId = null; }
+            if (this._freeformPath.length < 5) { this.clearSelectionFull(); return; }
+            this._selectByPolygonFull(this._freeformPath, additive, subtractive);
+            this._freeformPath = [];
+        };
+
+        // Patch clearSelection to use full version
+        this.clearSelection = this.clearSelectionFull.bind(this);
+
+        // Patch deleteSelected / duplicateSelected
+        this.deleteSelected    = this.deleteSelectedFull.bind(this);
+        this.duplicateSelected = this.duplicateSelectedFull.bind(this);
+
+        // Patch group drag move to also move strokes
+        this._onGroupDragMove = this._handleGroupDragMoveFull.bind(this);
+
+        // Capture stroke positions at drag start
+        const origStartGroupDrag = this._startGroupDrag.bind(this);
+        this._startGroupDrag = (ev, clickedElement) => {
+            // Snapshot stroke points before drag
+            this._strokeDragSnapshots = (this.selectedStrokes || []).map(stroke => ({
+                stroke,
+                points: stroke.points.map(p => ({ ...p }))
+            }));
+            origStartGroupDrag(ev, clickedElement);
+        };
+
+        // After drag ends, commit stroke positions
+        const origGroupDragEnd = this._handleGroupDragEnd.bind(this);
+        this._onGroupDragEnd = (e) => {
+            origGroupDragEnd(e);
+            // Stroke positions are already updated via live move; sync chapter
+            const chapter = chapters.find(c => c.id === currentId);
+            if (chapter) chapter.vectorStrokes = InkEngine.toJSON();
+            this._rerenderCanvas();
+            this._updateSelectionBox();
+        };
+    }
 }
+
 /**
  * AudioRecorderWidget — Record & Transcribe System
  * 
@@ -5708,24 +6305,61 @@ document.addEventListener('pointercancel', function(e) {
     stopDrawing(e);
 });
 
+
 // ============================================================
 // PEN INPUT ROUTER & PALM REJECTION
 //
-// TWO-MODE SYSTEM:
-//   1. "natural" tool  → Apple Pencil draws raw ink strokes on canvas.
-//      preventDefault() is called to block Scribble / text input.
+// THREE-MODE SYSTEM:
+//   1. Any ink/drawing tool (natural, pen, pencil, elegant, marker,
+//      brush, chalk, highlighter, custom, eraser)
+//      → Apple Pencil / stylus / mouse draws directly onto the canvas.
+//      preventDefault() blocks browser text selection / Scribble.
 //
-//   2. All other tools → Beautification mode.
-//      The pen is NOT captured for canvas. Instead we move the text
-//      cursor to exactly where the pencil touches BEFORE Scribble
-//      activates. This stops text from snapping to the old cursor
-//      position at the top/previous line.
+//   2. "text" tool
+//      → Move the text cursor to exactly where the pencil touches.
+//      Spawns a freeform-text-block on empty space so typed text
+//      appears right where the user tapped (Notability-style).
+//
+//   3. Interactive elements (buttons, checkboxes, inputs, resize
+//      handles, etc.) are always left to handle their own events.
 // ============================================================
+
+// All tools that write raw ink to the canvas
+const INK_DRAWING_TOOLS = new Set([
+    'natural', 'pen', 'pencil', 'elegant', 'marker',
+    'brush', 'chalk', 'highlighter', 'custom', 'eraser'
+]);
+
+/**
+ * Returns true if `el` is a UI control that should handle its own pointer events
+ * (button, checkbox, input, resize handle, lasso overlay, etc.).
+ */
+function isInteractiveElement(el) {
+    if (!el) return false;
+    const tag = el.tagName ? el.tagName.toLowerCase() : '';
+    if (['button', 'input', 'select', 'textarea', 'label', 'a'].includes(tag)) return true;
+    if (el.classList) {
+        const blockedClasses = [
+            'rd-resize-handle', 'lasso-action-bar', 'lasso-selection-rect',
+            'lasso-freeform-canvas', 'lasso-mode-toggle', 'lasso-mode-btn',
+            'lasso-action-btn', 'checkbox', 'rotate-handle', 'widget-rail-tab',
+            'tool-btn', 'btn', 'bubble-btn', 'fc-btn', 'pomodoro-btn'
+        ];
+        if (blockedClasses.some(c => el.classList.contains(c))) return true;
+    }
+    // Walk upwards to catch children of interactive containers
+    if (el.closest) {
+        if (el.closest('button, input, select, textarea, label, a, [role="button"]')) return true;
+        if (el.closest('.lasso-action-bar, .lasso-mode-toggle, .tool-btn, .tool-tray, #sidebar, .widget-rail')) return true;
+    }
+    return false;
+}
+
 paper.addEventListener('pointerdown', function(e) {
+    // ── Palm Rejection ──────────────────────────────────────────
     if (e.pointerType === 'pen') {
         lastPenTime = Date.now();
     } else if (e.pointerType === 'touch') {
-        // Strict Palm Rejection: Ignore touch if a pen was used in the last 500ms
         if (Date.now() - lastPenTime < 500) {
             e.preventDefault();
             e.stopPropagation();
@@ -5735,27 +6369,40 @@ paper.addEventListener('pointerdown', function(e) {
 
     if (e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
     if (isReadMode) return;
-    if (isSketchMode) return; // Sketch mode has its own handler
+    if (isSketchMode) return; // Sketch mode has its own canvas handler
 
-    if (activeSketchTool === 'natural') {
-        // FREEFORM MODE: capture pen input for raw canvas strokes
+    // ── Guard: never hijack interactive UI controls ──────────────
+    if (isInteractiveElement(e.target)) return;
+
+    // ── Mode 1: Ink / Drawing tools → write directly to canvas ───
+    if (INK_DRAWING_TOOLS.has(activeSketchTool)) {
         document.body.classList.add('pen-active');
         e.preventDefault();
         e.stopPropagation();
         startDrawing(e);
-    } else {
-        // BEAUTIFICATION MODE: Move cursor to tap position.
-        // If tapping in empty space far from text, spawn an absolute transparent div
-        // so text stays exactly where drawn.
+        return;
+    }
+
+    // ── Mode 2: Text tool → place cursor / spawn text block ──────
+    if (activeSketchTool === 'text') {
         let target = document.elementFromPoint(e.clientX, e.clientY);
-        
-        // If we tapped the paper directly, find the active content area
+
+        // Find the nearest content-area
         let editor = target && target.closest('.content-area');
-        if (!editor && target && target.classList.contains('paper')) {
-            editor = document.querySelector('.sequence-editor-block.active-focus .content-area') || document.querySelector('.content-area');
+        if (!editor && target && (target.classList.contains('paper') || target === paper)) {
+            editor = document.querySelector('.sequence-editor-block.active-focus .content-area')
+                  || document.querySelector('.content-area');
         }
 
-        if (editor && editor.isContentEditable) {
+        if (editor && editor.isContentEditable !== false) {
+            // If tapped directly on an existing freeform block, just focus it
+            const existingBlock = target && target.closest('.freeform-text-block');
+            if (existingBlock) {
+                existingBlock.focus();
+                return;
+            }
+
+            // Try to position caret under the tap point
             let range = null;
             if (document.caretRangeFromPoint) {
                 range = document.caretRangeFromPoint(e.clientX, e.clientY);
@@ -5768,7 +6415,7 @@ paper.addEventListener('pointerdown', function(e) {
                 }
             }
 
-            // Check if tap was far from the nearest text bounds (e.g. at the bottom of the page)
+            // Decide whether tap was far from existing text → spawn floating block
             let spawnFloating = false;
             if (range) {
                 const rects = range.getClientRects();
@@ -5784,21 +6431,17 @@ paper.addEventListener('pointerdown', function(e) {
                 spawnFloating = true;
             }
 
-            // Also check if we just tapped directly on an existing floating block
-            if (target && target.classList.contains('freeform-text-block')) {
-                spawnFloating = false; 
-            }
-
             if (spawnFloating) {
                 const freeBlock = document.createElement('div');
-                freeBlock.className = `freeform-text-block writing-tool-${activeSketchTool}`;
-                
+                freeBlock.className = 'freeform-text-block writing-tool-text';
+                freeBlock.contentEditable = 'true';
+
                 const editorRect = editor.getBoundingClientRect();
                 freeBlock.style.left = (e.clientX - editorRect.left) + 'px';
-                freeBlock.style.top = (e.clientY - editorRect.top) + 'px';
-                
+                freeBlock.style.top  = (e.clientY - editorRect.top)  + 'px';
+
                 editor.appendChild(freeBlock);
-                
+
                 range = document.createRange();
                 range.selectNodeContents(freeBlock);
                 range.collapse(true);
@@ -5809,23 +6452,9 @@ paper.addEventListener('pointerdown', function(e) {
                 sel.removeAllRanges();
                 sel.addRange(range);
             }
-            
-            // Set the appropriate inline font so text matches the tool immediately
-            const fonts = {
-                'pen': 'Patrick Hand',
-                'pencil': 'Indie Flower',
-                'elegant': 'Caveat',
-                'marker': 'Permanent Marker',
-                'chalk': 'Kalam',
-                'brush': 'Shadows Into Light'
-            };
-            if (fonts[activeSketchTool]) {
-                document.execCommand('fontName', false, fonts[activeSketchTool]);
-            }
 
             editor.focus();
-            // Do NOT preventDefault — let Scribble see this event and
-            // insert the recognised text at the cursor we just set.
+            // Do NOT preventDefault — let Scribble / keyboard IME work normally
         }
     }
 }, { capture: true });
@@ -5843,6 +6472,8 @@ paper.addEventListener('pointerup', function(e) {
     if (!drawing) return;
     stopDrawing(e);
 }, { capture: true });
+
+
 
 
 let isPanning = false;
@@ -6093,35 +6724,22 @@ window.selectWritingTool = (tool, save = true) => {
         selectSketchTool('highlighter');
         return;
     }
-    
+
     // AUTO-DISABLE ERASER: switching to any writing tool deactivates the eraser
     const eraserBtn = document.getElementById('eraserBtn');
     if (eraserBtn) eraserBtn.classList.remove('active');
-    
-    // Set activeSketchTool so InkEngine knows which profile to use.
-    // Only 'natural' routes Apple Pencil to the canvas; all other tools
-    // let iPad Scribble convert handwriting to styled text.
+
+    // Set the active tool globally so InkEngine and the pointer router know
     activeSketchTool = tool;
     window._currentWritingTool = tool;
 
-    // We DO NOT apply the font class to all existing .content-area blocks anymore.
-    // The user specifically requested that changing tools should NOT change the font
-    // of text they have already written.
-    // The selected tool's class will be applied to the current selection or new blocks.
-    
-    const fonts = {
-        'pen': 'Patrick Hand',
-        'pencil': 'Indie Flower',
-        'elegant': 'Caveat',
-        'marker': 'Permanent Marker',
-        'chalk': 'Kalam',
-        'brush': 'Shadows Into Light'
-    };
-    if (fonts[tool]) {
-        document.execCommand('fontName', false, fonts[tool]);
-    }
+    // Reflect tool mode on <body> for CSS cursor rules
+    document.body.classList.toggle('text-tool-active', tool === 'text');
+    if (tool !== 'text') document.body.classList.remove('pen-active');
 
+    // Update active state on all toolbar buttons
     document.querySelectorAll('.tool-opt').forEach(o => o.classList.toggle('active', o.dataset.tool === tool));
+
     if (save) {
         const chapter = chapters.find(c => c.id === currentId);
         if (chapter) {
@@ -6130,6 +6748,7 @@ window.selectWritingTool = (tool, save = true) => {
         }
     }
 };
+
 
 window.parseRawHtmlToSequence = function (htmlText) {
     const parser = new DOMParser();
@@ -14123,6 +14742,7 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () { var el = document.querySelector('#_auto_73'); if (el) el.addEventListener('click', function () { selectWritingTool('elegant') }); })();
     (function () { var el = document.querySelector('#_auto_74'); if (el) el.addEventListener('click', function () { selectWritingTool('brush') }); })();
     (function () { var el = document.querySelector('#_auto_75'); if (el) el.addEventListener('click', function () { selectWritingTool('chalk') }); })();
+    (function () { var el = document.querySelector('#textToolBtn'); if (el) el.addEventListener('click', function () { selectWritingTool('text') }); })();
     (function () { var el = document.querySelector('#_auto_76'); if (el) el.addEventListener('click', function () { toggleTopTools() }); })();
     (function () { var el = document.querySelector('#_auto_77'); if (el) el.addEventListener('click', function () { undoSketch() }); })();
     (function () { var el = document.querySelector('#_auto_78'); if (el) el.addEventListener('click', function () { redoSketch() }); })();

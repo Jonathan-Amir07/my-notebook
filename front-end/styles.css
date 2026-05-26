@@ -3218,6 +3218,48 @@ body.tools-hidden .show-tools-btn {
     filter: hue-rotate(60deg) drop-shadow(0 0 2px rgba(255, 255, 0, 0.5));
 }
 
+/* Text Tool — the "T" button in the toolbar */
+.tool-opt.tool-opt-text {
+    font-family: 'Georgia', serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -1px;
+    color: #2c3e50;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: transform 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.tool-opt.tool-opt-text.active {
+    background: linear-gradient(135deg, #3498db22, #2980b922);
+    border-color: #3498db;
+    color: #2980b9;
+    transform: scale(1.15);
+}
+
+body.dark-mode .tool-opt.tool-opt-text {
+    color: #ecf0f1;
+}
+
+body.dark-mode .tool-opt.tool-opt-text.active {
+    color: #5dade2;
+    border-color: #5dade2;
+    background: linear-gradient(135deg, #5dade222, #2e86c122);
+}
+
+/* When Text Tool is active, show a text cursor over the paper */
+body.text-tool-active .paper,
+body.text-tool-active .content-area {
+    cursor: text !important;
+}
+
+
+
 .sketch-only {
     display: none;
 }
