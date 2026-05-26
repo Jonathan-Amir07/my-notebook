@@ -3734,6 +3734,32 @@ font[face="Shadows Into Light"], font[face="Shadows Into Light"] * {
     color: var(--ink-color);
 }
 
+/* Beautification writing tool fonts */
+.freeform-text-block.writing-tool-patrick {
+    font-family: 'Patrick Hand', cursive !important;
+    font-size: 1.4rem !important;
+    color: #2c3e50 !important;
+}
+
+.freeform-text-block.writing-tool-shock {
+    font-family: 'Rock Salt', cursive !important;
+    font-size: 1.1rem !important;
+    color: #2c3e50 !important;
+    line-height: 1.6 !important;
+}
+
+.freeform-text-block.writing-tool-indie {
+    font-family: 'Indie Flower', cursive !important;
+    font-size: 1.3rem !important;
+    color: #5d6d7e !important;
+}
+
+.freeform-text-block.writing-tool-text {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+}
+
 /* Freeform Text Blocks */
 .freeform-text-block {
     position: absolute;

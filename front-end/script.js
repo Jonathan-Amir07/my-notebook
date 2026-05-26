@@ -1293,8 +1293,8 @@ class LassoSelector {
                 // All direct children that are block-level elements
                 Array.from(area.children).forEach(child => {
                     const tag = child.tagName.toLowerCase();
-                    // Explicitly include canvas text blocks
-                    if (child.classList.contains('canvas-text-block')) {
+                    // Explicitly include canvas text blocks and freeform text blocks
+                    if (child.classList.contains('canvas-text-block') || child.classList.contains('freeform-text-block')) {
                         addElement(child);
                         return;
                     }
@@ -1353,12 +1353,24 @@ class LassoSelector {
 
         const ev = e.touches ? e.touches[0] : e;
 
-        // Group drag if clicking a selected element
+        // Check if there is an active selection and the click is inside the combined bounds of the selection
+        const bounds = this._getCombinedBounds();
+        let clickedInsideSelection = false;
+        if (bounds) {
+            const pad = 6;
+            const x = ev.clientX;
+            const y = ev.clientY;
+            if (x >= bounds.left - pad && x <= bounds.right + pad && y >= bounds.top - pad && y <= bounds.bottom + pad) {
+                clickedInsideSelection = true;
+            }
+        }
+
+        // Group drag if clicking a selected element or clicking inside the selection box bounds
         const clickedSelected = this._findSelectedAncestor(e.target);
-        if (clickedSelected) {
+        if (clickedSelected || clickedInsideSelection) {
             e.preventDefault();
             e.stopPropagation();
-            this._startGroupDrag(ev, clickedSelected);
+            this._startGroupDrag(ev, clickedSelected || this.selectedElements[0]);
             return;
         }
 
@@ -6383,6 +6395,47 @@ paper.addEventListener('pointerdown', function(e) {
         return;
     }
 
+    // ── Mode 1.5: Beautification tools → spawn block & write text ───
+    const BEAUTIFICATION_TOOLS = new Set(['patrick', 'shock', 'indie']);
+    if (BEAUTIFICATION_TOOLS.has(activeSketchTool)) {
+        let target = document.elementFromPoint(e.clientX, e.clientY);
+        let editor = target && target.closest('.content-area');
+        if (!editor && target && (target.classList.contains('paper') || target === paper)) {
+            editor = document.querySelector('.sequence-editor-block.active-focus .content-area')
+                  || document.querySelector('.content-area');
+        }
+
+        if (editor && editor.isContentEditable !== false) {
+            const existingBlock = target && target.closest('.freeform-text-block');
+            if (existingBlock) {
+                existingBlock.focus();
+                return;
+            }
+
+            const freeBlock = document.createElement('div');
+            freeBlock.className = `freeform-text-block writing-tool-${activeSketchTool}`;
+            freeBlock.contentEditable = 'true';
+
+            const editorRect = editor.getBoundingClientRect();
+            freeBlock.style.left = (e.clientX - editorRect.left) + 'px';
+            freeBlock.style.top  = (e.clientY - editorRect.top)  + 'px';
+
+            editor.appendChild(freeBlock);
+
+            let range = document.createRange();
+            range.selectNodeContents(freeBlock);
+            range.collapse(true);
+
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+
+            editor.focus();
+            freeBlock.focus();
+        }
+        return;
+    }
+
     // ── Mode 2: Text tool → place cursor / spawn text block ──────
     if (activeSketchTool === 'text') {
         let target = document.elementFromPoint(e.clientX, e.clientY);
@@ -6734,8 +6787,9 @@ window.selectWritingTool = (tool, save = true) => {
     window._currentWritingTool = tool;
 
     // Reflect tool mode on <body> for CSS cursor rules
-    document.body.classList.toggle('text-tool-active', tool === 'text');
-    if (tool !== 'text') document.body.classList.remove('pen-active');
+    const isTextMode = ['text', 'patrick', 'shock', 'indie'].includes(tool);
+    document.body.classList.toggle('text-tool-active', isTextMode);
+    if (!isTextMode) document.body.classList.remove('pen-active');
 
     // Update active state on all toolbar buttons
     document.querySelectorAll('.tool-opt').forEach(o => o.classList.toggle('active', o.dataset.tool === tool));
@@ -7568,7 +7622,7 @@ function loadChapter(id) {
         if (chapter) {
             document.getElementById('pageTitle').value = chapter.title;
             updateToolVisibility(chapter);
-            selectWritingTool(chapter.tool || 'pen', false);
+            selectWritingTool(chapter.tool || 'natural', false);
         }
         renderSidebar();
         document.getElementById('mainSidebar').classList.remove('open');
@@ -7776,7 +7830,7 @@ function loadChapter(id) {
         sketchData = null;
     }
 
-    selectWritingTool(chapter.tool || 'pen', false);
+    selectWritingTool(chapter.tool || 'natural', false);
     renderSidebar();
     document.getElementById('mainSidebar').classList.remove('open');
     document.getElementById('saveStatus').innerText = "All changes saved";
@@ -7920,7 +7974,7 @@ window.toggleSketchMode = () => {
     editors.forEach(e => e.contentEditable = !isSketchMode);
 
     if (!isSketchMode) {
-        activeSketchTool = window._currentWritingTool || 'pen';
+        activeSketchTool = window._currentWritingTool || 'natural';
         // Auto-disable eraser when exiting sketch mode
         const eraserBtn = document.getElementById('eraserBtn');
         if (eraserBtn) eraserBtn.classList.remove('active');
@@ -14734,14 +14788,11 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () { var el = document.querySelector('#_auto_67'); if (el) el.addEventListener('click', function () { clearSketch() }); })();
     (function () { var el = document.querySelector('#trayToggle'); if (el) el.addEventListener('click', function () { toggleTray() }); })();
     (function () { var el = document.querySelector('#_auto_68'); if (el) el.addEventListener('click', function () { toggleTopTools() }); })();
-    (function () { var el = document.querySelector('#_auto_69'); if (el) el.addEventListener('click', function () { selectWritingTool('pen') }); })();
     (function () { var el = document.querySelector('#naturalPenBtn'); if (el) el.addEventListener('click', function () { selectWritingTool('natural') }); })();
-    (function () { var el = document.querySelector('#_auto_70'); if (el) el.addEventListener('click', function () { selectWritingTool('pencil') }); })();
-    (function () { var el = document.querySelector('#_auto_71'); if (el) el.addEventListener('click', function () { selectWritingTool('highlighter') }); })();
-    (function () { var el = document.querySelector('#_auto_72'); if (el) el.addEventListener('click', function () { selectWritingTool('marker') }); })();
-    (function () { var el = document.querySelector('#_auto_73'); if (el) el.addEventListener('click', function () { selectWritingTool('elegant') }); })();
-    (function () { var el = document.querySelector('#_auto_74'); if (el) el.addEventListener('click', function () { selectWritingTool('brush') }); })();
-    (function () { var el = document.querySelector('#_auto_75'); if (el) el.addEventListener('click', function () { selectWritingTool('chalk') }); })();
+    (function () { var el = document.querySelector('#patrickBtn'); if (el) el.addEventListener('click', function () { selectWritingTool('patrick') }); })();
+    (function () { var el = document.querySelector('#shockBtn'); if (el) el.addEventListener('click', function () { selectWritingTool('shock') }); })();
+    (function () { var el = document.querySelector('#indieBtn'); if (el) el.addEventListener('click', function () { selectWritingTool('indie') }); })();
+    (function () { var el = document.querySelector('#highlighterBtn'); if (el) el.addEventListener('click', function () { selectWritingTool('highlighter') }); })();
     (function () { var el = document.querySelector('#textToolBtn'); if (el) el.addEventListener('click', function () { selectWritingTool('text') }); })();
     (function () { var el = document.querySelector('#_auto_76'); if (el) el.addEventListener('click', function () { toggleTopTools() }); })();
     (function () { var el = document.querySelector('#_auto_77'); if (el) el.addEventListener('click', function () { undoSketch() }); })();
