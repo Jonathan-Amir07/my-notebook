@@ -5427,19 +5427,18 @@ let stickerPreview = null;
 window.toggleStickerMode = () => {
     isStickerMode = !isStickerMode;
     const btn = document.getElementById('stickerBtn');
-    const editor = document.querySelector('.content-area');
+    const paper = document.getElementById('paper');
 
     if (isStickerMode) {
         btn.classList.add('active');
-        if (editor) editor.contentEditable = "false";
-        document.getElementById('paper').style.cursor = "crosshair";
+        if (paper) paper.style.cursor = "crosshair";
         showToast("Draw stickers over text/images");
         if (isSketchMode) toggleSketchMode();
     } else {
         btn.classList.remove('active');
-        if (editor) editor.contentEditable = "true";
-        document.getElementById('paper').style.cursor = "default";
+        if (paper) paper.style.cursor = "default";
     }
+    window.updateEditorEditableState();
 };
 
 const paper = document.getElementById('paper');
@@ -5818,16 +5817,14 @@ window.toggleReadMode = () => {
     isReadMode = !isReadMode;
     document.body.classList.toggle('read-mode', isReadMode);
     const btn = document.getElementById('readModeBtn');
-    const editors = document.querySelectorAll('.content-area');
     if (isReadMode) {
         btn.innerText = "🔒 Unlock / Edit";
-        editors.forEach(e => e.contentEditable = "false");
         showToast("Read Mode Enabled");
     } else {
         btn.innerText = "🔓 Lock / Read";
-        editors.forEach(e => e.contentEditable = "true");
         showToast("Editing Enabled");
     }
+    window.updateEditorEditableState();
 };
 
 function handleSelectionChange() {
@@ -6197,10 +6194,12 @@ const InkEngine = {
         let recognized = null;
         if (this.current && this.current.points.length > 1) {
             // SHAPE RECOGNITION (Phase 5)
-            recognized = ShapeRecognizer.recognize(this.current.points);
-            if (recognized) {
-                this.current.points = recognized.points;
-                this.current.isShape = true;
+            if (this.current.tool !== 'natural' && this.current.tool !== 'highlighter') {
+                recognized = ShapeRecognizer.recognize(this.current.points);
+                if (recognized) {
+                    this.current.points = recognized.points;
+                    this.current.isShape = true;
+                }
             }
             
             this.strokes.push(this.current);
@@ -6295,6 +6294,13 @@ canvas.addEventListener('pointerdown', startDrawing);
 canvas.addEventListener('pointermove', draw);
 canvas.addEventListener('pointerup', stopDrawing);
 canvas.addEventListener('pointercancel', stopDrawing);
+
+if (activeCanvas) {
+    activeCanvas.addEventListener('pointerdown', startDrawing);
+    activeCanvas.addEventListener('pointermove', draw);
+    activeCanvas.addEventListener('pointerup', stopDrawing);
+    activeCanvas.addEventListener('pointercancel', stopDrawing);
+}
 
 // Document-level move/up listeners for mouse-initiated drawing.
 // When startDrawing is triggered from a block's pointerdown (for mouse input),
@@ -6405,10 +6411,14 @@ paper.addEventListener('pointerdown', function(e) {
                   || document.querySelector('.content-area');
         }
 
-        if (editor && editor.isContentEditable !== false) {
+        if (editor) {
             const existingBlock = target && target.closest('.freeform-text-block');
             if (existingBlock) {
-                existingBlock.focus();
+                if (document.activeElement !== existingBlock) {
+                    existingBlock.focus();
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
                 return;
             }
 
@@ -6430,8 +6440,10 @@ paper.addEventListener('pointerdown', function(e) {
             sel.removeAllRanges();
             sel.addRange(range);
 
-            editor.focus();
             freeBlock.focus();
+            
+            e.preventDefault();
+            e.stopPropagation();
         }
         return;
     }
@@ -6801,6 +6813,8 @@ window.selectWritingTool = (tool, save = true) => {
             saveChapterToDB(chapter);
         }
     }
+
+    window.updateEditorEditableState();
 };
 
 
@@ -7959,6 +7973,23 @@ function saveSketchToCloud() {
     }
 }
 
+window.updateEditorEditableState = () => {
+    const editors = document.querySelectorAll('.content-area');
+    const isBeautification = ['patrick', 'shock', 'indie'].includes(activeSketchTool);
+    const shouldBeEditable = !isReadMode && !isSketchMode && !isBeautification && !isStickerMode;
+    
+    editors.forEach(e => {
+        e.contentEditable = shouldBeEditable ? 'true' : 'false';
+    });
+};
+
+window.setPencilColor = (color) => {
+    customStrokeStyle = color;
+    activeSketchTool = 'custom';
+    if (!isSketchMode) toggleSketchMode();
+    window.updateEditorEditableState();
+};
+
 window.toggleSketchMode = () => {
     // Exit lasso mode if active (mutual exclusion)
     if (lassoSelector && lassoSelector.isActive) {
@@ -7970,14 +8001,15 @@ window.toggleSketchMode = () => {
     isSketchMode = !isSketchMode;
     document.body.classList.toggle('sketch-mode', isSketchMode);
     document.getElementById('sketchToggle').classList.toggle('active', isSketchMode);
-    const editors = document.querySelectorAll('.content-area');
-    editors.forEach(e => e.contentEditable = !isSketchMode);
-
-    if (!isSketchMode) {
+    
+    if (isSketchMode) {
+        window.updateEditorEditableState();
+    } else {
         activeSketchTool = window._currentWritingTool || 'natural';
         // Auto-disable eraser when exiting sketch mode
         const eraserBtn = document.getElementById('eraserBtn');
         if (eraserBtn) eraserBtn.classList.remove('active');
+        selectWritingTool(activeSketchTool, false);
     }
     showToast(isSketchMode ? "Finger Sketching Enabled" : "Writing Enabled");
 };
@@ -13051,6 +13083,11 @@ function executeLoadChapterLogic(chapter, id, highlightQuery = '') {
     // Render Backlinks (Linked Mentions) for this active page
     if (typeof window.renderBacklinks === 'function') {
         setTimeout(window.renderBacklinks, 50);
+    }
+
+    // Sync editor editable state
+    if (typeof window.updateEditorEditableState === 'function') {
+        window.updateEditorEditableState();
     }
 };
 
