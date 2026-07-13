@@ -1,4 +1,4 @@
-const CACHE_NAME = 'academic-notebook-v3';
+const CACHE_NAME = 'academic-notebook-v4';
 
 // We explicitly cache ONLY the main shell files.
 // Additional files requested during runtime will be added dynamically.
